@@ -6,16 +6,27 @@ body:
   - type: markdown
     attributes:
       value: |
-        The easiest way to report is from the copier itself: **Problem? Report it** at the bottom of the panel. It
-        fills in this form and saves a report file for you to attach below.
+        The easiest way to report is from the copier itself: **⋯ → Report a problem** (or **Get help** next to a
+        problem in the panel). It fills in this form and saves a report file for you to attach below.
   - type: input
     id: version
     attributes:
       label: Copier version
-      description: Shown in the panel's update bar and under Settings → Updates.
-      placeholder: "0.25.0"
+      description: Shown in the panel's bottom bar, e.g. v0.38.0.
+      placeholder: "0.38.0"
     validations:
       required: true
+  - type: dropdown
+    id: browser
+    attributes:
+      label: Browser
+      description: Every release is tested on Chrome. If it only happens in another browser, please say so.
+      options:
+        - Chrome
+        - Edge
+        - Brave
+        - Firefox
+        - Other
   - type: textarea
     id: what-happened
     attributes:

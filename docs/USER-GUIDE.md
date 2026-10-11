@@ -14,6 +14,9 @@ your own logged-in browser session: nothing logs in on your behalf, and it only 
 
 ## 1. Install
 
+**Use Chrome on a computer.** It's the recommended browser: every release is tested on Chrome before it ships.
+Edge and Brave are built on Chrome and behave the same. Firefox works, but isn't tested the same way.
+
 1. Install the **Tampermonkey** browser extension from your browser's official store:
    [Chrome / Brave](https://chromewebstore.google.com/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo), [Edge](https://microsoftedge.microsoft.com/addons/detail/tampermonkey/iikmkjmpaadaobahmlepeloendndfphd) or [Firefox](https://addons.mozilla.org/firefox/addon/tampermonkey/). Use those store pages, not download buttons on other
    sites (some are ads for unrelated software). In Chrome, Edge or Brave,

@@ -39,7 +39,9 @@ trades a size scaled to its own account.
 
 ## Getting it running
 
-You need a desktop browser (Chrome, Edge, Brave or Firefox). Five steps, about five minutes:
+**Use Chrome on a computer.** It's the recommended browser: every release is tested on Chrome before it ships. Edge
+and Brave are built on Chrome and behave the same. Firefox works, but isn't tested the same way. Five steps, about five
+minutes:
 
 1. **Add Tampermonkey from your browser's store.** It's free; click **Add** on the store page.
    - Chrome or Brave: [Chrome Web Store](https://chromewebstore.google.com/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo)
@@ -114,6 +116,7 @@ your version and the API budget (click it for Vest's build and the site check).
 | "did NOT fill" in the log | Vest accepted the order but didn't execute it, usually not enough margin for that size. The margin bar on the Trade tab shows how much fits. |
 | Breakeven stays grey | Price has to be clear of your entry first (Vest refuses a stop the price has already passed). Hover it for the reason. |
 | Amber status dot | Vest updated its site and the copier is checking itself. Give it a few seconds. If it says copying is off, send the Diag file and use Vest's own panel until an update. |
+| Something looks off on Firefox | Try the same thing in Chrome. Every release is tested on Chrome; if it only happens on Firefox, say so in your report. |
 | Need a hand | Ask in the [Discord](https://discord.gg/Aa69y9KnM3). |
 | Anything else | **⋯ → Report a problem** (or **Get help** next to a problem). It saves a report file and opens a pre-filled [GitHub issue](https://github.com/xAmped/Vest-Copier/issues); drag the file in. The file has sizes, prices and balances but no login data. |
 
