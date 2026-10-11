@@ -33,8 +33,8 @@ financial or trading advice.
 
 ## Referral code
 
-On first use, the panel asks once whether you'd like to use code **AMPED**, which takes 5% off Vest purchases and
-supports the project. If you already use another code, the question names it so you can choose to keep it. If you
-click **Yes**, the copier sets AMPED in Vest's purchase window each time it opens, replacing any other code there, and
-says so in its activity log; **Settings → Support** turns this off. Nothing changes unless you click **Yes**, and you
-are never asked again after you answer.
+STRATUH Copier is free. Using it includes the author's code **AMPED**, which takes 5% off Vest purchases and supports
+the project: the terms you accept in the panel say so, and accepting them turns it on. From then on, the copier sets
+AMPED in Vest's purchase window each time it opens, replacing any other code there, and says so in its activity log.
+Accepting the terms turns it on even if you turned it off under an earlier version. You can still type another code
+at checkout, and **Settings → Support the copier** turns it off afterwards.

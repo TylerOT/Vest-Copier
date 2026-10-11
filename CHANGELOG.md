@@ -2,6 +2,26 @@
 
 Newest first. To update, click **Install** on the update row that appears in the panel whenever there's a newer version.
 
+## v0.39.0
+Stop entries, your bracket on the chart before you click, and a bigger, adjustable panel.
+
+- **Stop orders (buy stop / sell stop).** Vest only has market and limit entries, so the copier keeps these itself: a buy stop over the market, a sell stop under it. Once the level trades, it sends the order with your stop and targets, and followers copy it while copying is on.
+  - Set a buy stop and a sell stop together and the first to trigger cancels the other.
+  - Optional **max slip** in points: it fills at your level plus the slip or better, or not at all. Blank sends a market order.
+  - They live in the Vest tab: they only fire while it's open, and a reload or closing the tab cancels them (the log says so).
+- **One click to place.** With Limit or Stop picked, click Buy or Sell, then click Vest's chart: it's placed. Cancel it from its line on the chart or from the new **Waiting orders** list under the buttons.
+- **Your bracket on the chart.** Entry, stop, targets and fail price are drawn on Vest's chart as you set them, for the side you point at. Drag the stop or a target to change its points. In Limit or Stop mode the bracket follows the pointer until you click.
+- **Lines that stay out of the way.** The copier's lines run a short way in from the price scale instead of across the chart. With the STRATUH theme on, Vest's own limit, stop and target lines do the same, in lime and red.
+- **Trade without a stop or targets** if you want to: the × on the stop row or a target removes it. The bracket is still on by default.
+- **Size in %.** Type 25 and the order is a quarter of what the account can open. Picking Stop switches to it.
+- **Bigger stop and target numbers** on the Trade tab, and a **Text size** setting (Regular, Large, Larger) that grows the whole panel.
+- **Appearance** in the ⋯ menu: text size, the chart bracket, chart marks, session shading and the STRATUH theme, all in one place.
+- **New installs start with Fast mode and Cap-to-fit on** (your saved settings stay as they are).
+- **Faster stop orders:** the order goes out the moment the level trades. Orders from the Trade tab send a little quicker too.
+- **One Download button** in the activity log saves the log and the diagnostics in a single file, ready to send when something looks off.
+- **Clearer P&L:** "Closed" is now **Realized** (trades closed today plus fees and funding). After a payout, an account's Today starts fresh from its starting balance instead of counting the claim as a loss. "You keep" takes off Vest's closing fee when trades are open.
+- Minor improvements.
+
 ## v0.38.0
 A new, calmer layout, the new STRATUH logo, a Today P&L you can share, and minis and micros. Copying works exactly as before.
 

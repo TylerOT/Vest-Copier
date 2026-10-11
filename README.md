@@ -29,8 +29,8 @@ New here? Start with the [10-minute tutorial video](https://youtu.be/mFJGsJ0IInY
 
 Balances, P&L and fills update live, straight from Vest's own feed, and an account that fails drops out by itself.
 
-Follower sizes copy 1:1 by default. Turn on Cap-to-fit if your followers are smaller than the master, and each one
-trades a size scaled to its own account.
+Followers size to their own account by default (Cap-to-fit): a smaller account trades a smaller size. Same-size
+accounts trade the same size. Switch to strict 1:1 in Edit if you want identical contracts everywhere.
 
 > [!WARNING]
 > These are live orders on real accounts. While it's copying, whatever you do on the master happens on every
@@ -89,19 +89,22 @@ copying** and a red **Flatten all** under it on every tab. Then three tabs:
 |---|---|
 | **Copier** | Your master, the followers and anyone left out, one line each with the room left to the floor. **Edit** picks them. |
 | **Trade** | An order ticket in points for the market Vest is showing (details below). |
-| **P&L** | Today's P&L and since start, what you keep after each profit split, **Share** (a picture of your day, or of any profitable trade from the last 30 days, to paste anywhere), and **Claim all profit** in one preview and one confirm. |
+| **P&L** | Today's P&L (a payout starts an account fresh) and since start, what you keep after each profit split, **Share** (a picture of your day, or of any profitable trade from the last 30 days, to paste anywhere), and **Claim all profit** in one preview and one confirm. |
 
-The **⋯** menu has **Settings** (fast mode, auto-flatten, cap-to-fit, the chart, updates, the AMPED code switch),
-**Help and rules** (the risk notice, the Discord, the guides), **Report a problem**, docking and reload.
+The **⋯** menu has **Settings** (fast mode, auto-flatten, cap-to-fit, updates, the AMPED code switch),
+**Appearance** (text size, what's drawn on the chart, the theme), **Help and rules** (the risk notice, the Discord, the
+guides), **Report a problem**, docking and reload.
 
 **On the Trade tab:**
 
 - **Margin and risk bars:** how much of Vest's buying power you're using, and what your stop would cost against the
   room to your floor, before you click.
 - **One price ladder:** targets, entry, stop and fail price in a single table, for the side you point at (Buy or Sell).
-- **Sizing:** contracts, dollars at risk, or the max the account allows. On NQ, ES and RTY, in units, **micros** or
-  **minis**, like Vest's own order form.
-- **Market or Limit:** with Limit, click Vest's chart for the price, then Place.
+  The same bracket is drawn on Vest's chart as you set it; drag a line to change it. The stop and targets are optional.
+- **Sizing:** contracts, dollars at risk, a % of the max, or the max the account allows. On NQ, ES and RTY, in units,
+  **micros** or **minis**, like Vest's own order form.
+- **Market, Limit or Stop:** with Limit or Stop, one click on Vest's chart places it. Stop orders (a buy stop over the
+  market, a sell stop under it) are kept by the copier, since Vest doesn't have them: they fire while the Vest tab is open.
 - **In a trade:** your stop, entry, price and targets on one bar, Breakeven, Close, and scaling in or out: pick 25, 50
   or 100% of the position (or MAX, the most you can add), then Add or Reduce. Your stop and targets stay where they are.
 
@@ -117,6 +120,8 @@ your version and the API budget (click it for Vest's build and the site check).
 - It won't copy closes Vest makes by itself, such as a stop filling or a drawdown breach on the master. The log tells
   you what Vest did, and a follower still in the trade a few seconds later gets a Flatten / Keep prompt.
 - It won't move your stop or targets when you add or reduce. Move them yourself on the chart.
+- It won't keep a stop order once its Vest tab is closed or reloaded: stop orders live in the tab (the log says when
+  one is cancelled). Vest's own orders (market, limit, your stop and targets) stay on Vest either way.
 - It won't let you change the master, followers or Cap-to-fit while copying, or start in a second Vest tab while one
   is already copying. Stop first.
 - It won't start right after Vest changes its website until its quick read-only check has passed (it runs by itself
@@ -131,7 +136,7 @@ your version and the API budget (click it for Vest's build and the site check).
 | Start copying refuses | The log names the account and the reason, usually a resting order or an opposite position. Clear it on Vest and start again. |
 | "did NOT fill" in the log | Vest accepted the order but didn't execute it, usually not enough margin for that size. The margin bar on the Trade tab shows how much fits. |
 | Breakeven stays grey | Price has to be clear of your entry first (Vest refuses a stop the price has already passed). Hover it for the reason. |
-| Amber status dot | Vest updated its site and the copier is checking itself. Give it a few seconds. If it says copying is off, send the Diag file and use Vest's own panel until an update. |
+| Amber status dot | Vest updated its site and the copier is checking itself. Give it a few seconds. If it says copying is off, send the file from the log's **Download** and use Vest's own panel until an update. |
 | Something looks off on Firefox | Try the same thing in Chrome. Every release is tested on Chrome; if it only happens on Firefox, say so in your report. |
 | Need a hand | Ask in the [Discord](https://discord.gg/Aa69y9KnM3). |
 | Anything else | **⋯ → Report a problem** (or **Get help** next to a problem). It saves a report file and opens a pre-filled [GitHub issue](https://github.com/xAmped/Vest-Copier/issues); drag the file in. The file has sizes, prices and balances but no login data. |
@@ -147,9 +152,10 @@ the page reloads with the new version. The [changelog](CHANGELOG.md) lists what 
 The copier doesn't cost anything. I keep it running in my spare time, so if you were going to buy a Vest evaluation anyway,
 code **AMPED** takes 5% off and sends a small commission my way.
 
-You'll be asked about it once. If you agree, the copier enters AMPED in the discount field of Vest's checkout window
-whenever it opens, replacing any code that was there, and logs the change. If your account already uses a code, the
-question names it so you can decline. Settings → Support the copier turns the switch off.
+It's part of the terms you accept when you first open the panel (and again when the terms change): from then on, the
+copier enters AMPED in the discount field of Vest's checkout window whenever it opens, replacing any code that was
+there, and logs the change. You can still type another code at checkout, and Settings → Support the copier turns it
+off.
 
 ## Privacy
 

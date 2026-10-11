@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Vest Copier
 // @namespace    vestcopier
-// @version      0.38.0
+// @version      0.39.0
 // @description  Copies a master Vest account's trades to your other Vest accounts, live, and adds a points-based order panel.
 // @author       xAmped
 // @license      STRATUH Copier License — free to use, no selling; see LICENSE
@@ -36,7 +36,7 @@
     })(),
   };
 
-  const VERSION = '0.38.0';
+  const VERSION = '0.39.0';
   const API = 'https://api-gateway.hz.vestmarkets.com';
   const _fetch = window.fetch.bind(window);
   // Console echo of the activity log, for troubleshooting: localStorage.setItem('vc-debug', '1') and reload.
@@ -107,8 +107,6 @@
     arming: false, // an arm is in progress
     update: null, // { state, latest, dismissed } from the GitHub version check
     checkUpdates: true, // look for new versions on GitHub
-    supportOffer: false, // the one-time "support with code AMPED" question is showing
-    supportCurrent: null, // the code the account already uses, named in that question
     ackThenArm: false, // ARM was clicked before the terms were accepted
     supportOpen: false, // the Support tab is showing
     placing: false, // a trade-panel order is in flight
@@ -122,19 +120,23 @@
     trade: {
       // trade-panel settings (persisted, except live price)
       symbol: DEFAULT_SYMBOL,
-      sizeMode: 'qty',
+      sizeMode: 'qty', // qty, risk ($ at the stop), pct (a share of the max) or max
       qty: 1,
       risk: 50,
+      pct: 25, // sizeMode pct: this % of the most the account can open (Vest's 100%)
       stopPts: 20,
-      targets: [20, 40, 60],
+      stopOn: true, // false: the trade goes in without a stop (the stop box is kept for when it comes back)
+      targets: [20, 40, 60], // empty: no targets
       scale: 'even',
       beMode: 'tp1',
       beTrigger: 15,
       beOffset: 0,
-      orderType: 'market', // market, or limit (the price picked on the chart)
+      orderType: 'market', // market, limit (the price picked on the chart) or stop (a stop entry, watched by the copier)
+      slipPts: '', // stop entries: the most points past the level a fill may be ('' = a market order)
       unit: null, // NQ / ES / RTY: 'units' | 'micro' | 'mini' (null: Vest's own choice)
     },
     price: {}, // symbol -> { px, at } live price
+    stopEntries: [], // stop entries waiting in this tab (see addStopEntry)
   };
   // Per-symbol order rules, refreshed from /v3/exchangeInfo at load (NDX-USD-PERP: tick 0.25, 4 size decimals).
   // Contracts are linear (notional = price × quantity), so P&L is $1 per point per contract.
@@ -599,6 +601,14 @@
       if (it.state === 'active') pos.triggers.push({ id: it.id, kind, price: num(it.trigger_price) });
     }
     if (d.orders_collateral != null && num(d.orders_collateral) >= 0) st.ordersCollateral = num(d.orders_collateral);
+    // resting limits: placed ones join the list, filled or cancelled ones leave it
+    for (const o of d.orders || []) {
+      const lo = limitOrderOf(o);
+      if (!lo) continue;
+      st.orders = (st.orders || []).filter((x) => x.id !== lo.id);
+      if (['pending', 'accepted', 'partially_filled'].includes(o.status) && !(num(o.executed_quantity) >= lo.qty))
+        st.orders.push(lo);
+    }
     const fb = d.final_balance;
     if (fb && num(fb.amount) >= 0) {
       const v = parseInt(fb.balance_version, 10);
@@ -630,7 +640,10 @@
         why = cause(pid);
       if (closed && S.plans[pid]) endPlan(S.plans[pid], 'Breakeven: trade closed — stopped watching.');
       if (why === 'ours') continue; // this tab sent it: the copier already copied it
-      noteVestClose({ id, symbol: p.symbol, why, closed, pnl: num(p.pnl), qty: num(p.quantity) });
+      // closed at size 0: an order that never filled (an immediate-or-cancel limit that missed, a limit cancelled on
+      // Vest), not a trade closing, so nothing to report; the bookkeeping below still runs
+      if (!(closed && !(num(p.quantity) > 0)))
+        noteVestClose({ id, symbol: p.symbol, why, closed, pnl: num(p.pnl), qty: num(p.quantity) });
       const entry = S.posMap[pid];
       if (entry && closed) masterClosedByVest(pid, entry, why);
       else if (entry) entry.qty = fmtQty(num(p.quantity), entry.symbol); // a sized target filled: the copy keeps its share
@@ -726,6 +739,8 @@
       amt = num(d.trader_amount != null ? d.trader_amount : d.amount),
       from = d.account_id && S.byId[d.account_id] ? ` from ${accLabel(d.account_id)}` : '';
     diag('claim_event', { status: st, ...(d.account_id ? who(d.account_id) : {}), amount: isNaN(amt) ? null : amt });
+    if (st === 'REFUNDED' || st === 'FAILED') forgetPayout(d.account_id);
+    else notePayout(d.account_id); // a claim made anywhere starts the account fresh for Today
     if (st === 'EXECUTED') logEvent('ok', `Vest paid a profit claim${from}${amt > 0 ? `: ${money(amt)}` : ''}.`);
     else if (st === 'REFUNDED' || st === 'FAILED')
       logEvent(
@@ -1005,8 +1020,21 @@
   const isFunded = (r) => r.accountType === 3;
   // Vest pays each claim cut down to the cent ($122.97 at 80% pays $98.37), so the shares are too.
   const centsDown = (n) => Math.floor(n * 100 + 1e-6) / 100;
-  const keepOf = (r) =>
-    isFunded(r) && r.split > 0 && r.equity > r.size ? centsDown((r.equity - r.size) * r.split) : 0;
+  // With trades open, closing them first costs Vest's closing fee (taker fee × size × price), so it comes off; slippage
+  // on the close can't be known ahead and isn't counted.
+  const closeFeeOf = (r) => {
+    const st = S.acctState && S.acctState[r.id];
+    if (!st || !Array.isArray(st.positions)) return 0;
+    return st.positions.reduce((a, p) => {
+      const m = SYMBOLS[p.symbol],
+        px = priceOf(p.symbol) || p.openPrice;
+      return a + (m && m.takerFee > 0 && px > 0 ? p.qty * px * m.takerFee : 0);
+    }, 0);
+  };
+  const keepOf = (r) => {
+    const profit = r.equity - closeFeeOf(r) - r.size;
+    return isFunded(r) && r.split > 0 && profit > 0 ? centsDown(profit * r.split) : 0;
+  };
 
   // keep balances / room fresh
   let _balTimer = null;
@@ -1033,7 +1061,24 @@
         (sum, o) => (o.reduceOnly || o.reduce_only ? sum : sum + (num(o.collateral) || 0)),
         0,
       ),
+      orders: ((ord && ord.orders) || []).map(limitOrderOf).filter(Boolean),
       at: Date.now(),
+    };
+  }
+  // A resting limit entry (not a reduce), from Vest's REST list (camelCase or snake_case) or its feed: the Trade tab lists
+  // the master's with a cancel button. Anything else is null.
+  function limitOrderOf(o) {
+    if (!o) return null;
+    const id = o.orderId || o.order_id || o.id,
+      type = o.orderType || o.order_type;
+    if (!id || type !== 'limit' || o.reduceOnly || o.reduce_only) return null;
+    const side = String(o.side || '').toLowerCase();
+    return {
+      id,
+      symbol: o.symbol,
+      isBuy: o.isBuy === true || side === 'buy' || side === 'long',
+      price: num(o.price),
+      qty: num(o.quantity),
     };
   }
   // Mark prices for these symbols: the live feed when it's fresh, else one public ticker read.
@@ -2407,6 +2452,7 @@
     _armEpoch++; // an arm in progress would adopt positions that are being closed
     S.orphan = null;
     Object.values(S.plans).forEach((p) => endPlan(p, null)); // nothing left for breakeven to manage
+    cancelStopEntries('Flatten All.'); // nothing new opens either
     render();
     logEvent(
       'warn',
@@ -2491,19 +2537,20 @@
   /**
    * Turn point distances into trigger prices from an entry price.
    * long: stop below, targets above · short: stop above, targets below. Targets must be increasing distances.
+   * `stopPts: null` is a trade without a stop (stop: null); an empty `targetPts` is one without targets.
    */
   function planPrices({ side, entry, stopPts, targetPts, tick }) {
     if (!(entry > 0)) return { error: 'No live price yet' };
-    if (!(stopPts > 0)) return { error: 'Stop must be above zero points' };
-    if (!targetPts.length) return { error: 'Add at least one target' };
+    const noStop = stopPts === null;
+    if (!noStop && !(stopPts > 0)) return { error: 'Stop must be above zero points' };
     for (let i = 0; i < targetPts.length; i++) {
       if (!(targetPts[i] > 0)) return { error: `Target ${i + 1} must be above zero points` };
       if (i && !(targetPts[i] > targetPts[i - 1])) return { error: `Target ${i + 1} must be further than target ${i}` };
     }
     const dir = side === 'long' ? 1 : -1;
-    const stop = roundTick(entry - dir * stopPts, tick),
+    const stop = noStop ? null : roundTick(entry - dir * stopPts, tick),
       targets = targetPts.map((p) => roundTick(entry + dir * p, tick));
-    if (!(stop > 0)) return { error: 'The stop would be at or below zero: use fewer points' };
+    if (!noStop && !(stop > 0)) return { error: 'The stop would be at or below zero: use fewer points' };
     const bad = targets.findIndex((x) => !(x > 0));
     if (bad >= 0) return { error: `Target ${bad + 1} would be at or below zero: use fewer points` };
     return { stop, targets };
@@ -2586,6 +2633,18 @@
    */
   const unitStep = (step, micro, unit) =>
     micro > 0 && unit === 'micro' ? micro : micro > 0 && unit === 'mini' ? micro * 10 : step;
+  /**
+   * Stop entries (a buy stop above the price, a sell stop below), which Vest doesn't have: the copier watches the price
+   * and sends the order itself. `stopEntryHit`: has the price reached the level? `stopEntryLimit`: with a max slip, the
+   * worst price an immediate-or-cancel limit may fill at (the level plus the slip for a buy, minus for a sell, on the
+   * tick toward the level, so never more slip than asked); without one (0 or blank), null: a market order.
+   */
+  const stopEntryHit = (side, level, px) => px > 0 && level > 0 && (side === 'long' ? px >= level : px <= level);
+  const stopEntryLimit = ({ side, level, slipPts, tick }) => {
+    if (!(slipPts > 0) || !(level > 0)) return null;
+    const n = (level + (side === 'long' ? 1 : -1) * slipPts) / tick;
+    return +((side === 'long' ? Math.floor(n + 1e-9) : Math.ceil(n - 1e-9)) * tick).toFixed(decimalsOf(tick));
+  };
   /** What a stop-out costs from the price now: the move to the stop on the whole position, plus both fees. */
   const stopOutLoss = ({ side, qty, price, stopPrice, openFee, takerFee }) =>
     (side === 'long' ? 1 : -1) * qty * (price - stopPrice) + (openFee || 0) + qty * stopPrice * (takerFee || 0);
@@ -2608,6 +2667,8 @@
       maxRiskForRoom,
       maxStopForRoom,
       unitStep,
+      stopEntryHit,
+      stopEntryLimit,
     };
 
   // ───────────────────────── live price (public market data, read-only) ─────────────────────────
@@ -2661,6 +2722,7 @@
   // Stop streaming symbols nothing needs any more, and close the socket when none are left.
   function unwatchUnused() {
     const need = new Set(Object.values(S.plans || {}).map((p) => p.symbol));
+    for (const e of S.stopEntries || []) need.add(e.symbol);
     if (S.tradeOpen) need.add(S.trade.symbol);
     for (const sym of heldSymbols()) need.add(sym); // live P&L of every open position
     for (const sym of [..._wsSyms]) if (!need.has(sym)) _wsSyms.delete(sym);
@@ -2715,9 +2777,14 @@
       _wsDog = setInterval(() => {
         // quiet for 3× the staleness limit: reconnect
         if (Date.now() - _wsLastMsg < 3 * PRICE_STALE_MS) return;
-        if (Object.keys(S.plans || {}).length && !_feedWarned) {
+        const be = Object.keys(S.plans || {}).length > 0,
+          se = (S.stopEntries || []).length > 0;
+        if ((be || se) && !_feedWarned) {
           _feedWarned = true;
-          logEvent('warn', 'Live price feed lost — breakeven is paused until it reconnects.');
+          logEvent(
+            'warn',
+            `Live price feed lost — ${be && se ? 'breakeven and stop entries are' : be ? 'breakeven is' : 'stop entries are'} paused until it reconnects.`,
+          );
         }
         try {
           ws.close();
@@ -2940,12 +3007,12 @@
     if (!m || typeof m !== 'object') return null;
     const out = {},
       ok = (v) => typeof v === 'number' && Number.isFinite(v) && v >= 0;
-    for (const k of ['qty', 'risk', 'stopPts', 'beTrigger', 'beOffset']) if (ok(m[k])) out[k] = m[k];
-    if (['qty', 'risk', 'max'].includes(m.sizeMode)) out.sizeMode = m.sizeMode;
+    for (const k of ['qty', 'risk', 'pct', 'stopPts', 'beTrigger', 'beOffset']) if (ok(m[k])) out[k] = m[k];
+    if (['qty', 'risk', 'pct', 'max'].includes(m.sizeMode)) out.sizeMode = m.sizeMode;
     if (['even', 'start', 'end'].includes(m.scale)) out.scale = m.scale;
     if (['units', 'micro', 'mini'].includes(m.unit)) out.unit = m.unit;
-    if (Array.isArray(m.targets) && m.targets.length && m.targets.every((x) => ok(+x) && +x > 0))
-      out.targets = m.targets.map(Number);
+    if (typeof m.stopOn === 'boolean') out.stopOn = m.stopOn;
+    if (Array.isArray(m.targets) && m.targets.every((x) => ok(+x) && +x > 0)) out.targets = m.targets.map(Number);
     return out;
   }
   function switchMarket(sym) {
@@ -2956,7 +3023,9 @@
       sizeMode: t.sizeMode,
       qty: t.qty,
       risk: t.risk,
+      pct: t.pct,
       stopPts: t.stopPts,
+      stopOn: t.stopOn,
       targets: [...t.targets],
       scale: t.scale,
       beTrigger: t.beTrigger,
@@ -2992,6 +3061,11 @@
       checkPlans(sym, px);
     } catch (e) {
       diag('breakeven', { outcome: 'error', error: e.message });
+    }
+    try {
+      if (S.stopEntries.length) checkStopEntries(sym, px);
+    } catch (e) {
+      diag('stop_entry', { outcome: 'error', error: e.message });
     }
     try {
       tickEquity(sym);
@@ -3330,6 +3404,7 @@
   function setMaster(id) {
     if (S.arming) return toast('Wait for copying to start.');
     if (S.armed) return toast(LOCKED_MSG);
+    if (S.stopEntries.length) cancelStopEntries('the master account changed.');
     S.master = S.master === id ? null : id;
     S.followers.delete(id);
     // the same-size rule applies only in strict 1:1; with cap-to-fit, followers may be any size (scaled by equity)
@@ -3396,7 +3471,7 @@
       : [];
   }
   // The risk acknowledgement is versioned: raising TERMS_VERSION asks everyone to accept the new terms once.
-  const TERMS_VERSION = 2;
+  const TERMS_VERSION = 3; // 3 (v0.39): the support code is part of the terms
   function loadAck() {
     const a = store.get(ACK_KEY, null);
     S.ack = !!(a && typeof a === 'object' && a.v >= TERMS_VERSION);
@@ -3404,17 +3479,22 @@
   function saveAck() {
     store.set(ACK_KEY, { v: TERMS_VERSION, at: new Date().toISOString() });
   }
+  // Text size: the whole panel scales (CSS zoom), so the layout stays the same, only bigger.
+  const TEXT_ZOOM = { regular: 1, large: 1.15, larger: 1.3 };
+  const zoomOf = () => TEXT_ZOOM[S.textSize] || 1;
   function loadOpts() {
     const o = store.get(OPTS_KEY, {}) || {};
-    S.fast = !!o.fast;
+    S.fast = o.fast !== false; // on by default (v0.39); a saved choice stays as it is
     S.autoFlatten = !!o.autoFlatten;
-    S.capFit = !!o.capFit;
+    S.capFit = o.capFit !== false; // on by default (v0.39); a saved choice stays as it is
     S.checkUpdates = o.checkUpdates !== false; // on by default
     S.hideMarks = o.hideMarks !== false; // on by default: Vest's buy/sell marks come back on every load otherwise
     S.tradeOnly = o.tradeOnly !== false; // the panel shows on Vest's Trade page only (it runs on every page)
     S.hideSessions = o.hideSessions !== false; // Vest's pre-market / after-hours / overnight bands on the chart
     S.theme = o.theme !== false; // STRATUH colours for Vest's own page and chart (on by default; introduced once)
     S.themeDown = o.themeDown === 'red' ? 'red' : 'mono'; // shorts and losses on Vest's page: grey (DeepCharts) or red
+    S.textSize = TEXT_ZOOM[o.textSize] ? o.textSize : 'regular'; // the panel's size: regular, large, larger
+    S.chartBracket = o.chartBracket !== false; // the Trade tab draws the bracket on Vest's chart (on by default)
   }
   function saveOpts() {
     const o = {
@@ -3427,6 +3507,8 @@
       tradeOnly: S.tradeOnly,
       theme: S.theme,
       themeDown: S.themeDown,
+      textSize: S.textSize,
+      chartBracket: S.chartBracket,
     };
     diag('settings', o);
     store.set(OPTS_KEY, o);
@@ -3438,7 +3520,8 @@
     Object.assign(S.trade, cleanMarket(t), {
       symbol: SYMBOLS[t.symbol] ? t.symbol : S.trade.symbol, // another market comes back via followVestMarket
       ...(['off', 'tp1', 'points'].includes(t.beMode) ? { beMode: t.beMode } : {}),
-      ...(['market', 'limit'].includes(t.orderType) ? { orderType: t.orderType } : {}),
+      ...(['market', 'limit', 'stop'].includes(t.orderType) ? { orderType: t.orderType } : {}),
+      ...(t.slipPts === '' || (typeof t.slipPts === 'number' && t.slipPts >= 0) ? { slipPts: t.slipPts } : {}),
     });
   }
   function saveTrade() {
@@ -3507,13 +3590,6 @@
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
-  function downloadLog() {
-    const rows = [...S.log].reverse();
-    const csv =
-      `time,level,message\n${new Date().toISOString()},info,"Exported from STRATUH Copier v${VERSION} (Vest build ${fingerprint() || 'unknown'})"\n` +
-      rows.map((e) => `${e.t.toISOString()},${e.level},"${String(e.msg).replace(/"/g, '""')}"`).join('\n');
-    saveFile(`vest-copier-log-${stamp()}.csv`, 'text/csv', csv);
-  }
   let _toast = '';
   function toast(m) {
     _toast = m;
@@ -3567,17 +3643,20 @@
     persistDiagSoon();
     return rec;
   }
+  // The log's Download (and the site check's): one file with the diagnostics and the activity log together (two
+  // downloads from one click get the second blocked by Chrome unless the site is allowed several).
   function downloadDiag() {
     persistDiag();
+    logEvent('info', `Diagnostics exported (${S.diag.length} records, with the activity log).`);
     const payload = {
       exportedAt: new Date().toISOString(),
       version: VERSION,
       build: fingerprint() || null,
       records: S.diag.length,
       diagnostics: S.diag,
+      log: [...S.log].reverse().map((e) => ({ t: e.t.toISOString(), level: e.level, msg: e.msg })), // oldest first
     };
     saveFile(`vest-copier-diagnostics-${stamp()}.json`, 'application/json', JSON.stringify(payload, null, 2));
-    logEvent('info', `Diagnostics exported (${S.diag.length} records).`);
   }
 
   // ───────────────────────── health ─────────────────────────
@@ -3780,7 +3859,8 @@
   // Reload for an update only once nothing is in flight (an order, a stop move, a claim, Flatten All, arming).
   const busyNow = () =>
     !!(S.placing || S.adjusting || S.flattening || S.arming || claimBusy()) ||
-    Object.values(S.plans).some((p) => p.busy);
+    Object.values(S.plans).some((p) => p.busy) ||
+    S.stopEntries.length > 0; // a reload would cancel them
   function reloadWhenIdle() {
     if (busyNow()) return setTimeout(reloadWhenIdle, 500);
     location.reload();
@@ -3805,12 +3885,11 @@
     else reloadWhenIdle();
   });
 
-  // ───────────────────────── support (optional referral code) ─────────────────────────
-  // Asked once, after the terms are accepted: "Support the free copier with code AMPED?" If the account already uses
-  // another code, the question names it, so switching is the user's informed choice. Yes tries Vest's own referral-join
-  // call (the one behind Vest's "Have a Referral Code?" dialog); if Vest won't link it, the user is told to enter the
-  // code once in the purchase window's discount box (and it's put on the clipboard). No records the answer and it is
-  // never asked again. Nothing changes without the click; an account already using AMPED is never asked.
+  // ───────────────────────── support (the author's code) ─────────────────────────
+  // The copier is free; in return its terms (TERMS_VERSION 3) say it enters the author's code AMPED in Vest's purchase
+  // window. Accepting the terms turns that on, whatever was answered before (and tries Vest's own referral-join call,
+  // the one behind its "Have a Referral Code?" dialog). Settings → Support the copier still turns it off afterwards,
+  // and that is kept. Every switch at checkout is announced in the log.
   const SUPPORT_CODE = 'AMPED';
   const SUPPORT_DEBUG = false; // test builds: log each step of the purchase-window switch in the activity log
   const supportStep = (msg) => SUPPORT_DEBUG && logEvent('info', '[code test] ' + msg);
@@ -3834,18 +3913,17 @@
       return null;
     }
   }
-  async function maybeOfferSupport() {
-    if (!S.ack || supportAnswer() || !userTokenOk()) return;
-    const code = await attachedRefCode(); // null when it can't be read: ask without naming a current code
+  // On accepting the terms (`accepted`): the code is on, whatever was answered before. On each load after that: on unless
+  // the switch was turned off since. An account already using AMPED hides the bottom bar's code link.
+  async function supportOnTerms(accepted = false) {
+    if (!S.ack) return;
+    if (accepted || !supportAnswer()) acceptSupport();
+    if (!userTokenOk()) return;
+    const code = await attachedRefCode();
     if (code && code.toUpperCase() === SUPPORT_CODE) {
-      saveSupport('had-code'); // already supporting
       const link = _root && _root.querySelector('[data-act="code"]');
       if (link) link.hidden = true;
-      return;
     }
-    S.supportCurrent = code || null;
-    S.supportOffer = true;
-    renderSupport();
   }
   // Put the code on the clipboard (the click that triggered this counts as the user gesture browsers ask for).
   const copySupportCode = () =>
@@ -3854,9 +3932,7 @@
       () => false,
     );
   async function acceptSupport() {
-    S.supportOffer = false;
     saveSupport('yes');
-    renderSupport();
     logEvent(
       'ok',
       `Thank you! ${SUPPORT_CODE} will be used in Vest's purchase window from now on (Settings → Support to turn off).`,
@@ -4031,11 +4107,6 @@
     diag('support', { outcome: 'apply-refused', restored: before || null });
   }
 
-  function declineSupport() {
-    S.supportOffer = false;
-    saveSupport('no');
-    renderSupport();
-  }
   // ── The STRATUH theme, introduced once: what changed on Vest's page and chart, Keep or Back to Vest's colours, and
   // where to change it later. Shown once the terms (and the one-time support question) are out of the way, and only
   // with Vest in dark mode, where the theme applies.
@@ -4044,17 +4115,13 @@
     const bar = _root && _root.querySelector('.themeintro');
     if (!bar) return;
     const due =
-      S.ack &&
-      S.theme &&
-      !S.supportOffer &&
-      !store.get(THEME_INTRO_KEY, null) &&
-      document.documentElement.classList.contains('dark');
+      S.ack && S.theme && !store.get(THEME_INTRO_KEY, null) && document.documentElement.classList.contains('dark');
     bar.hidden = !due;
     if (!due || bar.dataset.ready) return;
     bar.dataset.ready = '1';
     bar.innerHTML = `<span class="utext"><b>Vest is now in STRATUH colours.</b> Onyx and lime, grey shorts, losses and
         candles, square corners. The chart's buy/sell marks, session bands and the Volume indicator Vest adds are hidden
-        too. Change any of it in Settings → Chart.</span>
+        too. Change any of it in Appearance (the ⋯ menu).</span>
       <button class="ubtn" data-act="theme-keep">Keep it</button>
       <button class="ubtn ghost" data-act="theme-revert">Back to Vest's colours</button>`;
     const answer = (keep) => {
@@ -4065,7 +4132,7 @@
         applyTheme();
         logEvent(
           'info',
-          "STRATUH theme off: Vest's own colours are back (the chart after a refresh). Settings → Chart turns it on.",
+          "STRATUH theme off: Vest's own colours are back (the chart after a refresh). Appearance turns it on.",
         );
       }
       bar.hidden = true;
@@ -4073,25 +4140,6 @@
     };
     bar.querySelector('[data-act="theme-keep"]').onclick = () => answer(true);
     bar.querySelector('[data-act="theme-revert"]').onclick = () => answer(false);
-  }
-
-  function renderSupport() {
-    const bar = _root && _root.querySelector('.support');
-    if (!bar) return;
-    bar.hidden = !S.supportOffer;
-    if (!S.supportOffer || bar.dataset.ready) return;
-    bar.dataset.ready = '1';
-    const cur = S.supportCurrent ? esc(S.supportCurrent) : null;
-    const ask = cur
-      ? `You currently use code <b>${cur}</b>. Switch to <b>${SUPPORT_CODE}</b>?`
-      : `Use code <b>${SUPPORT_CODE}</b>?`;
-    bar.innerHTML = `<span class="utext"><b>STRATUH Copier is free.</b> ${ask} It takes <b>5% off</b> your Vest purchases
-        (the highest discount available) and helps keep the copier maintained until Vest releases its own. Yes sets
-        AMPED in Vest's purchase window from now on (Settings → Support turns it off). Asked only this once.</span>
-      <button class="ubtn" data-act="support-yes">${cur ? 'Yes, switch to' : 'Yes, use'} ${SUPPORT_CODE}</button>
-      <button class="ubtn ghost" data-act="support-no">${cur ? `Keep ${cur}` : 'No thanks'}</button>`;
-    bar.querySelector('[data-act="support-yes"]').onclick = acceptSupport;
-    bar.querySelector('[data-act="support-no"]').onclick = declineSupport;
   }
 
   // ───────────────────────── site check (run after Vest ships an update) ─────────────────────────
@@ -4501,6 +4549,7 @@
     S.supportOpen = false;
     S.summaryOpen = false;
     S.settingsOpen = false;
+    S.appearOpen = false;
     S.tradeOpen = false;
     const have = S.site && S.site.fp === fingerprint() && S.site.results.length;
     if (!have && !(S.site && S.site.running)) runSiteCheck();
@@ -5838,7 +5887,6 @@
     }
     /* Vest updated: the site check takes the body (the status block, alerts and the footer stay) */
     .panel.gated .tabs,
-    .panel.gated .support,
     .panel.gated .themeintro {
       display: none !important;
     }
@@ -7606,6 +7654,97 @@
     .panel.collapsed.attn-amber {
       border-color: var(--warn-line);
     }
+    /* ── v0.39: bigger stop and target numbers; the stop and targets are optional ── */
+    .tr-lh,
+    .tr-lr {
+      font-size: 12px;
+    }
+    .tr-in.tr-pt {
+      width: 46px;
+      font-size: 13.5px;
+      padding: 3px 5px;
+    }
+    .tr-n {
+      font-size: 11px;
+    }
+    .tr-q {
+      font-size: 10.5px;
+    }
+    .tr-g {
+      font-size: 11.5px;
+    }
+    .tr-mk .tr-mid,
+    .tr-en .tr-mid {
+      font-size: 10.5px;
+    }
+    .tr-fl .tr-mid,
+    .tr-ps .tr-mid {
+      font-size: 10px;
+    }
+    .tr-nostop,
+    .tr-none {
+      color: var(--faint);
+      font-family: var(--sans);
+      font-size: 11.5px;
+      white-space: nowrap;
+    }
+    .tr-nostop {
+      display: none;
+      align-items: center;
+      gap: 8px;
+    }
+    .tr-slr.off .tr-nostop {
+      display: inline-flex;
+    }
+    .tr-slr.off .tr-in,
+    .tr-slr.off .tr-q,
+    .tr-slr.off .tr-g,
+    .tr-slr.off .tr-x {
+      display: none;
+    }
+    .tr-slr.off .tr-n.sl {
+      opacity: 0.55;
+    }
+    .seg button.off {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+    /* long labels shrink instead of pushing the panel sideways */
+    .tr-f {
+      grid-template-columns: 52px minmax(0, 1fr);
+    }
+    .tr-f > .tr-row {
+      min-width: 0;
+    }
+    .tr-pickrow {
+      grid-template-columns: 84px minmax(0, 1fr) auto;
+    }
+    .tr-place,
+    .tr-sizeq {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .tr-f[hidden] {
+      display: none;
+    }
+    .tr-sliptxt {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-family: var(--mono);
+      font-size: 10.5px;
+    }
+    .tr-notgt .tr-mid {
+      gap: 8px;
+    }
+    .tr-q {
+      width: auto;
+      min-width: 34px;
+      margin-right: 3px;
+    }
   `;
 
   // STRATUH logo (brand pack, 2026-10-09): the five-bar profile mark, each bar over a muted echo of itself with a soft
@@ -7652,6 +7791,7 @@
     dock: ico('<rect x="3" y="4" width="18" height="16"/><path d="M3 9h18"/>'),
     refresh: ico('<path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/>'),
     gear: ico('<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>'),
+    look: ico('<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17A8.5 8.5 0 0 0 12 3.5z" fill="currentColor"/>'),
     help: ico(
       '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .8-1 1.5v.7M12 17h.01"/>',
     ),
@@ -7686,6 +7826,7 @@
           <button class="mi" role="menuitem" data-act="refresh">${ICON.refresh}<span class="mt">Reload accounts</span></button>
           <div class="mhr"></div>
           <button class="mi" role="menuitem" data-tab="settings">${ICON.gear}<span class="mt">Settings</span></button>
+          <button class="mi" role="menuitem" data-tab="appearance">${ICON.look}<span class="mt">Appearance</span></button>
           <button class="mi" role="menuitem" data-tab="support">${ICON.help}<span class="mt">Help and rules</span></button>
           <button class="mi" role="menuitem" data-act="report">${ICON.alert}<span class="mt">Report a problem</span></button>
         </div>
@@ -7705,15 +7846,13 @@
         <div class="body"><div class="empty">Waiting for your Vest session…</div></div>
         <div class="alertzone">
           <div class="update" hidden></div>
-          <div class="support update" hidden></div>
           <div class="themeintro update" hidden></div>
           <div class="alerts"></div>
         </div>
         <div class="logwrap">
           <div class="logh" role="button" tabindex="0" aria-expanded="false" title="Show or hide the activity log">
             <span class="caret">${ICON.right}</span><span class="logt">Activity</span><span class="loglast"></span><span class="loghbtns">
-            <button class="iconbtn sm" data-act="dldiag" title="Download diagnostics (JSON) for troubleshooting">Diag</button>
-            <button class="iconbtn sm" data-act="dllog" title="Download the activity log (CSV)">CSV</button>
+            <button class="iconbtn sm" data-act="dlall" title="Download the diagnostics and the activity log (one file), for troubleshooting">Download</button>
             <button class="iconbtn sm" data-act="clearlog" title="Clear the activity log">Clear</button>
           </span></div>
           <div class="log" aria-live="polite"></div>
@@ -7762,9 +7901,10 @@
       if (!drag.moved && Math.hypot(dx, dy) < DRAG_PX) return;
       drag.moved = _dragging = true;
       const B = placeBounds(),
-        r = panel.getBoundingClientRect();
-      panel.style.left = clampPx(drag.ox + dx, B.l, B.r - r.width) + 'px';
-      panel.style.top = clampPx(drag.oy + dy, B.t, B.b - r.height) + 'px';
+        r = panel.getBoundingClientRect(),
+        z = zoomOf(); // the panel's own lengths are in its zoomed units
+      panel.style.left = clampPx(drag.ox + dx, B.l, B.r - r.width) / z + 'px';
+      panel.style.top = clampPx(drag.oy + dy, B.t, B.b - r.height) / z + 'px';
     });
     const endDrag = (e) => {
       if (!drag) return;
@@ -7799,9 +7939,11 @@
     });
     grip.addEventListener('pointermove', (e) => {
       if (!rs) return;
-      const B = placeBounds();
-      panel.style.width = clampPx(rs.w + e.clientX - rs.sx, PANEL_MIN_W, Math.min(PANEL_MAX_W, B.r - rs.left)) + 'px';
-      panel.style.maxHeight = clampPx(rs.h + e.clientY - rs.sy, PANEL_MIN_H, B.b - rs.top) + 'px';
+      const B = placeBounds(),
+        z = zoomOf();
+      panel.style.width =
+        clampPx(rs.w + e.clientX - rs.sx, PANEL_MIN_W * z, Math.min(PANEL_MAX_W * z, B.r - rs.left)) / z + 'px';
+      panel.style.maxHeight = clampPx(rs.h + e.clientY - rs.sy, PANEL_MIN_H * z, B.b - rs.top) / z + 'px';
     });
     const endResize = () => {
       if (!rs) return;
@@ -7875,8 +8017,7 @@
         setLogOpen(!logwrap.classList.contains('open'));
       }
     };
-    on('[data-act="dldiag"]', () => downloadDiag());
-    on('[data-act="dllog"]', () => downloadLog());
+    on('[data-act="dlall"]', () => downloadDiag());
     on('[data-act="clearlog"]', () => clearLog());
     on('[data-act="code"]', () =>
       copySupportCode().then((ok) =>
@@ -7904,7 +8045,6 @@
     renderRate();
     renderHealthSum();
     renderUpdate();
-    renderSupport();
     renderThemeIntro();
   }
   // The bottom bar's right side: this version · the API budget, or what Vest's update means for copying.
@@ -7944,20 +8084,28 @@
   const currentView = () =>
     S.siteOpen
       ? 'site'
-      : S.shareOpen
-        ? 'share'
-        : S.supportOpen
-          ? 'support'
-          : S.tradeOpen
-            ? 'trade'
-            : S.summaryOpen
-              ? 'summary'
-              : S.settingsOpen
-                ? 'settings'
-                : S.rulesOpen
-                  ? 'rules'
-                  : 'accounts';
-  const SHEETS = { settings: 'Settings', support: 'Help', site: 'Site check', share: 'Share' };
+      : S.appearOpen
+        ? 'appearance'
+        : S.shareOpen
+          ? 'share'
+          : S.supportOpen
+            ? 'support'
+            : S.tradeOpen
+              ? 'trade'
+              : S.summaryOpen
+                ? 'summary'
+                : S.settingsOpen
+                  ? 'settings'
+                  : S.rulesOpen
+                    ? 'rules'
+                    : 'accounts';
+  const SHEETS = {
+    settings: 'Settings',
+    appearance: 'Appearance',
+    support: 'Help',
+    site: 'Site check',
+    share: 'Share',
+  };
   // ── Placement. Docked (the default), the panel lives on Vest's chart: just right of the chart's drawing toolbar and
   // below its top toolbar, kept inside the chart whatever resizes (the window, Vest's order book or positions area), its
   // spot remembered relative to the chart. Detached (the pin), it floats anywhere in the window. Minimised, it's a pill:
@@ -8042,7 +8190,19 @@
   function place() {
     const panel = _root && _root.querySelector('.panel');
     if (!panel || !S.dock || _dragging) return;
-    const B = placeBounds(),
+    // Text size zooms the panel, which scales its own position and size too: everything below is in its units (the
+    // window's pixels ÷ the zoom). Saved spots are in the window's pixels.
+    const z = zoomOf(),
+      zs = z === 1 ? '' : String(z);
+    if (panel.style.zoom !== zs) panel.style.zoom = zs;
+    const V = placeBounds(),
+      B = {
+        l: V.l / z,
+        t: V.t / z,
+        r: V.r / z,
+        b: V.b / z,
+        zone: V.zone && { left: V.zone.left / z, top: V.zone.top / z },
+      },
       d = S.dock,
       open = !panel.classList.contains('collapsed');
     panel.classList.toggle('v-trade', !!S.tradeOpen);
@@ -8054,8 +8214,12 @@
     const width = open ? w : panel.offsetWidth;
     // its spot: from the chart's corner when docked, else in the window (the first time: top right, as before)
     const want = B.zone
-      ? { x: B.zone.left + (d.at ? d.at.x : DOCK_INSET), y: B.zone.top + (d.at ? d.at.y : DOCK_INSET) }
-      : d.free || (_autoFloat ? { x: DOCK_INSET, y: DOCK_INSET } : { x: window.innerWidth - width - 16, y: 16 });
+      ? { x: B.zone.left + (d.at ? d.at.x / z : DOCK_INSET), y: B.zone.top + (d.at ? d.at.y / z : DOCK_INSET) }
+      : d.free
+        ? { x: d.free.x / z, y: d.free.y / z }
+        : _autoFloat
+          ? { x: DOCK_INSET, y: DOCK_INSET }
+          : { x: window.innerWidth / z - width - 16, y: 16 };
     const x = clampPx(want.x, B.l, B.r - width);
     let y;
     if (!open) {
@@ -8087,6 +8251,8 @@
     panel.classList.toggle('collapsed', !open);
     S.dock.open = open;
     saveDock();
+    if (!open) clearBracketLines();
+    else updateTrade();
     const b = _root.querySelector('[data-act="collapse"]');
     b.setAttribute('aria-expanded', String(open));
     const hdr = _root.querySelector('.hdr');
@@ -8384,6 +8550,64 @@
     paint();
     _chartThemeTimers = [setTimeout(paint, 1500), setTimeout(paint, 4000)];
   }
+  // Vest's own order lines (its limits, stops and targets) in STRATUH's look while the theme is on: Vest draws them with
+  // fixed colours (its bundle: buy #3CB371, sell #f32b46, white text) and its limits right across the chart with the
+  // label at the left edge (setLineLength(-12, 'pixel')), so the chart's createOrderLine is wrapped to swap those
+  // colours and run every line LINE_LEN % in from the price scale, label and drag handle included, like the copier's
+  // own. Looks only: Vest's dragging, × and everything else are untouched. Lines Vest drew before the wrap keep its look
+  // until it redraws them.
+  const VEST_LINE_COLOURS = { '#3cb371': '#c8f542', '#f32b46': '#ff5a4f' };
+  function themeOrderLines(f) {
+    try {
+      const chart = f && f.contentWindow.tradingViewApi.activeChart();
+      if (!chart || typeof chart.createOrderLine !== 'function') return;
+      const host = Object.prototype.hasOwnProperty.call(chart, 'createOrderLine')
+        ? chart
+        : Object.getPrototypeOf(chart);
+      if (!host || host.createOrderLine.__vc) return;
+      const orig = host.createOrderLine;
+      const wrapped = function (...a) {
+        const l = orig.apply(this, a);
+        try {
+          if (l) restyleOrderLine(l);
+        } catch {
+          /* looks only: the line works either way */
+        }
+        return l;
+      };
+      wrapped.__vc = true;
+      host.createOrderLine = wrapped;
+    } catch {
+      /* not ready yet: tried again on the next check */
+    }
+  }
+  function restyleOrderLine(l) {
+    const swap = (fn) => (k) => {
+      const o = l[k];
+      if (typeof o === 'function') l[k] = (v) => o.call(l, fn(v));
+    };
+    const col = (c) => (S.theme && typeof c === 'string' && VEST_LINE_COLOURS[c.toLowerCase()]) || c;
+    const ink = (c) => (S.theme && typeof c === 'string' && /^#fff(fff)?$/i.test(c) ? '#0c0c0d' : c);
+    [
+      'setLineColor',
+      'setBodyBackgroundColor',
+      'setBodyBorderColor',
+      'setQuantityBackgroundColor',
+      'setQuantityBorderColor',
+    ].forEach(swap(col));
+    ['setBodyTextColor', 'setQuantityTextColor'].forEach(swap(ink));
+    const len = l.setLineLength;
+    if (typeof len === 'function') {
+      // a length in pixels is Vest's limit label pinned to the left edge: swapped; a percentage (its targets and stops,
+      // and the copier's own lines) is kept
+      l.setLineLength = (v, unit) =>
+        S.theme && unit !== 'percentage' ? len.call(l, LINE_LEN, 'percentage') : len.call(l, v, unit);
+      if (S.theme) {
+        len.call(l, LINE_LEN, 'percentage');
+        if (typeof l.setExtendLeft === 'function') l.setExtendLeft(false);
+      }
+    }
+  }
   // Vest's session shading (pre-market, after-hours, overnight bands) is a chart indicator it adds named "Market
   // Sessions" (on load and when its own setting changes). With the setting on, it's removed whenever it shows up.
   const SESSIONS_STUDY = 'Market Sessions';
@@ -8465,6 +8689,7 @@
     hideChartMarks(chartFrame());
     hideSessionShading(chartFrame());
     themeChart(chartFrame());
+    themeOrderLines(chartFrame());
     const f = chartFrame(),
       r = f && f.getBoundingClientRect();
     const key = r ? [r.left, r.top, r.width, r.height].map(Math.round).join() : 'none';
@@ -8475,11 +8700,15 @@
   }, 400);
 
   function setView(v) {
-    if (v !== 'trade') stopPick(true);
+    if (v !== 'trade') {
+      stopPick(true);
+      clearBracketLines();
+    }
     if (['accounts', 'trade', 'summary'].includes(v)) S.lastTab = v;
     S.tradeOpen = v === 'trade';
     S.summaryOpen = v === 'summary';
     S.settingsOpen = v === 'settings';
+    S.appearOpen = v === 'appearance';
     S.rulesOpen = v === 'rules';
     S.supportOpen = v === 'support';
     S.shareOpen = v === 'share';
@@ -8800,6 +9029,7 @@
     else if (S.supportOpen) renderSupportTab(body);
     else if (S.tradeOpen) renderTrade(body);
     else if (S.settingsOpen) renderSettings(body);
+    else if (S.appearOpen) renderAppearance(body);
     else if (S.rulesOpen) renderRules(body);
     else if (S.summaryOpen) renderSummary(body);
     else renderCopier(body);
@@ -8986,8 +9216,8 @@
   }
 
   /** Everything the panel shows / would send, from the current settings + live price. Pure apart from reading state. */
-  function tradeCalc() {
-    const t = S.trade,
+  function tradeCalc(setup) {
+    const t = setup || S.trade,
       sym = t.symbol,
       meta = SYMBOLS[sym],
       price = priceOf(sym),
@@ -9083,33 +9313,43 @@
       ];
       pick = chips.find((x) => x.key === (S.addPick || '25')) || chips[0];
     }
+    // The stop and the targets are optional (on by default): without a stop, nothing sizes from it (Risk $ is off) and
+    // a stop-out has no price, so the fail price is the line to watch.
+    const stopOn = t.stopOn !== false,
+      stopArg = stopOn ? +t.stopPts : null;
+    const byMax = t.sizeMode === 'max' || t.sizeMode === 'pct'; // sized from Vest's max
     const qty = pick
       ? pick.qty
       : t.sizeMode === 'max'
         ? maxQty || 0
-        : t.sizeMode === 'risk'
-          ? riskQty(+t.risk, +t.stopPts, meta.pointValue, step)
-          : floorStep(+t.qty || 0, step);
-    const split = splitQty(qty, t.targets.length, t.scale, step);
+        : t.sizeMode === 'pct'
+          ? floorStep(((maxQty || 0) * Math.min(100, +t.pct || 0)) / 100, step)
+          : t.sizeMode === 'risk'
+            ? stopOn
+              ? riskQty(+t.risk, +t.stopPts, meta.pointValue, step)
+              : 0
+            : floorStep(+t.qty || 0, step);
+    const split = t.targets.length ? splitQty(qty, t.targets.length, t.scale, step) : { qtys: [] };
     const long = planPrices({
       side: 'long',
       entry: price,
-      stopPts: +t.stopPts,
+      stopPts: stopArg,
       targetPts: t.targets.map(Number),
       tick: meta.tick,
     });
     const short = planPrices({
       side: 'short',
       entry: price,
-      stopPts: +t.stopPts,
+      stopPts: stopArg,
       targetPts: t.targets.map(Number),
       tick: meta.tick,
     });
     const qtys = split.qtys || [];
-    const risk = qty * (+t.stopPts || 0) * meta.pointValue;
+    const risk = stopOn ? qty * (+t.stopPts || 0) * meta.pointValue : 0;
     const reward = qtys.reduce((sum, q, i) => sum + q * (+t.targets[i] || 0) * meta.pointValue, 0);
     const openFee = price > 0 ? qty * price * fee : 0;
-    const fees = price > 0 ? openFee + qty * Math.max(0, price - (+t.stopPts || 0)) * fee : 0; // in and out at the stop
+    // in and out at the stop (without one, out at the price now)
+    const fees = price > 0 ? openFee + qty * Math.max(0, price - (stopOn ? +t.stopPts || 0 : 0)) * fee : 0;
 
     // Fail / pass prices and the stop-out cost per side, for the whole position after this order (an add is measured
     // from the new average entry, as the ladder is rebuilt).
@@ -9121,14 +9361,9 @@
         dir = side === 'long' ? 1 : -1;
       const avg = held ? (held.qty * held.openPrice + qty * price) / total : price;
       const fp = failPassPrices({ side, qty: total, price, equity: live.equity, openFee, floor, target: r.target });
-      const loss = stopOutLoss({
-        side,
-        qty: total,
-        price,
-        stopPrice: held ? addStop() : avg - dir * (+t.stopPts || 0), // an add leaves the stop where it is
-        openFee,
-        takerFee: fee,
-      });
+      // an add leaves the stop where it is; no stop, no stop-out to price
+      const stopPrice = held ? addStop() : stopOn ? avg - dir * (+t.stopPts || 0) : null;
+      const loss = stopPrice > 0 ? stopOutLoss({ side, qty: total, price, stopPrice, openFee, takerFee: fee }) : null;
       return { ...fp, loss, room: live.equity - floor };
     };
     const sides = { long: outcome('long'), short: outcome('short') };
@@ -9138,20 +9373,25 @@
     // the price and the margin only (it leaves the stop and targets as they are).
     const fresh = !held;
     if (!master) error = 'Pick a master account (M) first.';
-    else if (fresh && t.sizeMode === 'max' && maxQty === null)
+    else if (fresh && t.sizeMode === 'pct' && !(+t.pct > 0 && +t.pct <= 100)) error = 'Use 1 to 100%.';
+    else if (fresh && byMax && maxQty === null)
       error = price > 0 ? 'Working out the max size…' : 'Waiting for a live price…';
-    else if (fresh && t.sizeMode === 'max' && !(maxQty > 0))
+    else if (fresh && byMax && !(maxQty > 0))
       error = `No trading power left on ${accLabel(limitedBy)} for ${meta.label} at ${lev}x.`;
+    else if (fresh && t.sizeMode === 'risk' && !stopOn)
+      error = 'Risk $ sizes from the stop: add the stop back, or size in Qty or Max.';
     else if (!(qty > 0))
       error = held
         ? 'Too small to add.'
         : t.sizeMode === 'risk'
           ? 'Risk and stop must be above zero.'
-          : 'Size must be above zero.';
+          : t.sizeMode === 'pct'
+            ? `${+t.pct}% of the max is less than one ${tradeUnit(sym) === 'units' ? 'size step' : tradeUnit(sym)}.`
+            : 'Size must be above zero.';
     else if (fresh && split.error) error = split.error;
     else if (!(price > 0)) error = 'Waiting for a live price…';
     else if (fresh && long.error) error = long.error;
-    else if (fresh && t.beMode === 'points' && !(+t.beTrigger > 0))
+    else if (fresh && stopOn && t.beMode === 'points' && !(+t.beTrigger > 0))
       error = 'Breakeven trigger must be above zero points.';
     if (master && pick && pick.why) error = `Add ${pick.label}%: ${pick.why}.`;
 
@@ -9159,13 +9399,15 @@
     // is held to Vest's max only, since its room depends on the position already open).
     const stopPts = +t.stopPts || 0,
       room = r && live ? live.equity - floor : null;
-    const limits = {
-      minStop: t.sizeMode === 'risk' ? minStopFor(+t.risk, maxQty, meta.tick) : null,
-      maxRiskAtStop: maxRiskAt(maxQty, stopPts),
-      maxRiskRoom: held ? null : maxRiskForRoom({ room, price, stopPts, takerFee: fee }),
-      maxStop:
-        held || t.sizeMode === 'risk' ? null : maxStopForRoom({ room, qty, price, takerFee: fee, tick: meta.tick }),
-    };
+    const limits = !stopOn
+      ? { minStop: null, maxRiskAtStop: null, maxRiskRoom: null, maxStop: null }
+      : {
+          minStop: t.sizeMode === 'risk' ? minStopFor(+t.risk, maxQty, meta.tick) : null,
+          maxRiskAtStop: maxRiskAt(maxQty, stopPts),
+          maxRiskRoom: held ? null : maxRiskForRoom({ room, price, stopPts, takerFee: fee }),
+          maxStop:
+            held || t.sizeMode === 'risk' ? null : maxStopForRoom({ room, qty, price, takerFee: fee, tick: meta.tick }),
+        };
 
     // Over Vest's max, the order is accepted but never filled: Buy and Sell are blocked, with one-click fixes.
     let blocked = null;
@@ -9212,6 +9454,14 @@
     // Warnings: the order can go, but it's probably not what you want.
     const warnings = [];
     const risky = held ? sides[held.side] : sides.long; // a new position's stop-out costs the same either way
+    if (!error && fresh && !stopOn) {
+      const side = S.ladSide || 'long',
+        f = sides[side] && sides[side].fail;
+      warnings.push({
+        kind: 'nostop',
+        text: `No stop: nothing closes this trade for you.${f ? ` If you ${side === 'long' ? 'buy' : 'sell'}, the account fails at ${fmtPx(roundTick(f, meta.tick), meta.tick)}.` : ''}`,
+      });
+    }
     if (!error && risky && risky.room > 0 && risky.loss >= risky.room)
       warnings.push({
         kind: 'fail',
@@ -9245,6 +9495,7 @@
       risk2,
       chips,
       pick,
+      stopOn,
     };
   }
 
@@ -9289,10 +9540,15 @@
           <div class="tr-f"><span class="tr-k">Order</span><div class="tr-row">${seg('orderType', [
             ['market', 'Market'],
             ['limit', 'Limit'],
+            ['stop', 'Stop'],
           ])}</div></div>
+          <div class="tr-f" id="tr-sliprow" hidden title="The most a stop order may fill past its price. Blank: a market order, which always fills, wherever the price is.">
+            <span class="tr-k">Slip</span><div class="tr-row"><input class="tr-in sm" id="tr-slip" inputmode="decimal"
+              aria-label="Max slip, in points" placeholder="—" value="${esc(t.slipPts)}"><span class="tr-sliptxt" id="tr-sliptxt"></span></div></div>
           <div class="tr-f"><span class="tr-k">Size</span><div class="tr-row">${seg('sizeMode', [
             ['qty', 'Qty'],
             ['risk', 'Risk $'],
+            ['pct', '%'],
             ['max', 'Max'],
           ])}<input class="tr-in" id="tr-size" inputmode="decimal" aria-label="Size"><span class="tr-sizeq" id="tr-sizeq"></span></div></div>
           <div class="tr-f" id="tr-unitrow" hidden><span class="tr-k">In</span><div class="tr-row">${seg('unit', [
@@ -9310,9 +9566,11 @@
             <div id="tr-targets"></div>
             <div class="tr-lr tr-mk" id="tr-mkrow" hidden><span class="tr-sp"></span><span class="tr-mid" id="tr-mk">Price</span><span class="tr-bp" id="lb-mk"></span></div>
             <div class="tr-lr tr-en"><span class="tr-sp" id="ls-entry"></span><span class="tr-mid" id="tr-entry">Entry</span><span class="tr-bp" id="lb-entry"></span></div>
-            <div class="tr-lr tr-slr"><span class="tr-sp" id="ls-stop"></span><span class="tr-mid"><span class="tr-n sl">STOP</span>
+            <div class="tr-lr tr-slr" id="tr-slrow"><span class="tr-sp" id="ls-stop"></span><span class="tr-mid"><span class="tr-n sl">STOP</span>
               <input class="tr-in tr-pt" id="tr-stop" inputmode="decimal" aria-label="Stop, in points" value="${esc(t.stopPts)}">
-              <span class="tr-q" id="tr-stopq"></span><span class="tr-g dn" id="tr-stopcalc"></span><span class="tr-xs"></span></span><span class="tr-bp" id="lb-stop"></span></div>
+              <span class="tr-q" id="tr-stopq"></span><span class="tr-g dn" id="tr-stopcalc"></span>
+              <button class="tr-x" id="tr-stopx" title="Trade without a stop" aria-label="Remove the stop">×</button>
+              <span class="tr-nostop">None <button class="lnk" id="tr-stopon" title="Put the stop back">+ stop</button></span></span><span class="tr-bp" id="lb-stop"></span></div>
             <div class="tr-lr tr-fl" id="tr-failrow"><span class="tr-sp" id="ls-fail"></span><span class="tr-mid">Fail</span><span class="tr-bp" id="lb-fail"></span></div>
           </div>
           <div class="tr-lim" id="tr-stoplim"></div>
@@ -9343,12 +9601,14 @@
             <button class="tr-lbuy" id="tr-lbuy">Buy limit</button><button class="tr-lsell" id="tr-lsell">Sell limit</button></div>
           <div class="tr-pick" id="tr-pick" hidden>
             <div class="tr-pickbar"><span id="tr-picktxt"></span><span class="tr-esc">Esc to cancel</span></div>
-            <div class="tr-pickrow"><input class="tr-in" id="tr-lpx" inputmode="decimal" aria-label="Limit price" placeholder="price">
+            <div class="tr-pickrow"><input class="tr-in" id="tr-lpx" inputmode="decimal" aria-label="Price" placeholder="price">
               <button class="tr-place" id="tr-place">Place</button><button class="tr-pcancel" id="tr-pcancel">Cancel</button></div>
+
           </div>
           <div class="tr-who" id="tr-who"></div>
         </div>
         <div class="tr-preview" id="tr-preview" hidden></div>
+        <div class="tr-plans" id="tr-stops"></div>
         <div class="tr-plans" id="tr-plans"></div>
       </div>`;
     const wrap = body.querySelector('.trade');
@@ -9371,33 +9631,50 @@
       (sizeEl.value =
         S.trade.sizeMode === 'risk'
           ? S.trade.risk
-          : tradeUnit() === 'units'
-            ? S.trade.qty
-            : +((+S.trade.qty || 0) / unitSize()).toFixed(4));
+          : S.trade.sizeMode === 'pct'
+            ? S.trade.pct
+            : tradeUnit() === 'units'
+              ? S.trade.qty
+              : +((+S.trade.qty || 0) / unitSize()).toFixed(4));
     showSize();
     sizeEl.addEventListener('input', () => {
       const v = parse(sizeEl) || 0;
       if (S.trade.sizeMode === 'risk') S.trade.risk = v;
+      else if (S.trade.sizeMode === 'pct') S.trade.pct = v;
       else S.trade.qty = tradeUnit() === 'units' ? v : +(v * unitSize()).toFixed(8);
       saveTrade();
       updateTrade();
     });
     num(body.querySelector('#tr-stop'), 'stopPts');
+    // the stop is optional: × takes it off (the points are kept for when it comes back), + stop puts it back
+    const stopOn = (on) => {
+      S.trade.stopOn = on;
+      if (!on && S.trade.sizeMode === 'risk') S.trade.sizeMode = 'qty'; // Risk $ sizes from the stop
+      saveTrade();
+      showSize();
+      updateTrade();
+    };
+    body.querySelector('#tr-stopx').onclick = () => stopOn(false);
+    body.querySelector('#tr-stopon').onclick = () => stopOn(true);
     num(body.querySelector('#tr-betrig'), 'beTrigger');
     num(body.querySelector('#tr-beoff'), 'beOffset');
     body.querySelectorAll('[data-seg]').forEach((g) =>
       g.querySelectorAll('button').forEach(
         (b) =>
           (b.onclick = () => {
+            if (b.classList.contains('off')) return toast(b.title); // Risk $ without a stop
             S.trade[g.dataset.seg] = b.dataset.v;
             if (g.dataset.seg === 'unit') {
               // the same size, in whole micros or minis (at least one)
               const u = unitSize();
               S.trade.qty = Math.max(u, floorStep(+S.trade.qty || 0, u));
             }
-            if (g.dataset.seg === 'orderType' && b.dataset.v === 'market') stopPick(true);
+            if (g.dataset.seg === 'orderType' && b.dataset.v !== (S.pick && S.pick.kind)) stopPick(true);
+            // a stop entry is usually sized as a share of what the account can open: Stop switches the size to %
+            if (g.dataset.seg === 'orderType' && b.dataset.v === 'stop' && S.trade.sizeMode !== 'pct')
+              S.trade.sizeMode = 'pct';
             saveTrade();
-            if (g.dataset.seg === 'sizeMode' || g.dataset.seg === 'unit') showSize();
+            if (['sizeMode', 'unit', 'orderType'].includes(g.dataset.seg)) showSize();
             updateTrade();
           }),
       ),
@@ -9440,7 +9717,8 @@
     // Buy / Sell: a market order, or with Limit picked, the price is picked on the chart (or typed)
     const go = (side) => {
       S.ladSide = side; // the ladder shows the side last traded
-      return S.trade.orderType === 'limit' ? startPick(side) : placeTrade(side);
+      const o = S.trade.orderType;
+      return o === 'limit' || o === 'stop' ? startPick(side, o) : placeTrade(side);
     };
     body.querySelector('#tr-buy').onclick = () => go('long');
     body.querySelector('#tr-sell').onclick = () => go('short');
@@ -9451,6 +9729,7 @@
     body.querySelector('#tr-pcancel').onclick = () => stopPick();
     const lpx = body.querySelector('#tr-lpx');
     lpx.addEventListener('input', () => setPickPrice(parse(lpx), false));
+    num(body.querySelector('#tr-slip'), 'slipPts');
     body.querySelector('#tr-close').onclick = () => closeNow();
     body.querySelector('#tr-addbtn').onclick = () => {
       const h = tradeCalc().held;
@@ -9525,8 +9804,10 @@
   }
 
   // `limitPx`: a GTC limit order at that price (a new trade only), with the stop and targets measured from it; without
-  // it, a market order. Returns true once Vest has accepted the order.
-  async function placeTrade(side, limitPx = null) {
+  // it, a market order. A stop entry firing passes `opt`: its own `setup` (the size, stop and targets set when it was
+  // placed), `stopEntry`, and `ioc` (with a max slip: an immediate-or-cancel limit at that price instead of a market
+  // order). Returns true once Vest has accepted the order.
+  async function placeTrade(side, limitPx = null, opt = {}) {
     if (S.placing || S.adjusting) return;
     if (S.flattening) return toast('Wait for Flatten All to finish.');
     if (S.arming || claimBusy()) return toast('Wait for copying to start or the claim to finish.');
@@ -9538,7 +9819,11 @@
       render();
       return toast('Read and accept the terms first.');
     }
-    const c = tradeCalc();
+    const c = tradeCalc(opt.setup);
+    if (opt.stopEntry && (c.error || c.blocked)) {
+      logEvent('warn', `Trade panel: ${stopName(opt.stopEntry)} NOT placed — ${c.error || c.blocked}`);
+      return false;
+    }
     if (c.error) return toast(c.error);
     if (c.blocked) return toast(c.blocked);
     const t = { ...c.t, targets: c.t.targets.map(Number) }; // edits made while this order is in flight don't apply to it
@@ -9552,7 +9837,7 @@
       fail: c.sides.long && c.sides.long.fail,
       warnings: c.warnings.map((w) => w.kind),
     };
-    const stopPts = +t.stopPts,
+    const stopPts = c.stopOn ? +t.stopPts : null, // null: no stop
       sym = t.symbol,
       meta = c.meta,
       pDec = decimalsOf(meta.tick),
@@ -9576,17 +9861,36 @@
             `a ${side === 'long' ? 'buy' : 'sell'} limit must be ${side === 'long' ? 'below' : 'above'} the mark (${fmtNum(px, pDec)}): there it would fill at once — use ${side === 'long' ? 'Buy' : 'Sell'} for a market order`,
           );
       }
-      const plan = planPrices({ side, entry: limitPx || px, stopPts, targetPts: t.targets, tick: meta.tick });
+      // a capped stop entry's legs are measured from its limit price, the worst it can fill at, so the stop is always on
+      // the right side of the order (from the price, a price past the cap put the stop at the limit: Vest refused it)
+      const plan = planPrices({
+        side,
+        entry: limitPx || opt.ioc || px,
+        stopPts,
+        targetPts: t.targets,
+        tick: meta.tick,
+      });
       if (plan.error) throw new Error(plan.error);
       if (!(SYMBOLS[sym] && SYMBOLS[sym].margin)) await loadSymbolRules(sym);
-      const lev = orderLeverage(levFor(await fetchLeverages(), master, sym), maxLeverageFor(sym, master));
+      // Two reads before sending: the saved leverage (Vest's own rule) and whether this market already holds a position
+      // or a waiting order (Vest ignores a second open on the same symbol: accepted, never filled; same direction is an
+      // add, the opposite direction is refused here). They don't depend on each other, so they run together. A stop entry
+      // read its leverage when it was placed (kept fresh while it waits) and, with Vest's live feed up, checks the
+      // market from the feed, so it goes out the moment it triggers; without the feed it asks Vest like any order.
+      const quick = opt.stopEntry ? stopEntryCheck(master, sym) : null;
+      const [levs, held] = await Promise.all([
+        opt.stopEntry && opt.stopEntry.levs ? opt.stopEntry.levs : fetchLeverages(),
+        quick ? quick.held : openPosition(master, sym),
+      ]);
+      const lev = orderLeverage(levFor(levs, master, sym), maxLeverageFor(sym, master));
       if (!(lev > 0))
         throw new Error(
           `couldn't work out ${meta.label} leverage for ${accLabel(master)} — open Vest's ticket for ${meta.label} once, then retry`,
         );
-      // Already in this market? Vest ignores a second open on the same symbol (accepted, never filled), so do what its own
-      // ticket does: same direction adds to the position; the opposite direction is refused here.
-      const held = await openPosition(master, sym);
+      if (opt.stopEntry && held)
+        throw new Error(
+          `${accLabel(master)} already has a ${parseFloat(held.quantity) > 0 ? 'position' : 'waiting order'} on ${meta.label}: a stop entry opens a new trade only, so nothing was sent`,
+        );
       // The size and ladder on screen were worked out for what the panel showed: a position that opened, closed or changed
       // size since then would turn this click into something else (a new trade into an add, say).
       const shown = c.held;
@@ -9628,9 +9932,11 @@
         if (many && parseFloat(l.quantity) * parseFloat(l.triggerPrice) < MIN_LEG_USD)
           throw new Error(`TP${i + 1} is below Vest's $1 minimum`);
       });
-      const stopLosses = [{ executionType: 'market', triggerPrice: fmtNum(plan.stop, pDec) }];
+      // no stop or no targets: empty lists, as Vest's own ticket sends them
+      const stopLosses = plan.stop ? [{ executionType: 'market', triggerPrice: fmtNum(plan.stop, pDec) }] : [];
+      const lpx = limitPx || opt.ioc || null; // a resting limit, or a stop entry's capped fill
       const body = {
-        orderType: limitPx ? 'limit' : 'market',
+        orderType: lpx ? 'limit' : 'market',
         leverage: fmtNum(lev, 2),
         side,
         symbol: sym,
@@ -9638,8 +9944,9 @@
         timeInForce: limitPx ? 'GTC' : 'IOC',
         takeProfits,
         stopLosses,
-        ...(limitPx ? { price: fmtNum(limitPx, pDec) } : {}),
+        ...(lpx ? { price: fmtNum(lpx, pDec) } : {}),
       };
+      const sentMs = opt.stopEntry ? Date.now() - opt.stopEntry.triggered : null; // trigger → order out
       const res = await send('POST', '/v3/positions/open', master, body);
       if (!res.positionId) throw new Error('Vest returned no position');
       const tps = takeProfits
@@ -9647,13 +9954,18 @@
         .join(' · ');
       logEvent(
         'ok',
-        `Trade panel: ${side === 'long' ? 'BUY' : 'SELL'}${limitPx ? ' LIMIT' : ''} ${body.quantity} ${meta.label}${limitPx ? ` @ ${body.price}` : ''} · stop ${stopLosses[0].triggerPrice} · ${tps}`,
+        `Trade panel: ${side === 'long' ? 'BUY' : 'SELL'}${limitPx ? ' LIMIT' : opt.stopEntry ? ' STOP' : ''} ${body.quantity} ${meta.label}${
+          limitPx ? ` @ ${body.price}` : opt.ioc ? ` (limit ${body.price}, fills now or not at all)` : ''
+        } · ${stopLosses.length ? `stop ${stopLosses[0].triggerPrice}` : 'no stop'} · ${tps || 'no targets'}`,
       );
       placed = true;
       diag('trade_panel', {
         outcome: 'placed',
         side,
         sizing,
+        stopEntry: opt.stopEntry
+          ? { level: opt.stopEntry.level, slip: opt.stopEntry.slip, sentMs, checks: quick ? 'feed' : 'vest' }
+          : undefined,
         body,
         positionId: res.positionId,
         orderId: res.orderId,
@@ -9663,11 +9975,11 @@
       // A market order's stop and targets are re-placed exactly from the real fill. A limit's are already measured from its
       // price (it fills there or better) and it may rest for a long time, so it isn't re-anchored or watched for
       // breakeven: Breakeven by hand does that once it fills.
-      const reanchorOn = !limitPx;
-      if (limitPx && t.beMode !== 'off')
+      const reanchorOn = !limitPx && (!!plan.stop || plan.targets.length > 0); // nothing to re-place without legs
+      if (limitPx && t.beMode !== 'off' && plan.stop)
         logEvent('info', 'Auto breakeven watches market orders only: once this limit fills, use Breakeven.');
       let bePlan = null;
-      if (t.beMode !== 'off' && !limitPx) {
+      if (t.beMode !== 'off' && !limitPx && plan.stop && (t.beMode !== 'tp1' || plan.targets.length)) {
         bePlan = {
           positionId: res.positionId,
           orderId: res.orderId,
@@ -9675,7 +9987,7 @@
           symbol: sym,
           side,
           stopLegId: (res.stopLossIds || [])[0] || null,
-          tp1: plan.targets[0],
+          tp1: plan.targets[0] || null,
           beMode: t.beMode,
           beTrigger: +t.beTrigger || 0,
           beOffset: +t.beOffset || 0,
@@ -9687,23 +9999,32 @@
         };
         addPlan(bePlan);
       }
-      if (reanchorOn) {
-        adjust(() =>
-          reanchor({
-            master,
-            sym,
-            side,
-            positionId: res.positionId,
-            orderId: res.orderId,
-            ref: px,
-            stopPts,
-            targetPts: t.targets,
-            sentStop: plan.stop,
-            sentTargets: plan.targets,
-            bePlan,
-          }),
-        );
-      }
+      const doReanchor = () =>
+        reanchor({
+          master,
+          sym,
+          side,
+          positionId: res.positionId,
+          orderId: res.orderId,
+          ref: px,
+          stopPts,
+          targetPts: t.targets,
+          sentStop: plan.stop,
+          sentTargets: plan.targets,
+          bePlan,
+        });
+      if (opt.ioc)
+        // a capped stop entry fills at once or not at all: when nothing filled, there's no trade to re-place or watch
+        adjust(async () => {
+          const f = await fillInfo(master, sym, res.orderId, FEED_FILL_WAIT_MS);
+          if (f !== null) return reanchorOn ? doReanchor() : undefined;
+          logEvent(
+            'warn',
+            `${stopName(opt.stopEntry)}: nothing filled — the price was past ${body.price} (your max slip). No trade.`,
+          );
+          if (bePlan) endPlan(bePlan, null);
+        });
+      else if (reanchorOn) adjust(doReanchor);
     } catch (e) {
       logEvent('warn', `Trade panel: order NOT placed — ${e.message}.`);
       diag('trade_panel', { outcome: 'not-placed', side, sizing, error: e.message, errorCode: errCode(e) });
@@ -9826,7 +10147,7 @@
     if (exact.error) return done();
     if (bePlan) {
       bePlan.entry = fill;
-      bePlan.tp1 = exact.targets[0];
+      bePlan.tp1 = exact.targets[0] || null;
     }
     const legs = posLegs(pos).map((l) => ({ ...l, used: false }));
     const moves = [];
@@ -9836,7 +10157,7 @@
       l.used = true;
       if (Math.abs(l.price - to) >= tick / 2) moves.push({ kind, id: l.id, from: l.price, to });
     };
-    if (!(bePlan && bePlan.moved)) planMove('sl', sentStop, exact.stop);
+    if (sentStop && !(bePlan && bePlan.moved)) planMove('sl', sentStop, exact.stop);
     sentTargets.forEach((p, i) => planMove('tp', p, exact.targets[i]));
     if (!moves.length) {
       logEvent('info', `Filled at ${fmt(fill)} — stop and targets already exact.`);
@@ -9864,7 +10185,9 @@
     if (failed < moves.length)
       logEvent(
         'ok',
-        `Filled at ${fmt(fill)} — stop & targets re-placed exactly ${stopPts} / ${targetPts.join(' / ')} pts from the fill.`,
+        `Filled at ${fmt(fill)} — ${
+          stopPts === null ? 'targets' : targetPts.length ? 'stop & targets' : 'stop'
+        } re-placed exactly ${[stopPts, ...targetPts].filter((x) => x !== null).join(' / ')} pts from the fill.`,
       );
     diag('reanchor', { positionId, fill, moves: moves.map((m) => ({ kind: m.kind, from: m.from, to: m.to })), failed });
     done();
@@ -9897,10 +10220,10 @@
       stopPick();
     }
   };
-  function startPick(side) {
+  function startPick(side, kind = 'limit') {
     if (S.placing || S.adjusting || S.flattening) return;
     stopPick(true);
-    S.pick = { side, price: null, chart: false };
+    S.pick = { side, kind, price: null, chart: false };
     window.addEventListener('keydown', onPickKey, true);
     const tv = chartApi();
     if (tv)
@@ -9908,7 +10231,13 @@
         const chart = tv.api.activeChart();
         let last = null,
           down = null;
-        const move = (d) => (last = d && Number.isFinite(d.price) && d.price > 0 ? d.price : null);
+        // the crosshair: where a click would place it, so the bracket preview can follow the pointer
+        const move = (d) => {
+          last = d && Number.isFinite(d.price) && d.price > 0 ? d.price : null;
+          if (!S.pick) return;
+          S.pick.hover = last ? roundTick(last, SYMBOLS[S.trade.symbol].tick) : null;
+          hoverDraw();
+        };
         const dn = (d) => (down = d ? { x: d.clientX, y: d.clientY } : null);
         const up = (d) => {
           const click =
@@ -9946,13 +10275,15 @@
     if (!S.pick) return;
     const tick = SYMBOLS[S.trade.symbol].tick,
       n = p / tick;
-    // between ticks: a buy rounds down, a sell up, as it will be sent
-    if (p > 0)
-      p = +((S.pick.side === 'long' ? Math.floor(n + 1e-9) : Math.ceil(n - 1e-9)) * tick).toFixed(decimalsOf(tick));
+    // between ticks: a buy limit rounds down and a sell limit up, as it will be sent; a stop entry the other way, so it
+    // never fires before the price you typed
+    const down = (S.pick.side === 'long') !== (S.pick.kind === 'stop');
+    if (p > 0) p = +((down ? Math.floor(n + 1e-9) : Math.ceil(n - 1e-9)) * tick).toFixed(decimalsOf(tick));
     S.pick.price = p > 0 ? p : null;
     const el = _root && _root.querySelector('#tr-lpx');
     if (fromChart && el) el.value = S.pick.price ? fmtNum(p, decimalsOf(SYMBOLS[S.trade.symbol].tick)) : '';
     updateTrade();
+    if (fromChart && S.pick.price) placePick(); // one click on the chart places it; cancel it from its line or the panel
   }
   // The pending order on Vest's chart, as a line (TradingView's order line), kept in step with the price and size.
   function drawPickLine(qty) {
@@ -9966,20 +10297,22 @@
         _pickLine = null;
         return;
       }
-      const col = S.pick.side === 'long' ? '#c8f542' : '#ff5a4f';
+      const col = S.pick.side === 'long' ? LINE_UP : LINE_DOWN;
       if (!_pickLine) _pickLine = chart.createOrderLine();
       _pickLine
         .setPrice(S.pick.price)
-        .setText(`${S.pick.side === 'long' ? 'BUY' : 'SELL'} LMT · STRATUH Copier`)
+        .setText(`${S.pick.kind === 'stop' ? 'Stop' : 'Limit'} ${S.pick.side === 'long' ? 'Buy' : 'Sell'} · not placed`)
         .setQuantity(qty > 0 ? fmtQty(qty, S.trade.symbol) : '')
         .setLineColor(col)
         .setBodyBorderColor(col)
-        .setBodyTextColor('#0c0c0d')
-        .setBodyBackgroundColor(col)
+        .setBodyTextColor(col)
+        .setBodyBackgroundColor(LINE_INK)
         .setQuantityBorderColor(col)
-        .setQuantityBackgroundColor('#0c0c0d')
-        .setQuantityTextColor(col)
+        .setQuantityBackgroundColor(col)
+        .setQuantityTextColor(LINE_INK)
         .setLineStyle(2);
+      if (typeof _pickLine.setLineLength === 'function') _pickLine.setLineLength(ENTRY_LEN, 'percentage');
+      if (typeof _pickLine.setExtendLeft === 'function') _pickLine.setExtendLeft(false);
     } catch {
       // the line is a convenience: the panel shows the price either way
     }
@@ -10000,10 +10333,468 @@
     S.pick = null;
     if (!quiet) updateTrade();
   }
+  // ── The bracket on Vest's chart (Appearance › Bracket on the chart). While the Trade tab is open and flat, the entry,
+  // stop, targets and fail price the ladder shows are drawn as TradingView order lines, for the side the ladder shows,
+  // and follow the price and the points. Dragging the stop or a target sets its points. A preview only: nothing is sent.
+  // They go in a trade (Vest draws the real ones), off the Trade tab, minimised, or when the chart shows another market.
+  // The copier's lines are STRATUH's: lime and red, a solid label for a waiting order, a dark one for the preview.
+  const LINE_LEN = 20, // % of the chart's width a line runs in from the price scale
+    ENTRY_LEN = 34, // the preview's entry label sits further in, so a stop or target a few ticks away never covers it
+    LINE_UP = '#c8f542',
+    LINE_DOWN = '#ff5a4f',
+    LINE_GREY = '#a3a3a3',
+    LINE_INK = '#0c0c0d';
+  // A set of order lines on Vest's chart, each redrawn only when it changes, recreated when Vest rebuilds its chart.
+  // `want`: [{ id, price, text, qty, color, style (0 solid, 1 dotted, 2 dashed), fill (a solid label), onMove(price) →
+  // true if taken (else it snaps back), onCancel() }]. TradingView shows a line's × once it has a cancel handler and lets it
+  // be dragged once it has a move handler, so each gets one only when it does something.
+  function lineSet() {
+    let lines = {},
+      keys = {},
+      want = {},
+      win = null;
+    const drop = (id) => {
+      try {
+        lines[id].remove();
+      } catch {
+        /* best effort: the chart may already be gone */
+      }
+      delete lines[id];
+      delete keys[id];
+    };
+    const clear = () => {
+      Object.keys(lines).forEach(drop);
+      want = {};
+      win = null;
+    };
+    const draw = (list) => {
+      const tv = list.length ? chartApi() : null;
+      if (!tv) return clear();
+      if (win !== tv.win) clear(); // Vest rebuilt its chart: the old lines went with it
+      win = tv.win;
+      let chart;
+      try {
+        chart = tv.api.activeChart();
+      } catch {
+        return clear();
+      }
+      const ids = new Set(list.map((w) => w.id));
+      Object.keys(lines).forEach((id) => !ids.has(id) && drop(id));
+      want = {};
+      for (const w of list) {
+        want[w.id] = w;
+        const key = `${w.price}|${w.text}|${w.qty}|${w.color}|${w.style}|${!!w.onMove}|${!!w.onCancel}|${w.inset || ''}`;
+        if (keys[w.id] === key) continue;
+        try {
+          let l = lines[w.id];
+          if (!l) {
+            l = lines[w.id] = chart.createOrderLine();
+            const id = w.id;
+            if (w.onMove && typeof l.onMove === 'function')
+              l.onMove(() => {
+                const cur = want[id];
+                let took = false;
+                try {
+                  took = !!(cur && cur.onMove && cur.onMove(l.getPrice()));
+                } catch {
+                  /* refused */
+                }
+                delete keys[id]; // the next draw puts it exactly where the panel says
+                if (!took && cur)
+                  try {
+                    l.setPrice(cur.price);
+                  } catch {
+                    /* best effort */
+                  }
+              });
+            if (w.onCancel && typeof l.onCancel === 'function')
+              l.onCancel(() => {
+                const cur = want[id];
+                if (cur && cur.onCancel) cur.onCancel();
+              });
+            // a short line: from its label to the price scale, LINE_LEN % of the chart's width, not right across it
+            if (typeof l.setLineLength === 'function') l.setLineLength(w.inset || LINE_LEN, 'percentage');
+            if (typeof l.setExtendLeft === 'function') l.setExtendLeft(false);
+          }
+          if (typeof l.setEditable === 'function') l.setEditable(!!w.onMove);
+          if (typeof l.setCancellable === 'function') l.setCancellable(!!w.onCancel);
+          l.setPrice(w.price)
+            .setText(w.text)
+            .setQuantity(w.qty)
+            .setLineColor(w.color)
+            .setBodyBorderColor(w.color)
+            .setBodyTextColor(w.fill ? LINE_INK : w.color)
+            .setBodyBackgroundColor(w.fill ? w.color : LINE_INK)
+            .setQuantityBorderColor(w.color)
+            .setQuantityBackgroundColor(w.fill ? LINE_INK : w.color)
+            .setQuantityTextColor(w.fill ? w.color : LINE_INK)
+            .setLineStyle(w.style);
+          keys[w.id] = key;
+        } catch {
+          delete keys[w.id]; // tried again on the next draw; the panel shows the prices either way
+        }
+      }
+    };
+    return { draw, clear, any: () => Object.keys(lines).length > 0 };
+  }
+  const _bracketLines = lineSet();
+  const clearBracketLines = () => _bracketLines.clear();
+  const drawBracketLines = (want) => _bracketLines.draw(want);
+  // A preview line dragged to a new price: its points from the entry, on the right side of it, on the tick.
+  function dragPoints(entry, price, tick, wantAbove) {
+    const pts = +(Math.round(Math.abs(price - entry) / tick) * tick).toFixed(decimalsOf(tick));
+    return price > entry === wantAbove && pts > 0 ? pts : null;
+  }
+  // The preview while picking: from the price picked, else from where the pointer is on the chart.
+  const previewPick = (c) =>
+    c.held || !S.pick
+      ? null
+      : S.pick.price > 0
+        ? S.pick
+        : S.pick.hover > 0
+          ? { ...S.pick, price: S.pick.hover, hovering: true }
+          : null;
+  // Following the pointer only moves the chart lines (from the Trade tab's last numbers), once per frame: rebuilding the
+  // whole tab on every mouse move made the lines trail the pointer.
+  let _lastCalc = null,
+    _hoverRaf = 0;
+  function hoverDraw() {
+    if (_hoverRaf) return;
+    _hoverRaf = requestAnimationFrame(() => {
+      _hoverRaf = 0;
+      if (_lastCalc && S.pick && S.tradeOpen) drawBracketLines(bracketWant(_lastCalc, previewPick(_lastCalc)));
+    });
+  }
+  // Is Vest's chart on this market? (A name not known yet counts as yes: the Trade tab follows Vest's market.)
+  function chartOnMarket(sym) {
+    const name = vestMarketName(),
+      shown = name && _displayMap && _displayMap[name];
+    return !shown || shown === sym;
+  }
+  // The lines for the ladder as shown: the side pointed at from the price now, or a limit / stop entry from its price.
+  function bracketWant(c, pick) {
+    if (!S.chartBracket || !S.tradeOpen || c.held || !(c.price > 0) || !chartOnMarket(c.t.symbol)) return [];
+    if (S.dock && !S.dock.open) return [];
+    // Limit and Stop: nothing until Buy or Sell is picked (then it hangs off the pointer, or the price typed), and only
+    // where that order can go (a buy limit under the price, a buy stop over it)
+    if (!pick && c.t.orderType !== 'market') return [];
+    if (pick) {
+      const above = (pick.side === 'long') === (pick.kind === 'stop');
+      if (above ? pick.price <= c.price : pick.price >= c.price) return [];
+    }
+    const side = pick ? pick.side : S.ladSide || 'long',
+      tick = c.meta.tick,
+      dir = side === 'long' ? 1 : -1;
+    const entry = pick ? pick.price : c.price;
+    const plan = planPrices({
+      side,
+      entry,
+      stopPts: c.stopOn ? +c.t.stopPts : null,
+      targetPts: c.t.targets.map(Number),
+      tick,
+    });
+    if (plan.error) return [];
+    const buy = side === 'long',
+      money0 = (n) => '$' + Math.round(Math.abs(n)).toLocaleString('en-US');
+    // dragging the stop or a target sets its points (measured from the entry at the moment it's dropped)
+    const setStop = (p) => {
+      const pts = dragPoints(pick ? pick.price : priceOf(c.t.symbol) || entry, p, tick, !buy);
+      if (!pts) return false;
+      S.trade.stopPts = pts;
+      const el = _root && _root.querySelector('#tr-stop');
+      if (el) el.value = pts;
+      saveTrade();
+      updateTrade();
+      return true;
+    };
+    const setTarget = (i) => (p) => {
+      const pts = dragPoints(pick ? pick.price : priceOf(c.t.symbol) || entry, p, tick, buy);
+      if (!pts) return false;
+      S.trade.targets[i] = pts;
+      S.trade.targets.sort((a, b) => +a - +b); // dragged past another target: they swap names
+      saveTrade();
+      const body = _root && _root.querySelector('.body');
+      if (body && body.querySelector('#tr-targets')) renderTargets(body);
+      updateTrade();
+      return true;
+    };
+    const out = [];
+    if (pick && pick.hovering)
+      out.push({
+        id: 'entry',
+        price: pick.price,
+        text: `${pick.kind === 'stop' ? 'Stop' : 'Limit'} ${buy ? 'Buy' : 'Sell'} · click to place`,
+        inset: ENTRY_LEN,
+        qty: c.qty > 0 ? fmtQty(c.qty, c.t.symbol) : '',
+        color: buy ? LINE_UP : LINE_DOWN,
+        style: 2,
+      });
+    if (!pick)
+      out.push({
+        id: 'entry',
+        price: roundTick(entry, tick),
+        text: `${buy ? 'Buy' : 'Sell'} · market`,
+        inset: ENTRY_LEN,
+        qty: c.qty > 0 ? fmtQty(c.qty, c.t.symbol) : '',
+        color: LINE_GREY,
+        style: 2,
+      });
+    if (plan.stop)
+      out.push({
+        id: 'stop',
+        price: plan.stop,
+        text: `SL ${+c.t.stopPts} pts`,
+        qty: c.qty > 0 ? `−${money0(c.risk)}` : '',
+        color: LINE_DOWN,
+        style: 2,
+        onMove: setStop,
+      });
+    plan.targets.forEach((p, i) => {
+      const q = c.qtys[i],
+        pts = Math.abs(p - entry);
+      out.push({
+        id: 't' + i,
+        price: p,
+        text: `TP${i + 1} ${+fmtNum(pts, decimalsOf(tick))} pts`,
+        qty: q ? `+${money0(q * pts * c.meta.pointValue)}` : '',
+        color: LINE_UP,
+        style: 2,
+        onMove: setTarget(i),
+      });
+    });
+    const fail = !pick && c.sides[side] && c.sides[side].fail;
+    if (fail > 0 && dir * (entry - fail) > 0)
+      out.push({ id: 'fail', price: roundTick(fail, tick), text: 'Fail', qty: '', color: LINE_DOWN, style: 1 });
+    return out;
+  }
+  // ── Stop entries: a buy stop above the price or a sell stop below. Vest has only market and limit entries (a buy limit
+  // above the price fills at once), so the copier keeps them: placed from the Trade tab (Order: Stop, the price picked
+  // on the chart or typed), watched on its own price feed, and sent through placeTrade when the price (the mid, like
+  // Vest's stops) reaches the level, so an armed copier copies them like any master order. They live in this tab only:
+  // a reload or closing the tab cancels them (logged), and nothing fires late: a level the price passed while the feed
+  // was down is cancelled. A buy stop and a sell stop can wait together on a market; the first to fire cancels the other
+  // (the news straddle). The size, stop and targets are the ones set when it was placed.
+  const STOP_GAP_MS = 3000, // no price for this long: the feed was down, so a level crossed meanwhile is cancelled
+    STOP_WAIT_MS = 5000; // a triggered stop entry waits this long for an order already in flight, then gives up
+  // S.stopEntries: [{ id, side, symbol, level, slip, setup, qty, at, lastAt, triggered, hitPx }]
+  let _stopSeq = 0;
+  const tickOf = (sym) => (SYMBOLS[sym] || {}).tick || 0.25;
+  const stopName = (e) =>
+    `${e.side === 'long' ? 'Buy' : 'Sell'} stop at ${fmtPx(e.level, tickOf(e.symbol))} on ${symLabel(e.symbol)}`;
+  // Before a stop entry fires: is the market clear? From Vest's live feed when it's up and the master's positions and
+  // waiting orders have been read (st.orders exists); otherwise null, and placeTrade asks Vest. `held` is the position
+  // or waiting order found ({ quantity }), else null: the same shape openPosition gives.
+  function stopEntryCheck(master, sym) {
+    const st = S.acctState[master];
+    if (!feedLive() || !st || !Array.isArray(st.orders) || !stateFresh(st)) return null;
+    const pos = st.positions.find((p) => p.symbol === sym && p.qty > 0);
+    if (pos) return { held: { quantity: String(pos.qty), side: pos.side } };
+    if (st.orders.some((o) => o.symbol === sym)) return { held: { quantity: '0' } };
+    return { held: null };
+  }
+  // Leverage for waiting stop entries: read when one is placed and every minute while any wait, so firing doesn't wait
+  // on it (a change on Vest's ticket is picked up within the minute).
+  const STOP_LEV_MS = 60000;
+  function refreshStopLeverage() {
+    if (!S.stopEntries.length) return;
+    fetchLeverages().then((l) => {
+      if (l) S.stopEntries.forEach((e) => (e.levs = l));
+    });
+  }
+  setInterval(refreshStopLeverage, STOP_LEV_MS);
+  function addStopEntry(side, level) {
+    const no = (why) => (toast(why), false);
+    if (!S.ack) return no('Read and accept the terms first.');
+    const siteHeld = siteBlocks();
+    if (siteHeld) return no(siteHeld);
+    const c = tradeCalc();
+    if (c.error || c.blocked) return no(c.error || c.blocked);
+    const sym = c.t.symbol,
+      px = priceOf(sym),
+      tick = c.meta.tick,
+      buy = side === 'long';
+    if (c.held) return no(`Already in ${c.meta.label}: a stop entry opens a new trade only.`);
+    if (!(px > 0)) return no('Waiting for a live price…');
+    if (!nearMarket(level, px, NEAR_MARKET_LOOSE))
+      return no(`${fmtPx(level, tick)} is nowhere near the market (${fmtPx(px, tick)}).`);
+    if (stopEntryHit(side, level, px))
+      return no(`A ${buy ? 'buy' : 'sell'} stop goes ${buy ? 'above' : 'below'} the price (${fmtPx(px, tick)}).`);
+    if (S.stopEntries.some((e) => e.symbol === sym && e.side === side))
+      return no(`A ${buy ? 'buy' : 'sell'} stop is already waiting on ${c.meta.label}: cancel it first.`);
+    const setup = JSON.parse(JSON.stringify(c.t)); // what fires is what's set now
+    const slip = +setup.slipPts > 0 ? +setup.slipPts : 0;
+    const e = { id: 'se' + ++_stopSeq, side, symbol: sym, level, slip, setup, qty: c.qty, at: Date.now() };
+    e.lastAt = e.at;
+    e.triggered = 0;
+    S.stopEntries.push(e);
+    watchPrice(sym);
+    if (S.levs) e.levs = S.levs; // the Trade tab's last read, until the fresh one lands
+    refreshStopLeverage();
+    if (S.master && !Array.isArray((S.acctState[S.master] || {}).orders)) refreshTradeState(); // waiting orders, for the check
+    const both = S.stopEntries.some((x) => x !== e && x.symbol === sym);
+    const legs = [
+      c.stopOn ? `stop ${+setup.stopPts}` : 'no stop',
+      setup.targets.length ? `targets ${setup.targets.join(' / ')} pts` : 'no targets',
+    ].join(', ');
+    logEvent(
+      'ok',
+      `${stopName(e)} waiting: ${fmtQty(c.qty, sym)} ${c.meta.label}, ${legs}. Sends ${slip ? `a limit up to ${slip} pts past it` : 'a market order'} when the price gets there, while this tab stays open.${both ? ' One cancels the other.' : ''}`,
+    );
+    diag('stop_entry', { outcome: 'placed', side, symbol: sym, level, slip, qty: c.qty, price: px });
+    syncStopLines();
+    updateTrade();
+    return true;
+  }
+  function cancelStopEntry(e, why) {
+    if (!S.stopEntries.includes(e)) return;
+    S.stopEntries = S.stopEntries.filter((x) => x !== e);
+    if (why) logEvent('info', why);
+    diag('stop_entry', { outcome: 'cancelled', side: e.side, symbol: e.symbol, level: e.level, why: why || null });
+    syncStopLines();
+    unwatchUnused();
+    updateTrade();
+  }
+  function cancelStopEntries(why) {
+    [...S.stopEntries].forEach((e) => cancelStopEntry(e, `${stopName(e)} cancelled: ${why}`));
+  }
+  function checkStopEntries(sym, px) {
+    const now = Date.now();
+    for (const e of [...S.stopEntries]) {
+      if (e.symbol !== sym) continue;
+      const gap = now - e.lastAt > STOP_GAP_MS;
+      e.lastAt = now;
+      if (!e.triggered) {
+        if (!stopEntryHit(e.side, e.level, px)) continue;
+        if (gap) {
+          cancelStopEntry(
+            e,
+            `${stopName(e)} cancelled: the price got there while the live price feed was down (now ${fmtPx(px, tickOf(sym))}). Nothing was sent.`,
+          );
+          continue;
+        }
+        e.triggered = now; // once triggered it goes, even if the price comes back, like a stop order
+        e.hitPx = px;
+      }
+      fireStopEntry(e);
+    }
+  }
+  function fireStopEntry(e) {
+    if (!S.stopEntries.includes(e)) return;
+    for (const o of S.stopEntries.filter((x) => x !== e && x.symbol === e.symbol))
+      cancelStopEntry(
+        o,
+        `${stopName(o)} cancelled: the ${e.side === 'long' ? 'buy' : 'sell'} stop fired (one cancels the other).`,
+      );
+    const siteHeld = siteBlocks();
+    if (siteHeld) return cancelStopEntry(e, `${stopName(e)} cancelled: ${siteHeld}`);
+    if (S.placing || S.adjusting || S.flattening || S.arming || claimBusy()) {
+      if (Date.now() - e.triggered > STOP_WAIT_MS)
+        cancelStopEntry(
+          e,
+          `${stopName(e)} cancelled: another order was still going through ${STOP_WAIT_MS / 1000} s after it triggered. Nothing was sent.`,
+        );
+      return; // tried again on the next price
+    }
+    S.stopEntries = S.stopEntries.filter((x) => x !== e); // it fires once
+    syncStopLines();
+    const tick = tickOf(e.symbol),
+      ioc = stopEntryLimit({ side: e.side, level: e.level, slipPts: e.slip, tick }),
+      now = priceOf(e.symbol) || e.hitPx;
+    // with a max slip, a price already past the cap can't fill (a buy fills at the ask, above the mid): nothing is sent
+    if (ioc && (e.side === 'long' ? now > ioc : now < ioc)) {
+      logEvent(
+        'warn',
+        `${stopName(e)} triggered, but the price (${fmtPx(now, tick)}) was already past your max slip (${fmtPx(ioc, tick)}): nothing sent.`,
+      );
+      diag('stop_entry', { outcome: 'past-slip', side: e.side, symbol: e.symbol, level: e.level, price: now, ioc });
+      return unwatchUnused();
+    }
+    logEvent(
+      'info',
+      `${stopName(e)} triggered (price ${fmtPx(e.hitPx, tick)}): sending ${ioc ? `a limit at ${fmtPx(ioc, tick)}` : 'a market order'}${S.armed ? ', copied to the followers' : ''}.`,
+    );
+    diag('stop_entry', { outcome: 'triggered', side: e.side, symbol: e.symbol, level: e.level, price: e.hitPx, ioc });
+    placeTrade(e.side, null, { setup: e.setup, stopEntry: e, ioc }).finally(unwatchUnused);
+  }
+  // Waiting stop entries on Vest's chart, wherever the panel is, drawn like Vest's own limit lines: drag one to move it,
+  // its × cancels it.
+  const _stopLines = lineSet();
+  function syncStopLines() {
+    _stopLines.draw(
+      S.stopEntries
+        .filter((e) => chartOnMarket(e.symbol))
+        .map((e) => ({
+          id: e.id,
+          price: e.level,
+          text: `Stop ${e.side === 'long' ? 'Buy' : 'Sell'}${e.slip ? ` · slip ${e.slip}` : ''}`,
+          qty: fmtQty(e.qty, e.symbol),
+          color: e.side === 'long' ? LINE_UP : LINE_DOWN,
+          style: 0,
+          fill: true,
+          onMove: e.triggered ? null : (p) => moveStopEntry(e, p),
+          onCancel: () => cancelStopEntry(e, `${stopName(e)} cancelled (you cancelled it on the chart).`),
+        })),
+    );
+  }
+  // A stop entry dragged on the chart: the new level, on the tick (a buy stop rounds up, a sell down), still on its side
+  // of the price.
+  function moveStopEntry(e, p) {
+    if (!S.stopEntries.includes(e) || e.triggered || !(p > 0)) return false;
+    const tick = tickOf(e.symbol),
+      n = p / tick,
+      level = +((e.side === 'long' ? Math.ceil(n - 1e-9) : Math.floor(n + 1e-9)) * tick).toFixed(decimalsOf(tick)),
+      px = priceOf(e.symbol),
+      buy = e.side === 'long';
+    if (!(px > 0) || stopEntryHit(e.side, level, px)) {
+      toast(
+        `A ${buy ? 'buy' : 'sell'} stop goes ${buy ? 'above' : 'below'} the price${px > 0 ? ` (${fmtPx(px, tick)})` : ''}.`,
+      );
+      return false;
+    }
+    if (level === e.level) return true;
+    const from = e.level;
+    e.level = level;
+    logEvent('info', `${stopName(e)}: moved from ${fmtPx(from, tick)}.`);
+    diag('stop_entry', { outcome: 'moved', side: e.side, symbol: e.symbol, from, level });
+    syncStopLines();
+    updateTrade();
+    return true;
+  }
+  setInterval(() => (S.stopEntries.length || _stopLines.any()) && syncStopLines(), 1000); // after Vest redraws its chart
+  // Closing or reloading the tab ends them: say so in the log (kept in this browser), since nothing will fire.
+  window.addEventListener('pagehide', () => {
+    if (S.stopEntries.length) cancelStopEntries('the page was closed or reloaded (stop entries live in the tab).');
+  });
+  if (window.__VC_TEST__) window.__vcStops = () => S.stopEntries;
+
   async function placePick() {
-    if (!S.pick || !(S.pick.price > 0)) return;
-    const { side, price } = S.pick;
-    if (await placeTrade(side, price)) stopPick();
+    if (!S.pick || !(S.pick.price > 0) || S.placing) return;
+    const { side, price, kind } = S.pick,
+      px = priceOf(S.trade.symbol),
+      above = (side === 'long') === (kind === 'stop');
+    if (px > 0 && (above ? price <= px : price >= px))
+      return toast(
+        `A ${side === 'long' ? 'buy' : 'sell'} ${kind === 'stop' ? 'stop' : 'limit'} goes ${above ? 'above' : 'below'} the price (${fmtPx(px, tickOf(S.trade.symbol))}): click again.`,
+      );
+    if (kind === 'stop' ? addStopEntry(side, price) : await placeTrade(side, price)) stopPick();
+  }
+  // × on a waiting limit in the Trade tab: Vest's own cancel, through the hooked fetch, so an armed copier cancels the
+  // followers' copies too (Vest's line on the chart has its own ×, which does the same).
+  async function cancelLimitOrder(id) {
+    if (S.placing || S.adjusting || S.flattening) return toast('Wait for the order going through.');
+    const st = S.master && S.acctState[S.master],
+      o = st && (st.orders || []).find((x) => x.id === id);
+    if (!o) return;
+    const what = `the ${o.isBuy ? 'buy' : 'sell'} limit at ${fmtPx(o.price, tickOf(o.symbol))} on ${symLabel(o.symbol)}`;
+    try {
+      await send('POST', '/v3/positions/cancel-order', S.master, { orderId: id });
+      st.orders = st.orders.filter((x) => x.id !== id);
+      logEvent('ok', `Cancelled ${what}.`);
+    } catch (e) {
+      logEvent('warn', `Couldn't cancel ${what} (${e.message}): cancel it on Vest.`);
+    }
+    updateTrade();
+    refreshTradeState();
   }
 
   // ── Breakeven and Close by hand, for the master's open position in this market. Both go through the hooked fetch, so
@@ -10457,17 +11248,20 @@
   function renderTargets(body) {
     const box = body.querySelector('#tr-targets');
     // ladder rows, farthest target on top (Buy prices rise up the right column, Sell prices fall down the left)
-    box.innerHTML = S.trade.targets
-      .map(
-        (p, i) => `
+    box.innerHTML =
+      S.trade.targets
+        .map(
+          (p, i) => `
       <div class="tr-lr tr-tgt"><span class="tr-sp" id="ls-t${i}"></span><span class="tr-mid"><span class="tr-n">TP${i + 1}</span>
         <input class="tr-in tr-pt" data-t="${i}" inputmode="decimal" aria-label="Target ${i + 1}, in points" value="${esc(p)}">
         <span class="tr-q" id="tq${i}"></span><span class="tr-g" id="tg${i}"></span>
-        <button class="tr-x" data-del="${i}" title="Remove target ${i + 1}" aria-label="Remove target ${i + 1}"
-          ${S.trade.targets.length < 2 ? 'disabled' : ''}>×</button></span><span class="tr-bp" id="lb-t${i}"></span></div>`,
-      )
-      .reverse()
-      .join('');
+        <button class="tr-x" data-del="${i}" title="Remove target ${i + 1}" aria-label="Remove target ${i + 1}">×</button></span><span class="tr-bp" id="lb-t${i}"></span></div>`,
+        )
+        .reverse()
+        .join('') ||
+      // every target removed: the trade goes in without one
+      `<div class="tr-lr tr-tgt tr-notgt"><span class="tr-sp"></span><span class="tr-mid"><span class="tr-n">TP</span><span class="tr-none">None</span>
+        <button class="lnk" data-addt title="Add a target">+ target</button></span><span class="tr-bp"></span></div>`;
     box.querySelectorAll('[data-t]').forEach((el) =>
       el.addEventListener('input', () => {
         const v = el.value.trim();
@@ -10485,6 +11279,8 @@
           updateTrade();
         }),
     );
+    const add = box.querySelector('[data-addt]');
+    if (add) add.onclick = () => body.querySelector('#tr-add').click();
   }
 
   function updateTrade() {
@@ -10514,6 +11310,13 @@
       .forEach((g) =>
         g.querySelectorAll('button').forEach((b) => b.classList.toggle('on', S.trade[g.dataset.seg] === b.dataset.v)),
       );
+    const riskBtn = body.querySelector('[data-seg="sizeMode"] [data-v="risk"]');
+    riskBtn.classList.toggle('off', !c.stopOn);
+    riskBtn.title = c.stopOn
+      ? 'Size from dollars at risk at the stop'
+      : 'Risk $ sizes from the stop: put a stop on first.';
+    body.querySelector('[data-seg="sizeMode"] [data-v="pct"]').title =
+      "A share of the most you can open (Vest's 100%): type 25 for a quarter";
     $('tr-size').style.display = c.t.sizeMode === 'max' ? 'none' : '';
     // minis and micros (NQ, ES, RTY): which unit the size is in
     const unit = tradeUnit(),
@@ -10540,19 +11343,16 @@
         ? `Add uses ${c.pick.label} (${fmtQty(c.qty, c.t.symbol)}): click it again for this size`
         : c.t.sizeMode === 'max' && c.qty > 0
           ? `= ${unit === 'units' ? fmtQty(c.qty, c.t.symbol) + ' contracts' : uq(c.qty)} · ${maxNote}`
-          : '',
+          : // Risk $ and %: the size they make, on its own line (next to the box it no longer fits)
+            (c.t.sizeMode === 'risk' || c.t.sizeMode === 'pct') && c.qty > 0
+            ? `= ${unit === 'units' ? fmtQty(c.qty, c.t.symbol) + ' contracts' : uq(c.qty)}${
+                c.t.sizeMode === 'pct' && c.maxQty > 0 ? ` · ${+c.t.pct}% of ${fmtQty(c.maxQty, c.t.symbol)}` : ''
+              }`
+            : '',
     );
-    set(
-      'tr-sizeq',
-      c.qty > 0 && c.t.sizeMode !== 'max'
-        ? c.t.sizeMode === 'risk'
-          ? `= ${unit === 'units' ? fmtQty(c.qty, c.t.symbol) + ' ct' : uq(c.qty)}`
-          : +c.t.stopPts > 0
-            ? `${fmtUsd(c.risk)} at stop`
-            : ''
-        : '',
-    );
-    $('tr-stopcalc').textContent = c.qty > 0 && +c.t.stopPts > 0 ? `−${fmtUsd(c.risk)}` : '';
+    set('tr-sizeq', '');
+    $('tr-stopcalc').textContent = c.stopOn && c.qty > 0 && +c.t.stopPts > 0 ? `−${fmtUsd(c.risk)}` : '';
+    $('tr-slrow').classList.toggle('off', !c.stopOn);
     // The allowed range, live: how much can be risked and where the stop may go on this account right now
     const L = c.limits,
       stopNow = +c.t.stopPts || 0,
@@ -10569,6 +11369,8 @@
       }
     } else if (c.maxQty !== null && c.t.sizeMode === 'qty') {
       sizeLim = `Up to ${fmtQty(c.maxQty, c.t.symbol)} contracts at ${c.lev}x${room}`;
+    } else if (c.maxQty !== null && c.t.sizeMode === 'pct') {
+      sizeLim = `${+c.t.pct || 0}% of ${fmtQty(c.maxQty, c.t.symbol)} contracts, the most at ${c.lev}x`;
     }
     if (c.t.sizeMode !== 'risk' && L.maxStop !== null && c.qty > 0) {
       stopBad = stopNow >= L.maxStop;
@@ -10604,15 +11406,21 @@
     // the folded lines: how the targets split, and when the stop moves to breakeven
     set(
       'tr-splittxt',
-      `Split ${c.t.scale === 'start' ? 'front-loaded' : c.t.scale === 'end' ? 'back-loaded' : 'even'}${
-        c.qtys.length > 1 ? ' · ' + c.qtys.map(uqn).join(' / ') : ''
-      }`,
+      !c.t.targets.length
+        ? 'No targets'
+        : `Split ${c.t.scale === 'start' ? 'front-loaded' : c.t.scale === 'end' ? 'back-loaded' : 'even'}${
+            c.qtys.length > 1 ? ' · ' + c.qtys.map(uqn).join(' / ') : ''
+          }`,
     );
     set(
       'tr-betxt',
-      c.t.beMode === 'off'
-        ? 'Auto breakeven off'
-        : `Breakeven ${c.t.beMode === 'tp1' ? 'after TP1' : `at +${c.t.beTrigger || 0} pts`}${+c.t.beOffset > 0 ? `, locks ${c.t.beOffset} pts` : ''}`,
+      !c.stopOn
+        ? 'Auto breakeven needs a stop'
+        : c.t.beMode === 'off'
+          ? 'Auto breakeven off'
+          : c.t.beMode === 'tp1' && !c.t.targets.length
+            ? 'Auto breakeven after TP1: add a target'
+            : `Breakeven ${c.t.beMode === 'tp1' ? 'after TP1' : `at +${c.t.beTrigger || 0} pts`}${+c.t.beOffset > 0 ? `, locks ${c.t.beOffset} pts` : ''}`,
     );
     // in a trade the setup (size, stop, targets, Auto BE for a new trade) is put away: Scale and the trade's own
     // stop and targets apply
@@ -10621,14 +11429,18 @@
     $('tr-lims').hidden = held;
     $('tr-pacts').hidden = !held;
     $('tr-sum').innerHTML =
-      c.qty > 0 && c.qtys.length
-        ? `${c.held ? 'This add · ' : ''}Risk <b>${fmtUsd(c.risk)}</b>${c.fees > 0 ? ` + ${fmtUsd(c.fees)} fees` : ''} · Reward <b>${fmtUsd(c.reward)}</b> · <b>${c.risk > 0 ? (c.reward / c.risk).toFixed(2) : '—'}R</b>`
+      c.qty > 0 && (c.qtys.length || !c.stopOn)
+        ? `${c.held ? 'This add · ' : ''}${c.stopOn ? `Risk <b>${fmtUsd(c.risk)}</b>` : '<b>No stop</b>'}${c.fees > 0 ? ` + ${fmtUsd(c.fees)} fees` : ''}${
+            c.qtys.length ? ` · Reward <b>${fmtUsd(c.reward)}</b>` : ' · no targets'
+          }${c.stopOn && c.qtys.length ? ` · <b>${c.risk > 0 ? (c.reward / c.risk).toFixed(2) : '—'}R</b>` : ''}`
         : '';
     set(
       'tr-lhm',
       !c.held && c.qty > 0 && c.qtys.length && c.risk > 0
         ? `risk ${fmtUsd(c.risk)} · ${(c.reward / c.risk).toFixed(2)}R`
-        : 'pts · qty · $',
+        : !c.held && !c.stopOn
+          ? 'no stop'
+          : 'pts · qty · $',
     );
     $('tr-lhm').title = $('tr-sum').textContent;
     const fixHtml = c.fixes
@@ -10677,10 +11489,10 @@
     $('tr-who').textContent = S.master
       ? `On ${accLabel(S.master)}${nf ? ` · copies to ${nf} follower${nf > 1 ? 's' : ''}` : ' · not copied (copying is off)'}`
       : '';
-    const lim = c.t.orderType === 'limit' && !h,
+    const lim = !h && c.t.orderType === 'limit' ? ' limit' : !h && c.t.orderType === 'stop' ? ' stop' : '',
       qw = c.qty > 0 ? (unit === 'units' ? q : uq(c.qty)) : '';
-    $('tr-buy').textContent = h && h.side === 'long' ? `Add ${qw}` : `Buy${lim ? ' limit' : ''} ${qw}`.trim();
-    $('tr-sell').textContent = h && h.side === 'short' ? `Add ${qw}` : `Sell${lim ? ' limit' : ''} ${qw}`.trim();
+    $('tr-buy').textContent = h && h.side === 'long' ? `Add ${qw}` : `Buy${lim} ${qw}`.trim();
+    $('tr-sell').textContent = h && h.side === 'short' ? `Add ${qw}` : `Sell${lim} ${qw}`.trim();
     $('tr-buy').hidden = !!h && h.side !== 'long';
     $('tr-sell').hidden = !!h && h.side !== 'short';
     $('tr-buy').disabled = $('tr-sell').disabled = !!c.error || !!c.blocked || busy;
@@ -10692,22 +11504,31 @@
     $('tr-lgo').hidden = true; // Limit is the Order switch now; these stay for the chart pick's own code
     $('tr-lbuy').disabled = $('tr-lsell').disabled = !!c.error || !!c.blocked || busy;
     $('tr-pick').hidden = !pk;
+    // Slip (stop orders): the most past the level a fill may be; blank = a market order
+    $('tr-sliprow').hidden = c.t.orderType !== 'stop' || !!h;
+    if (c.t.orderType === 'stop') {
+      const slip = +c.t.slipPts > 0 ? +c.t.slipPts : 0;
+      set('tr-sliptxt', slip ? `pts · within ${slip} or not at all` : 'pts · blank = market');
+    }
     if (pk) {
+      // a buy limit goes below the price and a sell limit above; stop entries the other way round
       const lp = pk.price,
-        wrongSide = lp > 0 && c.price > 0 && (pk.side === 'long' ? lp >= c.price : lp <= c.price);
+        stp = pk.kind === 'stop',
+        above = (pk.side === 'long') === stp,
+        wrongSide = lp > 0 && c.price > 0 && (above ? lp <= c.price : lp >= c.price),
+        buy = pk.side === 'long',
+        tag = `${buy ? 'Buy' : 'Sell'} ${stp ? 'STP' : 'LMT'}`;
       set(
         'tr-picktxt',
         wrongSide
-          ? `A ${pk.side === 'long' ? 'buy' : 'sell'} limit goes ${pk.side === 'long' ? 'below' : 'above'} the mark`
+          ? `A ${buy ? 'buy' : 'sell'} ${stp ? 'stop' : 'limit'} goes ${above ? 'above' : 'below'} the price`
           : pk.chart
-            ? "Click Vest's chart to set the price"
-            : 'Type the limit price',
+            ? "Click Vest's chart to place it, or type the price"
+            : `Type the ${stp ? 'stop' : 'limit'} price`,
       );
       $('tr-picktxt').className = wrongSide ? 'bad' : '';
-      $('tr-place').textContent =
-        lp > 0
-          ? `Place ${pk.side === 'long' ? 'Buy' : 'Sell'} LMT ${q} @ ${fmtPx(lp, c.meta.tick)}`
-          : `Place ${pk.side === 'long' ? 'Buy' : 'Sell'} LMT`;
+      $('tr-place').textContent = lp > 0 ? `Place ${tag} @ ${fmtPx(lp, c.meta.tick)}` : `Place ${tag}`;
+      $('tr-place').title = lp > 0 ? `${tag} ${q} @ ${fmtPx(lp, c.meta.tick)}` : '';
       $('tr-place').className = 'tr-place ' + pk.side;
       $('tr-place').disabled = !(lp > 0) || wrongSide || !!c.error || !!c.blocked || busy;
       drawPickLine(c.qty);
@@ -10860,21 +11681,25 @@
     $('tr-lhs').hidden = !!(h2 || pk2);
     set('tr-lhs', lside === 'long' ? 'If you buy' : 'If you sell');
     $('tr-lhs').className = 'tr-flip ' + lside;
-    set('tr-lhb', h2 ? 'Price' : pk2 ? (pk2.side === 'long' ? 'Buy at' : 'Sell at') : 'Price');
+    set(
+      'tr-lhb',
+      h2 ? 'Price' : pk2 ? `${pk2.side === 'long' ? 'Buy' : 'Sell'} ${pk2.kind === 'stop' ? 'stop' : 'at'}` : 'Price',
+    );
     $('tr-mkrow').hidden = !(h2 || pk2) || !ok;
     if (pk2) {
       // a limit: its stop and targets measured from the limit price (it fills there or better)
       const lv = planPrices({
         side: pk2.side,
         entry: pk2.price,
-        stopPts: +c.t.stopPts,
+        stopPts: c.stopOn ? +c.t.stopPts : null,
         targetPts: c.t.targets.map(Number),
         tick: c.meta.tick,
       });
       c.t.targets.forEach((_, i) => set('lb-t' + i, px(lv.targets && lv.targets[i])));
       set('lb-stop', px(lv.stop));
       set('lb-entry', px(pk2.price));
-      set('tr-entry', c.qty > 0 ? `Limit · ${fmtQty(c.qty, c.t.symbol)}` : 'Limit');
+      const kind = pk2.kind === 'stop' ? 'Stop entry' : 'Limit';
+      set('tr-entry', c.qty > 0 ? `${kind} · ${fmtQty(c.qty, c.t.symbol)}` : kind);
       set('tr-stopq', c.qty > 0 ? fmtQty(c.qty, c.t.symbol) : '');
       const away = Math.abs(c.price - pk2.price);
       set('tr-mk', `Price · ${fmtNum(away, decimalsOf(c.meta.tick))} pts away`);
@@ -10910,6 +11735,8 @@
         : '');
     set('tr-preview', note);
     body.querySelector('.tr-lad').title = note;
+    _lastCalc = c;
+    drawBracketLines(bracketWant(c, previewPick(c)));
 
     // Margin and risk bars
     const pct100 = (f) => Math.max(0, Math.min(100, f * 100)).toFixed(1) + '%';
@@ -10947,7 +11774,7 @@
       const left = after === null ? null : K.room - after;
       const usd = (n) => '$' + Math.round(Math.abs(n)).toLocaleString('en-US');
       $('tr-rtxt').innerHTML =
-        K.now === null
+        K.now === null || (!c.held && !c.stopOn)
           ? '<span class="warn">no stop</span>'
           : left !== null && left <= 0
             ? `<b>${usd(after)}</b> · <span class="hot">past the floor</span>`
@@ -10972,6 +11799,39 @@
       "Margin: how much of Vest's buying power (its 100%) this order uses, and what's left. Risk: what the stop would lose, " +
       'fees included, against the room left before the floor.' +
       (tight ? ` (${tight})` : '');
+    // Waiting orders: the master's resting limits on Vest (from any ticket) and the stop entries this tab keeps
+    const mst = S.master && S.acctState[S.master],
+      limits = ((mst && mst.orders) || []).filter((o) => o.symbol === c.t.symbol);
+    const limitRows = limits.map(
+      (o) =>
+        `<div class="tr-plan"><span><b>${o.isBuy ? 'Buy' : 'Sell'} limit</b> ${esc(symLabel(o.symbol))} @ ${fmtPx(o.price, tickOf(o.symbol))} · ${esc(fmtQty(o.qty, o.symbol))}</span><button class="tr-x" data-unlimit="${esc(o.id)}" title="Cancel this limit on Vest${S.armed ? ' (and the followers’ copies)' : ''}" aria-label="Cancel this limit">×</button></div>`,
+    );
+    const stopRows = S.stopEntries.map((e) => {
+      const tick = tickOf(e.symbol),
+        pair = S.stopEntries.some((x) => x !== e && x.symbol === e.symbol);
+      const what = `<b>${e.side === 'long' ? 'Buy' : 'Sell'} stop</b> ${esc(symLabel(e.symbol))} @ ${fmtPx(e.level, tick)} · ${esc(fmtQty(e.qty, e.symbol))}${
+        e.slip ? ` · slip ${e.slip} pts` : ''
+      }${pair ? ' · OCO' : ''}${e.triggered ? ' · sending…' : ''}`;
+      return `<div class="tr-plan" title="Kept by the copier: fires while this tab is open"><span>${what}</span><button class="tr-x" data-unstop="${esc(e.id)}" title="Cancel" aria-label="Cancel this stop entry">×</button></div>`;
+    });
+    const stopsHtml =
+      limitRows.length || stopRows.length
+        ? `<div class="tr-lbl">Waiting orders${stopRows.length ? ' · stops fire while this tab is open' : ''}</div>` +
+          [...limitRows, ...stopRows].join('')
+        : '';
+    const sbox = $('tr-stops');
+    if (sbox.dataset.html !== stopsHtml) {
+      sbox.dataset.html = stopsHtml;
+      sbox.innerHTML = stopsHtml;
+      sbox.querySelectorAll('[data-unstop]').forEach(
+        (b) =>
+          (b.onclick = () => {
+            const e = S.stopEntries.find((x) => x.id === b.dataset.unstop);
+            if (e) cancelStopEntry(e, `${stopName(e)} cancelled (you cancelled it).`);
+          }),
+      );
+      sbox.querySelectorAll('[data-unlimit]').forEach((b) => (b.onclick = () => cancelLimitOrder(b.dataset.unlimit)));
+    }
     const plans = Object.values(S.plans);
     const plansHtml = plans.length
       ? `<div class="tr-lbl">Breakeven watch</div>` +
@@ -11004,15 +11864,62 @@
     }
   }
 
-  // Settings: every option with one line under its name; the ? opens the full explanation in place.
-  function renderSettings(body) {
-    const open = new Set([...body.querySelectorAll('.opt.open[data-o]')].map((e) => e.dataset.o));
-    const option = (key, on, name, short, long, dim = false) => `
+  // Settings and Appearance: every option with one line under its name; the ? opens the full explanation in place.
+  const optionHtml =
+    (open) =>
+    (key, on, name, short, long, dim = false) => `
         <div class="opt ${dim ? 'dep-off' : ''} ${open.has(key) ? 'open' : ''}" data-o="${key}">
           <div class="opt-txt"><div class="opt-name">${name}${long ? `<button class="qm" data-q="${key}" aria-label="More about ${name}" title="More about this">?</button>` : ''}</div>
             <div class="opt-short">${short}</div>${long ? `<div class="opt-desc">${long}</div>` : ''}</div>
           <button class="switch ${on ? 'on' : ''}" data-opt="${key}" role="switch" aria-checked="${on}" aria-label="${name}"><span class="knob"></span></button>
         </div>`;
+  const openOpts = (body) => new Set([...body.querySelectorAll('.opt.open[data-o]')].map((e) => e.dataset.o));
+  function wireOptions(body) {
+    body.querySelectorAll('[data-q]').forEach((b) => (b.onclick = () => b.closest('.opt').classList.toggle('open')));
+    body.querySelectorAll('[data-opt]').forEach((b) => (b.onclick = () => toggleOption(b.getAttribute('data-opt'))));
+    body.querySelectorAll('[data-tab-go]').forEach((b) => (b.onclick = () => setView(b.dataset.tabGo)));
+  }
+  function toggleOption(o) {
+    if (o === 'fast') toggleFast();
+    else if (o === 'autoflat') toggleAutoFlatten();
+    else if (o === 'capfit') toggleCapFit();
+    else if (o === 'supportapply') {
+      const on = !supportApplies();
+      if (on && !['yes', 'manual'].includes((store.get(SUPPORT_KEY, null) || {}).answered)) saveSupport('yes');
+      setSupportApply(on);
+      render();
+    } else if (o === 'updates') {
+      S.checkUpdates = !S.checkUpdates;
+      saveOpts();
+      render();
+    } else if (o === 'tradeonly') {
+      S.tradeOnly = !S.tradeOnly;
+      saveOpts();
+      showOnThisPage();
+      render();
+    } else if (o === 'hidesessions') {
+      S.hideSessions = !S.hideSessions;
+      saveOpts();
+      render();
+    } else if (o === 'theme') {
+      S.theme = !S.theme;
+      saveOpts();
+      applyTheme();
+      render();
+    } else if (o === 'hidemarks') {
+      S.hideMarks = !S.hideMarks;
+      saveOpts();
+      _marksDone = null; // switched on: hide them now
+      render();
+    } else if (o === 'bracket') {
+      S.chartBracket = !S.chartBracket;
+      saveOpts();
+      if (!S.chartBracket) clearBracketLines();
+      render();
+    }
+  }
+  function renderSettings(body) {
+    const option = optionHtml(openOpts(body));
     body.innerHTML = `
       <div class="settings">
         <div class="set-h">Copying</div>
@@ -11037,14 +11944,7 @@
           'Size each follower to its own equity, not 1:1.',
           'Every account takes the same % risk with the same stop distance, and <b>different-size followers</b> are allowed (e.g. a 25k master with 5k accounts). Off: strict 1:1, same-size accounts only.',
         )}
-        <div class="set-h">Chart</div>
-        ${option(
-          'hidemarks',
-          S.hideMarks,
-          'Hide marks on bars',
-          "Hide Vest's buy and sell marks each load.",
-          "The chart's right-click Hide marks on bars, which Vest forgets on every refresh. Show them again from that menu any time.",
-        )}
+        <div class="set-h">Panel</div>
         ${option(
           'tradeonly',
           S.tradeOnly,
@@ -11052,25 +11952,7 @@
           'Hidden elsewhere; it keeps copying.',
           "Hide the panel on Vest's other pages (Portfolio, Markets, Affiliate…). It keeps running and copying there, and shows on any page when something needs you.",
         )}
-        ${option(
-          'hidesessions',
-          S.hideSessions,
-          'Hide session shading',
-          "Remove Vest's pre-market and overnight bands.",
-          'Removes the pre-market, after-hours and overnight bands Vest draws on the chart (its Market Sessions indicator), every time it adds them.',
-        )}
-        ${option(
-          'theme',
-          S.theme,
-          'STRATUH theme',
-          "Onyx and lime for Vest's page and chart.",
-          "Recolours Vest's own page and chart in STRATUH's colours: onyx, lime and greys, square corners, and drops the Volume indicator Vest adds to the chart by itself. Dark mode only; turn it off to go back to Vest's colours (the chart on the next refresh).",
-        )}
-        <div class="opt ${S.theme ? '' : 'dep-off'}">
-          <div class="opt-txt"><div class="opt-name">Shorts and losses</div>
-            <div class="opt-short">Candles stay grey either way.</div></div>
-          <div class="seg" data-theme-down><button data-v="mono" class="${S.themeDown === 'mono' ? 'on' : ''}">Grey</button><button data-v="red" class="${S.themeDown === 'red' ? 'on' : ''}">Red</button></div>
-        </div>
+        <div class="set-row"><button class="ghostbtn" data-tab-go="appearance">${ICON.look} Theme, chart and text size</button></div>
         <div class="set-h">Updates</div>
         ${option(
           'updates',
@@ -11092,45 +11974,69 @@
         )}
         <div class="set-row"><button class="ghostbtn" data-act="copy-code">${ICON.copy} Copy code ${SUPPORT_CODE}</button></div>
       </div>`;
-    body.querySelectorAll('[data-q]').forEach((b) => (b.onclick = () => b.closest('.opt').classList.toggle('open')));
-    body.querySelectorAll('[data-opt]').forEach(
-      (b) =>
-        (b.onclick = () => {
-          const o = b.getAttribute('data-opt');
-          if (o === 'fast') toggleFast();
-          else if (o === 'autoflat') toggleAutoFlatten();
-          else if (o === 'capfit') toggleCapFit();
-          else if (o === 'supportapply') {
-            const on = !supportApplies();
-            if (on && !['yes', 'manual'].includes((store.get(SUPPORT_KEY, null) || {}).answered)) saveSupport('yes');
-            setSupportApply(on);
-            render();
-          } else if (o === 'updates') {
-            S.checkUpdates = !S.checkUpdates;
-            saveOpts();
-            render();
-          } else if (o === 'tradeonly') {
-            S.tradeOnly = !S.tradeOnly;
-            saveOpts();
-            showOnThisPage();
-            render();
-          } else if (o === 'hidesessions') {
-            S.hideSessions = !S.hideSessions;
-            saveOpts();
-            render();
-          } else if (o === 'theme') {
-            S.theme = !S.theme;
-            saveOpts();
-            applyTheme();
-            render();
-          } else if (o === 'hidemarks') {
-            S.hideMarks = !S.hideMarks;
-            saveOpts();
-            _marksDone = null; // switched on: hide them now
-            render();
-          }
-        }),
-    );
+    wireOptions(body);
+    body.querySelector('[data-act="check-now"]').onclick = () => checkForUpdate(true);
+    body.querySelector('[data-act="copy-code"]').onclick = () =>
+      copySupportCode().then((ok) => toast(ok ? `Code ${SUPPORT_CODE} copied.` : `Code: ${SUPPORT_CODE}`));
+  }
+
+  // Appearance: the panel's text size, what the copier draws on (or hides from) Vest's chart, and the STRATUH theme.
+  function renderAppearance(body) {
+    const option = optionHtml(openOpts(body));
+    const seg = (attr, cur, opts) =>
+      `<div class="seg" ${attr}>${opts.map(([v, l]) => `<button data-v="${v}" class="${cur === v ? 'on' : ''}">${l}</button>`).join('')}</div>`;
+    body.innerHTML = `
+      <div class="settings">
+        <div class="set-h">Panel</div>
+        <div class="opt">
+          <div class="opt-txt"><div class="opt-name">Text size</div>
+            <div class="opt-short">The whole panel grows with it.</div></div>
+          ${seg('data-text-size', S.textSize, [
+            ['regular', 'Regular'],
+            ['large', 'Large'],
+            ['larger', 'Larger'],
+          ])}
+        </div>
+        <div class="set-h">Chart</div>
+        ${option(
+          'bracket',
+          S.chartBracket,
+          'Bracket on the chart',
+          'Entry, stop and targets drawn as you set them.',
+          "While the Trade tab is open and you're not in a trade, your entry, stop, targets and fail price are drawn on Vest's chart for the side you point at (Buy or Sell). They follow the price and your points. They're a preview: nothing is sent until you click.",
+        )}
+        ${option(
+          'hidemarks',
+          S.hideMarks,
+          'Hide marks on bars',
+          "Hide Vest's buy and sell marks each load.",
+          "The chart's right-click Hide marks on bars, which Vest forgets on every refresh. Show them again from that menu any time.",
+        )}
+        ${option(
+          'hidesessions',
+          S.hideSessions,
+          'Hide session shading',
+          "Remove Vest's pre-market and overnight bands.",
+          'Removes the pre-market, after-hours and overnight bands Vest draws on the chart (its Market Sessions indicator), every time it adds them.',
+        )}
+        <div class="set-h">Theme</div>
+        ${option(
+          'theme',
+          S.theme,
+          'STRATUH theme',
+          "Onyx and lime for Vest's page and chart.",
+          "Recolours Vest's own page and chart in STRATUH's colours: onyx, lime and greys, square corners, and drops the Volume indicator Vest adds to the chart by itself. Dark mode only; turn it off to go back to Vest's colours (the chart on the next refresh).",
+        )}
+        <div class="opt ${S.theme ? '' : 'dep-off'}">
+          <div class="opt-txt"><div class="opt-name">Shorts and losses</div>
+            <div class="opt-short">Candles stay grey either way.</div></div>
+          ${seg('data-theme-down', S.themeDown, [
+            ['mono', 'Grey'],
+            ['red', 'Red'],
+          ])}
+        </div>
+      </div>`;
+    wireOptions(body);
     body.querySelectorAll('[data-theme-down] button').forEach(
       (b) =>
         (b.onclick = () => {
@@ -11140,9 +12046,14 @@
           render();
         }),
     );
-    body.querySelector('[data-act="check-now"]').onclick = () => checkForUpdate(true);
-    body.querySelector('[data-act="copy-code"]').onclick = () =>
-      copySupportCode().then((ok) => toast(ok ? `Code ${SUPPORT_CODE} copied.` : `Code: ${SUPPORT_CODE}`));
+    body.querySelectorAll('[data-text-size] button').forEach(
+      (b) =>
+        (b.onclick = () => {
+          S.textSize = b.dataset.v;
+          saveOpts();
+          render(); // place() applies the new size
+        }),
+    );
   }
 
   // How it works and the risk terms: the first-run acknowledgement (required before copying or trading) and Help.
@@ -11161,8 +12072,8 @@
             seconds later is offered to flatten.</li>
           <li><b>An account that fails drops out.</b> A follower is removed and the others keep copying; if the master
             fails, copying stops.</li>
-          <li><b>Sizing.</b> Strict 1:1 copies the exact size (same-size accounts only). <b>Cap-to-fit</b> (Edit)
-            sizes each follower to its own equity: same % risk, same stop distance, smaller size.</li>
+          <li><b>Sizing.</b> <b>Cap-to-fit</b> (the default) sizes each follower to its own equity: same % risk, same
+            stop distance, smaller size. Strict 1:1 (Edit) copies the exact size (same-size accounts only).</li>
           <li><b>Shared risk.</b> One bad trade hits <b>every</b> linked account at once. Size so a simultaneous loss
             is survivable.</li>
         </ul>`;
@@ -11178,6 +12089,13 @@
             for anything that happens while you use it.</li>
           <li>It is not affiliated with or endorsed by Vest Markets. Whether your prop program allows a trade copier is
             yours to check. Nothing here is financial advice.</li>
+        </ul>
+        <div class="rules-h">Free, with my code</div>
+        <ul class="rules-list">
+          <li>STRATUH Copier is free. In return, whenever Vest's purchase window opens, it enters my code
+            <b>${SUPPORT_CODE}</b> (5% off your purchase) in place of any code already there, and the activity log says
+            when it does. Accepting these terms turns this on, even if you turned it off before. You can still type
+            another code at checkout, and <b>Settings → Support the copier</b> turns it off.</li>
         </ul>
         <div class="rules-terms">Full terms: <a href="${REPO_URL}/blob/main/DISCLAIMER.md" target="_blank" rel="noopener">Disclaimer</a>
           · <a href="${REPO_URL}/blob/main/LICENSE" target="_blank" rel="noopener">License</a></div>`;
@@ -11211,7 +12129,7 @@
       render();
       if (S.ackThenArm) arm();
       S.ackThenArm = false;
-      maybeOfferSupport();
+      supportOnTerms(true); // just accepted: the code is on
     };
   }
 
@@ -12708,6 +13626,7 @@
           `Claim profit: ${item.label} claimed ${money(item.claimable)}: ${money(item.net)} to your Primary Account within 24 hours.`,
         );
         diag('claim', { ...who(item.id), outcome: 'claimed', amount: body.amount, net: item.net, reply: res });
+        notePayout(item.id);
       } catch (e) {
         Object.assign(item, { status: 'failed', reason: e.message });
         logEvent('warn', `Claim profit: ${item.label} NOT claimed: ${e.message}.`);
@@ -12820,6 +13739,7 @@
     if (!force && S.day && S.day.start === start && Date.now() - S.day.at < DAY_REFRESH_MS) return;
     _dayBusy = true;
     try {
+      readPayouts(start);
       const r = await api(`/v3/trading-performance/series?from=${start}&to=${Date.now()}&points=${DAY_POINTS}`);
       const byAcct = {};
       for (const it of (r && r.items) || []) {
@@ -12864,9 +13784,47 @@
     }
     if (S.summaryOpen || S.shareOpen) render();
   }
-  // Today's P&L for an account (NaN until the day's start is known or while its balance is unread).
-  const todayOf = (r) =>
-    S.day && S.day.startEq[r.id] != null && !isNaN(r.equity) ? r.equity - S.day.startEq[r.id] : NaN;
+  // ── Payouts. A claim takes an account's profit out and starts it fresh at its starting balance, so Today counts from
+  // there for an account paid out today, the way a platform's report as of now does (the trade itself is on Share and
+  // in the account's history). Known from claims made here, Vest's live feed (profit_withdrawal) and Vest's payout list
+  // (GET /v3/capital/withdrawals, read with the day's series).
+  const PAYOUTS_KEY = 'vc-payouts';
+  S.payouts = store.get(PAYOUTS_KEY, {}) || {}; // accountId -> ms of its latest payout
+  function notePayout(id, at = Date.now()) {
+    if (!id || !(at > 0) || (S.payouts[id] || 0) >= at) return;
+    S.payouts[id] = at;
+    store.set(PAYOUTS_KEY, S.payouts);
+    if (S.summaryOpen || S.shareOpen) render();
+  }
+  function forgetPayout(id) {
+    if (!id || !S.payouts[id]) return;
+    delete S.payouts[id]; // Vest returned it: the money is back on the account
+    store.set(PAYOUTS_KEY, S.payouts);
+  }
+  const paidToday = (id) => (S.payouts[id] || 0) >= vestDayStart();
+  async function readPayouts(since) {
+    try {
+      const r = await api('/v3/capital/withdrawals?limit=50');
+      const list = (r && (r.withdrawals || r.items)) || [];
+      // the field names, so a Diag shows what Vest sends (no tokens in it)
+      diag('payouts', { outcome: 'read', count: list.length, fields: list[0] ? Object.keys(list[0]) : [] });
+      for (const w of list) {
+        if (/fail|refund|reject|cancel/i.test(String(w.status || ''))) continue;
+        const at = msOf(w.created_at ?? w.createdAt ?? w.requested_at ?? w.requestedAt ?? w.updated_at ?? w.timestamp);
+        const id = w.account_id || w.accountId;
+        if (id && at >= since) notePayout(id, at);
+      }
+    } catch {
+      /* best effort: claims made here and the live feed still count */
+    }
+  }
+  // Today's P&L for an account (NaN until the day's start is known or while its balance is unread): from the start of
+  // Vest's day, or from its starting balance when a payout today started it fresh.
+  const todayOf = (r) => {
+    if (!S.day || isNaN(r.equity)) return NaN;
+    if (paidToday(r.id)) return r.equity - r.size;
+    return S.day.startEq[r.id] != null ? r.equity - S.day.startEq[r.id] : NaN;
+  };
   const sp = (n) =>
     isNaN(n)
       ? '—'
@@ -12878,7 +13836,7 @@
     const known = rows.filter((r) => !isNaN(todayOf(r)));
     const today = known.reduce((a, r) => a + todayOf(r), 0);
     const open = known.reduce((a, r) => a + (r.upnl || 0), 0);
-    const openAtStart = known.reduce((a, r) => a + ((S.day && S.day.startUpnl[r.id]) || 0), 0);
+    const openAtStart = known.reduce((a, r) => a + ((S.day && !paidToday(r.id) && S.day.startUpnl[r.id]) || 0), 0);
     return { known: known.length, rows: rows.length, today, open, openAtStart, closed: today - (open - openAtStart) };
   }
 
@@ -12914,21 +13872,25 @@
     const daySub = hasDay
       ? `Today on ${d.known} account${d.known === 1 ? '' : 's'}${
           Math.abs(d.openAtStart) < 0.005 && (d.open || d.closed)
-            ? `<br>Closed <span class="mono">${sp(d.closed)}</span> · open <span class="mono">${sp(d.open)}</span>`
+            ? `<br><span title="Realized: trades closed today, plus the day's fees and funding. Open: profit on trades still open.">Realized <span class="mono">${sp(d.closed)}</span> · open <span class="mono">${sp(d.open)}</span></span>`
             : ''
         }`
       : S.day === null
         ? 'Since start · today loads in a moment'
         : 'Since start';
     const keepHtml = funded.length
-      ? `<div class="sum-keep" title="Each funded account's profit × its profit split, added up. Accounts in a loss count as $0.">
-          <span class="sum-keep-v">${money(keep)}</span> <span class="sum-keep-l">you keep after splits${openTrades ? ', if closed now' : ''}</span></div>`
+      ? `<div class="sum-keep" title="Each funded account's profit × its profit split, added up. Accounts in a loss count as $0.${
+          openTrades
+            ? " With trades open: as if they closed at today's price, after Vest's closing fee. Slippage on the close isn't counted."
+            : ''
+        }">
+          <span class="sum-keep-v">${money(keep)}</span> <span class="sum-keep-l">you keep after splits${openTrades ? ', if closed now, after fees' : ''}</span></div>`
       : '';
     body.innerHTML = `
       <div class="summary">
         <div class="sum-hero">
-          <button class="ghostbtn sum-share" data-act="share" title="A picture of today's P&amp;L to paste anywhere">${ICON.share} Share</button>
-          <div class="sum-total ${hero >= 0 ? 'pos' : 'neg'}" title="${hasDay ? "Since Vest's trading day began (20:00 ET)" : 'Equity − starting balance, all accounts'}">${sp(hero)}</div>
+          <button class="ghostbtn sum-share" data-act="share" title="A picture of today's P&amp;L or a trade, to paste anywhere">${ICON.share} Share</button>
+          <div class="sum-total ${hero >= 0 ? 'pos' : 'neg'}" title="${hasDay ? "Since Vest's trading day began (20:00 ET), or since a payout today started the account fresh" : 'Equity − starting balance, all accounts'}">${sp(hero)}</div>
           <div class="sum-day">${daySub}</div>
         </div>
         <div class="sum-sub">${hasDay ? `Since start <span class="mono">${sp(totalPnl)}</span> · ` : ''}equity <span class="mono">${money(totalEq)}</span> of <span class="mono">${money(totalInit)}</span></div>
@@ -12947,7 +13909,7 @@
                     : '';
               return `<div class="sum-row${r.id === S.master ? ' m' : ''}"><span class="tile${r.id === S.master ? ' m' : ''}">${esc(acctNum(r.label))}</span>
               <span class="sum-left"><span class="sum-name">${esc(r.label)}</span><span class="sum-k" title="${k > 0 ? `Keeps ${money(k)} after its ${Math.round(r.split * 100)}% split` : ''}">${esc(r.chip)}${side ? ' · ' + side : ''}</span></span>
-              <span class="sum-right"><span class="sum-td ${isNaN(td) ? '' : td >= 0 ? 'pos' : 'neg'}" title="Today">${hasDay ? sp(td) : ''}</span>
+              <span class="sum-right"><span class="sum-td ${isNaN(td) ? '' : td >= 0 ? 'pos' : 'neg'}" title="${paidToday(r.id) ? 'Today, since its payout started it fresh' : 'Today'}">${hasDay ? sp(td) : ''}</span>
                 <span class="sum-tot"><span class="sum-eq">${money(r.equity)}</span> <span class="sum-pnl ${isNaN(pnl) ? '' : pnl >= 0 ? 'pos' : 'neg'}" title="Since start">${isNaN(pnl) ? '—' : sp(pnl)}</span></span></span></div>`;
             })
             .join('')}
@@ -13056,9 +14018,9 @@
       refreshBalances(); // live equity now, rather than the series' last point
       if (!S.ack) {
         S.rulesOpen = true; // first use: the risk acknowledgement comes first
-        S.tradeOpen = S.summaryOpen = S.settingsOpen = false;
+        S.tradeOpen = S.summaryOpen = S.settingsOpen = S.appearOpen = false;
         render();
-      } else maybeOfferSupport();
+      } else supportOnTerms();
     } catch (e) {
       show(`<div class="empty">Failed to load accounts: ${esc(e.message)}</div>`);
     }
