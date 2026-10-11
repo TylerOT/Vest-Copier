@@ -123,7 +123,8 @@ your version and the API budget (click it for Vest's build and the site check).
 ## Updates
 
 New versions show up as a row above the activity line. Click **Install**, confirm in Tampermonkey, switch back to Vest and
-the page reloads with the new version. The [changelog](CHANGELOG.md) lists what each one changed.
+the page reloads with the new version. The [changelog](CHANGELOG.md) lists what each one changed, and the
+[roadmap](ROADMAP.md) what's coming next.
 
 ## About the AMPED code
 
