@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Vest Copier
 // @namespace    vestcopier
-// @version      0.39.0
+// @version      0.39.1
 // @description  Copies a master Vest account's trades to your other Vest accounts, live, and adds a points-based order panel.
 // @author       xAmped
 // @license      STRATUH Copier License — free to use, no selling; see LICENSE
@@ -36,7 +36,7 @@
     })(),
   };
 
-  const VERSION = '0.39.0';
+  const VERSION = '0.39.1';
   const API = 'https://api-gateway.hz.vestmarkets.com';
   const _fetch = window.fetch.bind(window);
   // Console echo of the activity log, for troubleshooting: localStorage.setItem('vc-debug', '1') and reload.
@@ -596,7 +596,25 @@
     for (const it of d.order_intents || []) {
       const pos = st.positions.find((x) => x.id === it.position_id),
         kind = it.kind === 'stop_loss' ? 'sl' : it.kind === 'take_profit' ? 'tp' : null;
-      if (!pos || !kind) continue;
+      if (!kind) continue;
+      if (!pos) {
+        // a leg waiting on an order that hasn't filled (a resting limit): kept to draw it on the chart
+        if (!it.position_id) continue;
+        const pl = (st.pendingLegs = st.pendingLegs || {}),
+          list = (pl[it.position_id] || []).filter((t) => t.id !== it.id);
+        if (it.state === 'pending_activation')
+          list.push({
+            id: it.id,
+            kind,
+            price: num(it.trigger_price),
+            qty:
+              it.size_mode && it.size_mode !== 'full_position' ? (it.size != null ? String(it.size) : undefined) : null,
+            exec: it.execution || 'market',
+          });
+        if (list.length) pl[it.position_id] = list;
+        else delete pl[it.position_id];
+        continue;
+      }
       pos.triggers = pos.triggers.filter((t) => t.id !== it.id);
       if (it.state === 'active') pos.triggers.push({ id: it.id, kind, price: num(it.trigger_price) });
     }
@@ -1062,9 +1080,29 @@
         0,
       ),
       orders: ((ord && ord.orders) || []).map(limitOrderOf).filter(Boolean),
+      // a resting limit's stop and targets wait on its size-0 position until it fills (Vest draws them only then)
+      pendingLegs: Object.fromEntries(
+        ((pos && pos.positions) || [])
+          .filter((p) => !(num(p.quantity) > 0) && posIdOf(p))
+          .map((p) => [
+            posIdOf(p),
+            [
+              ...(p.takeProfits || []).map((b) => pendingLegOf('tp', b)),
+              ...(p.stopLosses || []).map((b) => pendingLegOf('sl', b)),
+            ].filter((l) => l.id),
+          ]),
+      ),
       at: Date.now(),
     };
   }
+  // A pending stop or target from Vest's REST position: its size only when it's a sized one, and how it executes.
+  const pendingLegOf = (kind, b) => ({
+    id: b.id || null,
+    kind,
+    price: parseFloat(b.triggerPrice),
+    qty: b.quantity != null && b.sizeMode !== 'full_position' ? String(b.quantity) : null,
+    exec: b.executionType || 'market',
+  });
   // A resting limit entry (not a reduce), from Vest's REST list (camelCase or snake_case) or its feed: the Trade tab lists
   // the master's with a cancel button. Anything else is null.
   function limitOrderOf(o) {
@@ -1075,10 +1113,13 @@
     const side = String(o.side || '').toLowerCase();
     return {
       id,
+      positionId: o.positionId || o.position_id || null, // the size-0 placeholder holding its pending stop and targets
       symbol: o.symbol,
       isBuy: o.isBuy === true || side === 'buy' || side === 'long',
       price: num(o.price),
       qty: num(o.quantity),
+      leverage: num(o.leverage) || null,
+      expiration: o.expirationTime ?? o.expiration_time ?? null, // a re-placed limit keeps it, as Vest's own drag does
     };
   }
   // Mark prices for these symbols: the live feed when it's fresh, else one public ticker read.
@@ -1817,9 +1858,12 @@
       };
       if (o.req.price != null) payload.price = o.req.price;
       if (o.req.expirationTime != null) payload.expirationTime = o.req.expirationTime; // a moved limit keeps its expiry
+      const clearing = waitClear(f, o.sym);
+      if (clearing) await clearing; // a cancel on this market is still going through
       const r = await acctPost(f, '/v3/positions/open', payload);
       const rec = { positionId: r.positionId, orderId: r.orderId, legs: legsOf(payload, r), qty: cq.qty };
       if (followersMap) followersMap[f] = rec;
+      if (!isImmediate(o.req)) watchRestingOpen(f, payload, rec);
       logEvent('ok', `↳ OPENED ${cq.qty} ${o.sym} ${o.side} on ${accLabel(f)} (${lat()})`);
       // the diag record stays open here; confirmFills fills in filled / slippage / margin / met
       const d = diag('open', {
@@ -1846,6 +1890,36 @@
       });
       return null;
     }
+  }
+
+  // A resting limit copy is accepted at once and can still be refused a moment later (Vest's feed reports it); fill
+  // checks don't cover resting orders, so it's watched here. "Already exists" (a cancel on that market hadn't cleared)
+  // is retried once after the old position has gone; any refusal that stands is said in the log.
+  async function watchRestingOpen(f, payload, rec) {
+    const refused = (x) => x && x.missing && /refused/.test(x.why || '');
+    const ff = await feedFill(rec.orderId, RESTING_REJECT_WAIT_MS);
+    if (!refused(ff)) return;
+    diag('open', { ...who(f), outcome: 'refused-after', orderId: rec.orderId, why: ff.why });
+    let why = ff.why;
+    if (/10006/.test(why)) {
+      await waitMarketClear(f, payload.symbol);
+      try {
+        const r = await acctPost(f, '/v3/positions/open', payload);
+        Object.assign(rec, { positionId: r.positionId, orderId: r.orderId, legs: legsOf(payload, r) });
+        const again = await feedFill(r.orderId, RESTING_REJECT_WAIT_MS);
+        if (!refused(again)) {
+          logEvent('ok', `↳ ${accLabel(f)}: its limit was refused while the old one cleared; placed again.`);
+          return;
+        }
+        why = again.why;
+      } catch (e) {
+        why = e.message;
+      }
+    }
+    logEvent(
+      'warn',
+      `↳ ${accLabel(f)}: Vest refused its limit (${why}), so it has no waiting order. Check it on Vest.`,
+    );
   }
 
   // Close / reduce one follower, retrying once on a rate limit or server error: an exit that silently fails leaves that
@@ -2209,13 +2283,27 @@
       if (!e) return untracked('cancel');
       const key = Object.keys(S.posMap).find((k) => S.posMap[k] === e);
       if (key) delete S.posMap[key];
+      // a moved limit is a cancel then a new order (Vest's chart drag, the panel's leg drag): each follower's copy of the
+      // new one waits until its cancel has gone through and the old position has cleared
+      const sent = {};
+      for (const f of followers) {
+        const fp = e.followers[f];
+        if (!fp || !fp.orderId) continue;
+        const done = new Promise((resolve) => (sent[f] = resolve));
+        gateCancel(f, e.symbol, async () => {
+          await done;
+          await waitPositionGone(f, fp.positionId);
+        });
+      }
       enqueue(e, () =>
         Promise.all(
           followers.map(async (f) => {
             const fp = e.followers[f];
             if (!fp || !fp.orderId) return;
             try {
-              await acctPost(f, '/v3/positions/cancel-order', { orderId: fp.orderId });
+              await acctPost(f, '/v3/positions/cancel-order', { orderId: fp.orderId }).finally(
+                () => sent[f] && sent[f](),
+              );
               logEvent('ok', `↳ cancelled order on ${accLabel(f)} (${lat()})`);
               diag('cancel', { ...who(f), orderId: fp.orderId, outcome: 'cancelled', met: true, ms: msSince(t0) });
             } catch (err) {
@@ -10055,6 +10143,51 @@
     const r = await api('/v3/positions/opened', (await mintAccountToken(accountId)).token);
     return ((r && r.positions) || []).find((x) => (positionId ? posIdOf(x) === positionId : x.symbol === sym)) || null;
   }
+  // After a cancel, Vest removes the order's (size-0) position a moment later, and an open on that market sent before
+  // that is refused ("This position already exists", code 10006; seen live 2026-10-11 when a limit was moved quickly).
+  // waitPositionGone: until the position is gone (up to POSITION_GONE_MS). gateCancel: while a cancel on an account's
+  // market is going through, opens there (copies, re-placed limits) wait for it (waitClear).
+  const POSITION_GONE_MS = 2500,
+    RESTING_REJECT_WAIT_MS = 1500;
+  async function waitPositionGone(acct, positionId) {
+    if (!positionId) return sleep(300);
+    const end = Date.now() + POSITION_GONE_MS;
+    while (Date.now() < end) {
+      try {
+        if (!(await openPosition(acct, null, positionId))) return true;
+      } catch {
+        /* unreadable: look again */
+      }
+      await sleep(150);
+    }
+    return false;
+  }
+  // Until the account holds no unfilled (size-0) position on this market: a retry after "already exists".
+  async function waitMarketClear(acct, sym) {
+    const end = Date.now() + POSITION_GONE_MS;
+    while (Date.now() < end) {
+      try {
+        const r = await api('/v3/positions/opened', (await mintAccountToken(acct)).token);
+        if (!((r && r.positions) || []).some((x) => x.symbol === sym && !(parseFloat(x.quantity) > 0))) return true;
+      } catch {
+        /* unreadable: look again */
+      }
+      await sleep(150);
+    }
+    return false;
+  }
+  const _clearing = {}; // "account|symbol" -> a cancel going through on that market
+  function gateCancel(acct, sym, job) {
+    const key = acct + '|' + sym;
+    const p = job()
+      .catch(() => {})
+      .finally(() => {
+        if (_clearing[key] === p) delete _clearing[key];
+      });
+    _clearing[key] = p;
+    return p;
+  }
+  const waitClear = (acct, sym) => _clearing[acct + '|' + sym] || null;
   const tryOpenPosition = async (...a) => {
     try {
       return await openPosition(...a);
@@ -10716,26 +10849,206 @@
     diag('stop_entry', { outcome: 'triggered', side: e.side, symbol: e.symbol, level: e.level, price: e.hitPx, ioc });
     placeTrade(e.side, null, { setup: e.setup, stopEntry: e, ioc }).finally(unwatchUnused);
   }
-  // Waiting stop entries on Vest's chart, wherever the panel is, drawn like Vest's own limit lines: drag one to move it,
-  // its × cancels it.
+  // Waiting orders on Vest's chart, wherever the panel is. A stop entry: its line (drag it to move it, × cancels it) and
+  // its stop and targets, dashed, hanging off it (drag one to change that stop entry's points; nothing is sent, it's
+  // the copier's own order). A resting limit: Vest draws its line but not its stop and targets until it fills, so they
+  // are drawn here, to look at only (moving a leg of an unfilled order on Vest isn't confirmed yet).
   const _stopLines = lineSet();
   function syncStopLines() {
-    _stopLines.draw(
-      S.stopEntries
-        .filter((e) => chartOnMarket(e.symbol))
-        .map((e) => ({
-          id: e.id,
-          price: e.level,
-          text: `Stop ${e.side === 'long' ? 'Buy' : 'Sell'}${e.slip ? ` · slip ${e.slip}` : ''}`,
-          qty: fmtQty(e.qty, e.symbol),
-          color: e.side === 'long' ? LINE_UP : LINE_DOWN,
-          style: 0,
-          fill: true,
-          onMove: e.triggered ? null : (p) => moveStopEntry(e, p),
-          onCancel: () => cancelStopEntry(e, `${stopName(e)} cancelled (you cancelled it on the chart).`),
-        })),
-    );
+    const want = [];
+    for (const e of S.stopEntries.filter((x) => chartOnMarket(x.symbol))) {
+      want.push({
+        id: e.id,
+        price: e.level,
+        text: `Stop ${e.side === 'long' ? 'Buy' : 'Sell'}${e.slip ? ` · slip ${e.slip}` : ''}`,
+        qty: fmtQty(e.qty, e.symbol),
+        color: e.side === 'long' ? LINE_UP : LINE_DOWN,
+        style: 0,
+        fill: true,
+        onMove: e.triggered ? null : (p) => moveStopEntry(e, p),
+        onCancel: () => cancelStopEntry(e, `${stopName(e)} cancelled (you cancelled it on the chart).`),
+      });
+      want.push(...stopEntryBracket(e));
+    }
+    want.push(...limitLegLines());
+    _stopLines.draw(want);
   }
+  function stopEntryBracket(e) {
+    const tick = tickOf(e.symbol),
+      t = e.setup,
+      tag = `${e.side === 'long' ? 'Buy' : 'Sell'} stop`;
+    const plan = planPrices({
+      side: e.side,
+      entry: e.level,
+      stopPts: t.stopOn === false ? null : +t.stopPts,
+      targetPts: t.targets.map(Number),
+      tick,
+    });
+    if (plan.error) return [];
+    const drag = (kind, i) => (e.triggered ? null : (p) => setStopEntryLeg(e, kind, i, p));
+    const out = [];
+    if (plan.stop)
+      out.push({
+        id: e.id + '-sl',
+        price: plan.stop,
+        text: `SL ${+t.stopPts} pts`,
+        qty: tag,
+        color: LINE_DOWN,
+        style: 2,
+        onMove: drag('sl', 0),
+      });
+    plan.targets.forEach((p, i) =>
+      out.push({
+        id: `${e.id}-t${i}`,
+        price: p,
+        text: `TP${i + 1} ${+t.targets[i]} pts`,
+        qty: tag,
+        color: LINE_UP,
+        style: 2,
+        onMove: drag('tp', i),
+      }),
+    );
+    return out;
+  }
+  // A stop entry's stop or target dragged on the chart: its new points from the level (on the right side of it).
+  function setStopEntryLeg(e, kind, i, p) {
+    if (!S.stopEntries.includes(e) || e.triggered) return false;
+    const buy = e.side === 'long',
+      pts = dragPoints(e.level, p, tickOf(e.symbol), kind === 'sl' ? !buy : buy);
+    if (!pts) return false;
+    if (kind === 'sl') {
+      e.setup.stopPts = pts;
+      e.setup.stopOn = true;
+    } else {
+      e.setup.targets[i] = pts;
+      e.setup.targets.sort((a, b) => +a - +b);
+    }
+    logEvent('info', `${stopName(e)}: ${kind === 'sl' ? 'stop' : `target ${i + 1}`} now ${pts} pts.`);
+    diag('stop_entry', { outcome: 'leg-moved', side: e.side, symbol: e.symbol, kind, pts });
+    syncStopLines();
+    updateTrade();
+    return true;
+  }
+  // The master's resting limits' stop and targets, waiting for the fill (to look at only).
+  function limitLegLines() {
+    const st = S.master && S.acctState[S.master];
+    if (!st || !Array.isArray(st.orders) || !st.pendingLegs) return [];
+    const out = [];
+    for (const o of st.orders) {
+      const legs = (o.positionId && st.pendingLegs[o.positionId]) || [];
+      if (!legs.length || !chartOnMarket(o.symbol)) continue;
+      const tick = tickOf(o.symbol),
+        pts = (l) => +fmtNum(Math.abs(l.price - o.price), decimalsOf(tick)),
+        tag = `${o.isBuy ? 'Buy' : 'Sell'} limit`;
+      const tps = legs.filter((l) => l.kind === 'tp').sort((a, b) => pts(a) - pts(b));
+      for (const l of legs)
+        out.push({
+          id: `${o.id}-${l.id}`,
+          price: l.price,
+          text: l.kind === 'sl' ? `SL ${pts(l)} pts · on fill` : `TP${tps.indexOf(l) + 1} ${pts(l)} pts · on fill`,
+          qty: tag,
+          color: l.kind === 'sl' ? LINE_DOWN : LINE_UP,
+          style: 2,
+          onMove: (p) => moveLimitLeg(o, l.id, p),
+        });
+    }
+    return out;
+  }
+  // A resting limit's stop or target dragged on the chart. Vest can't change the legs of a limit that hasn't filled
+  // (its own table only cancels it), so this does what its chart drag of the limit itself does: cancel the order and
+  // place it again at once, same price, size, leverage and expiry, with the leg moved. Both go through the hooked fetch,
+  // so copying cancels and re-places the followers' copies too. Checked before anything is sent: the leg on the right
+  // side of the limit price (Vest's rule), the sizes of sized targets known, every leg a market one.
+  function moveLimitLeg(o, legId, p) {
+    const master = S.master,
+      st = master && S.acctState[master],
+      legs = (st && st.pendingLegs && st.pendingLegs[o.positionId]) || [],
+      leg = legs.find((l) => l.id === legId),
+      tick = tickOf(o.symbol),
+      long = o.isBuy,
+      at = roundTick(p, tick),
+      what = `${long ? 'Buy' : 'Sell'} limit at ${fmtPx(o.price, tick)}`;
+    const no = (why) => (toast(`${what}: ${why}`), false);
+    if (!leg || !(at > 0)) return false;
+    if (leg.kind === 'sl' ? (long ? at >= o.price : at <= o.price) : long ? at <= o.price : at >= o.price)
+      return no(
+        `a ${leg.kind === 'sl' ? 'stop' : 'target'} goes ${(leg.kind === 'sl') === long ? 'under' : 'over'} the limit price.`,
+      );
+    if (S.placing || S.adjusting || S.flattening || S.arming) return no('wait for the order going through.');
+    const tps = legs.filter((l) => l.kind === 'tp');
+    if (legs.some((l) => l.exec !== 'market') || (tps.length > 1 && tps.some((l) => !(+l.qty > 0))))
+      return no("its targets can't be rebuilt exactly here: cancel it and place it again.");
+    const lev =
+      o.leverage > 0 ? o.leverage : orderLeverage(levFor(S.levs, master, o.symbol), maxLeverageFor(o.symbol, master));
+    if (!(lev > 0)) return no("its leverage isn't known: cancel it and place it again.");
+    const pDec = decimalsOf(tick),
+      moved = legs.map((l) => (l.id === legId ? { ...l, price: at } : l)),
+      mtps = moved.filter((l) => l.kind === 'tp');
+    const body = {
+      orderType: 'limit',
+      leverage: fmtNum(lev, 2),
+      side: long ? 'long' : 'short',
+      symbol: o.symbol,
+      quantity: fmtQty(o.qty, o.symbol),
+      timeInForce: 'GTC',
+      takeProfits: mtps.map((l) => ({
+        executionType: 'market',
+        triggerPrice: fmtNum(l.price, pDec),
+        ...(mtps.length > 1 ? { quantity: l.qty } : {}),
+      })),
+      stopLosses: moved
+        .filter((l) => l.kind === 'sl')
+        .map((l) => ({ executionType: 'market', triggerPrice: fmtNum(l.price, pDec) })),
+      price: fmtNum(o.price, pDec),
+      ...(o.expiration != null ? { expirationTime: o.expiration } : {}),
+    };
+    const name = leg.kind === 'sl' ? 'stop' : `target ${tps.indexOf(leg) + 1}`;
+    S.placing = true;
+    updateTrade();
+    (async () => {
+      try {
+        await send('POST', '/v3/positions/cancel-order', master, { orderId: o.id });
+      } catch (e) {
+        logEvent('warn', `${what}: couldn't move its ${name} (cancel refused: ${e.message}). The order is unchanged.`);
+        return;
+      }
+      st.orders = (st.orders || []).filter((x) => x.id !== o.id);
+      // Vest clears the old order's position a moment after the cancel; an order sent before is refused (code 10006)
+      await waitPositionGone(master, o.positionId);
+      const refused = (x) => x && x.missing && /refused/.test(x.why || '');
+      try {
+        let res = await send('POST', '/v3/positions/open', master, body),
+          ff = await feedFill(res.orderId, RESTING_REJECT_WAIT_MS);
+        if (refused(ff) && /10006/.test(ff.why)) {
+          await waitMarketClear(master, o.symbol);
+          res = await send('POST', '/v3/positions/open', master, body);
+          ff = await feedFill(res.orderId, RESTING_REJECT_WAIT_MS);
+        }
+        if (refused(ff)) throw new Error(ff.why);
+        logEvent(
+          'ok',
+          `${what}: ${name} moved to ${fmtPx(at, tick)}, order re-placed${S.armed ? ' (followers too)' : ''}.`,
+        );
+        diag('trade_panel', { outcome: 'limit-leg-moved', kind: leg.kind, to: at, body });
+      } catch (e) {
+        logEvent(
+          'warn',
+          `${what}: it was cancelled to move its ${name}, but Vest refused it again (${e.message}). No limit is waiting now: place it again.`,
+        );
+        diag('trade_panel', { outcome: 'limit-replace-failed', error: e.message, body });
+      }
+    })().finally(() => {
+      S.placing = false;
+      syncStopLines();
+      updateTrade();
+      refreshTradeState();
+    });
+    return true;
+  }
+  const masterHasLimits = () => {
+    const st = S.master && S.acctState[S.master];
+    return !!(st && Array.isArray(st.orders) && st.orders.length);
+  };
   // A stop entry dragged on the chart: the new level, on the tick (a buy stop rounds up, a sell down), still on its side
   // of the price.
   function moveStopEntry(e, p) {
@@ -10760,7 +11073,8 @@
     updateTrade();
     return true;
   }
-  setInterval(() => (S.stopEntries.length || _stopLines.any()) && syncStopLines(), 1000); // after Vest redraws its chart
+  // after Vest redraws its chart, and as limits come and go
+  setInterval(() => (S.stopEntries.length || _stopLines.any() || masterHasLimits()) && syncStopLines(), 1000);
   // Closing or reloading the tab ends them: say so in the log (kept in this browser), since nothing will fire.
   window.addEventListener('pagehide', () => {
     if (S.stopEntries.length) cancelStopEntries('the page was closed or reloaded (stop entries live in the tab).');

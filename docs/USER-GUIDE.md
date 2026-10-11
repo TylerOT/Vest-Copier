@@ -244,8 +244,13 @@ every order like any other master order.
     nothing is sent.
 - **Waiting orders** (under the buttons): your resting limits on this market and your stop entries, each with an **×**.
   The × on a limit cancels it on Vest (and the followers' copies while copying). On the chart, a stop entry is a lime
-  or red line you can drag to a new level, with its own ×; a limit is Vest's own line, which you can drag or cancel the
-  same way.
+  or red line you can drag to a new level, with its own ×, and its stop and targets hang off it as dashed lines: drag
+  one to change that stop order's points (the whole bracket moves with the entry). A limit is Vest's own line, which
+  you can drag or cancel the same way; until it fills, the copier draws its stop and targets as dashed lines marked
+  "on fill" (Vest shows them only once the limit fills). Drag one and the copier cancels the limit and places it again
+  at once with that stop or target moved (Vest can't change them on a waiting limit; its own drag of the limit does the
+  same cancel and re-place). While copying, the followers' copies do the same. For that split second the limit is off
+  the book.
 - **Fits your screen:** on the Trade tab the panel grows to the bottom of the window, and the buttons stay pinned in
   view while you scroll the form.
 

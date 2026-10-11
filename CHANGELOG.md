@@ -2,6 +2,13 @@
 
 Newest first. To update, click **Install** on the update row that appears in the panel whenever there's a newer version.
 
+## v0.39.1
+Moving limits is reliable on every account, and waiting orders show their whole bracket on the chart.
+
+- **Moving a limit while copying:** when a limit was moved quickly (dragging it on Vest's chart), a follower's new copy could reach Vest before its old one had cleared, and Vest refused it ("This position already exists"), leaving that follower without a limit and nothing in the log. Each follower's copy now waits until its old one has cleared, a refused copy is tried once more, and one that still fails is named in the log.
+- **Stop orders show their stop and targets** as dashed lines hanging off the order. Drag one to change that stop order's points; drag the order and its bracket moves with it.
+- **Limits show their stop and targets before they fill** (Vest only draws them once a limit fills), marked "on fill". Drag one and the limit is cancelled and placed again straight away with it moved, followers included, the same way Vest moves a limit you drag.
+
 ## v0.39.0
 Stop entries, your bracket on the chart before you click, and a bigger, adjustable panel.
 
