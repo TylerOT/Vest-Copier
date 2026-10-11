@@ -1,12 +1,13 @@
 // ==UserScript==
 // @name         Vest Copier
 // @namespace    vestcopier
-// @version      0.37.0
+// @version      0.38.0
 // @description  Copies a master Vest account's trades to your other Vest accounts, live, and adds a points-based order panel.
 // @author       xAmped
 // @license      STRATUH Copier License — free to use, no selling; see LICENSE
 // @homepageURL  https://github.com/xAmped/Vest-Copier
 // @supportURL   https://github.com/xAmped/Vest-Copier/issues
+// @icon         data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAHwklEQVR4Aexab2wUVRCfWVojiMp9QCFSqEFjjCHRRBNNRHbFWkSNNRFRKVoTo3zQpDXSI7bCAS3hikmbyAckJlYpCmJCCX+kFNytmGiCCSTEECIqUAggHw7kn7HtPn/zdreU2j1YKAdsu9nfmzfzZt7M+73Xvb1LDRrg1yABA/wA0OAJCDsBU6aUmFOnlqQCFBc/t+Dpp5+tmTSpKD19+oyVb7/9niOorKxOXSnmzKk2w+q42vbQE2AYJEXNIyIf/JFSqgp6ZX7+Ta8lEiMmCZh53pXCdUly0bW4Qgnouxju23wDWyMSoIhjxkFEApiUuoG3u4/SIxIQs9WDkIgExOz8RydADT4DBswzYNOm5hTAAVpa1nNr60Zua2vlpqbPOZ1e2G+oq6tJ4TRekzviM+Ca1HhVkw44AnqzGUpAOl1fXldXvz9AbW3dgfnzFx1MJqsOrVu3MXPo0OFOQSZzYn8m5zhZ3nshl6uHEoAJRxDxOAEefCLHQhYAd+Xl5Y0YPnz4EAEzj8s1iAi1Ub9cxqXPEr+PQFl7BALIfw2O18tQJAJYr10JcbFBBALi90VIdvGSCAh23pMSFh9cEgF48usVe1L/HWg9Dk02AnbhJ7AvBFgoJK+AXAl8c/bs2e3t7Yd+F4AUjFFOQcS7qJ+uUAKSyYpmoCxAdfXs11OpD0vx3j592rQXn5gw4YF7BInE7WW5x23N/bT+wZ/FQ0/ArPpRhe/WjzIDzFpy55Pv1N45eebcO4qTTWNLl2y7r3yJfV/5ivaHTcHX7Y+agjVHHjc9mObaI4KnzPVHgOOCKeZ3xwXPma3HfWRKTFvjJXN7RvAK5CvmT6dKNXZA7jhVZgp2nnrL3HnOw+5zs0zBnnPvmns6BOXmbx2CD8w/O3yoOWY7cETNKQw7MaEEGK5RppRha7iQXca2LmVsVZ20+eZb8leMHD+0ftT44fWkyB5Cho3XJNswxM+1WbFtKNfGryc2U5etDLLJZdgU5iObWdkuQ8KfXWUT/PEhaytmxLiYh2zldtlMZLskNmXjE8imIcom+BvIp0jZBvxdds/ng7/Oh/nJ4O58LhllkQnoGaBEQTVIKj0NZpSsFMFMSiy+Tj0kYVx0keLnuaEHO1odF0gZU7BrKQ3mkTjpCpj9fJBiD+KYPbv4aEAXKeMiBa40ITBC7BeY9WRYJRN7dghdLJLBrK2iM2MAHsyQ/mKkWIIufhiCip6vw8sjAToG4CYWIt1KvNjJu2R+6YlkxqKhBH7MugcLbj9O/KDpO9sis43pYGlQMklV3ScABmYkRTK03YsIkmKYui/fL9CZEdFXHOxBvPaFrknRChEz4oi0FD/RdB7YRSdcgS5xcCSR4tf/J0CSySIkOfqSRCeDriVs+vZ1XYw2SE0oE3a0JHFSvEgdB7vvJo5E0MWPcImf1pFXS9gkTuzM0iPSrYyTf8Eu8dl2OduYPwtqkR5m7z4B0JlxDJEMZn0CyNd7SlmU6CLFD2FQ0esRB+3CeDhJ0XBEYt3TkhmeEhdI34/ZqwOqd0OXDrxFaPTjCdDzEWH2gHkpESrWqIhZehgWiWJJLpHQlfSB/8XBpqPgx6x7pFvo5OsiJQ6umixmLBpK4Mese7Dg9uOCfLBQtl3ONiaxGnoy5NBSLOgwowgkg/l8UdD9YREe4Ad2vD5a5j7iYO+5SFFF7x0ndp0PebTUBm8+6aIsuiDO97usE+AabiOzawkMA9JwJ+exeorzaMo/ZzpmHt13tuLYH2cqFJOFz2ULLFjYJYtdtoiV5bJhERFsiFWwucoyGJKUpciwWJFFhmG5XYQcYmMLu4F5YDMINtdS8HfhT4h3Ec/wV5KPh2BuxtzK0vng7yIfSIHNtRj+eF+w8F5iEfzzyG1ELX3eyNmnnZZVHN2/tOKoE2DZ7GPff1p1bNuKBX+1pEsPNiUn722Ybe1tmFnwi/Nqwc/dmFbwozNttMBxXhzt4fnRWx3BMyM3Ox42OEUjgUQzZLNjQVqJb52JGqucibeuch7TaIJsch65tVHjoaGfOYIJQ5c5Ae4futS5P1/Q4Nyb7+Hu/I8dQQEvdgSjefH+vldJFEpAWEDc7KEEpNP1JUBjgJqaJV+mUouaKiurV69Zs/aH3bt/3SfIZE425g5/l/T3BoQSgEQPMvMbAvQh1UxmmoHPpJeHDRs2saBgzHgBbBijnAC5H0Qt/XpnI6BXInna9jLFQI1AgCLsdgyWfOESIhCAA6gkmKWJDSIR4J0AzcJAJGAAPwOCnfdkbDZfLyTbn8AJ/NUfEOAVF5IOot8OEg53dnaeOH36dJdAxnIFVIya0Ga5ow6FEoCfwxsqKysKBcnk+4VVVZXj5s2rGptO14554YVnE2PG3JUnSCRGFOYOtzdEXeDF/EMJuFhgXMYHCQjbSf/f5BWkRnHx86qoaKoyzSJVWvqmSiY/umzg+0QqLG+u7RFPQPw+CiMSEK+XIDltEQlgiYkVIhKgYveFKCIBg8+AWB1/WUzkEyBBcUIoAa5LDhHNPw+1EN8DaqHXdXT8+1Umc6JNgO8B86PCMEjmpuvhCiVg8+ZmZ5P3L/Pyb/OplpYNc7ds2Vjd1taaXL165Yzlyz8xBXV1NamoWLy45von4HrYnVzUEHoCcpH8eshxwxNwpST+BwAA//8h3IihAAAABklEQVQDADro88wjRs5WAAAAAElFTkSuQmCC
 // @updateURL    https://raw.githubusercontent.com/xAmped/Vest-Copier/main/src/vest-copier.user.js
 // @downloadURL  https://github.com/xAmped/Vest-Copier/releases/latest/download/vest-copier.user.js
 // @match        https://next.vestmarkets.com/*
@@ -21,8 +22,21 @@
   'use strict';
   if (window.__vestCopier) return;
   window.__vestCopier = true;
+  // How the script started, for the diagnostics: the page's load state (a late start can miss Vest's first requests) and
+  // whether this is a frame (Vest's chart is one) rather than the page.
+  const BOOT_STATE = {
+    readyState: document.readyState,
+    ms: Math.round(performance.now()),
+    frame: (() => {
+      try {
+        return window.top !== window;
+      } catch {
+        return true;
+      }
+    })(),
+  };
 
-  const VERSION = '0.37.0';
+  const VERSION = '0.38.0';
   const API = 'https://api-gateway.hz.vestmarkets.com';
   const _fetch = window.fetch.bind(window);
   // Console echo of the activity log, for troubleshooting: localStorage.setItem('vc-debug', '1') and reload.
@@ -117,12 +131,17 @@
       beMode: 'tp1',
       beTrigger: 15,
       beOffset: 0,
+      orderType: 'market', // market, or limit (the price picked on the chart)
+      unit: null, // NQ / ES / RTY: 'units' | 'micro' | 'mini' (null: Vest's own choice)
     },
     price: {}, // symbol -> { px, at } live price
   };
   // Per-symbol order rules, refreshed from /v3/exchangeInfo at load (NDX-USD-PERP: tick 0.25, 4 size decimals).
   // Contracts are linear (notional = price × quantity), so P&L is $1 per point per contract.
   const SYMBOLS = { [DEFAULT_SYMBOL]: { label: 'NQ', tick: 0.25, step: 0.0001, pointValue: 1 } };
+  // Vest's minis and micros: how many units one micro is ($ per point), from its bundle's map (2026-10-10:
+  // new Map([["SPX-USD-PERP",5n],["NDX-USD-PERP",2n],["RTY-USD-PERP",5n]])). A mini is 10 micros. Orders still send units.
+  const MICRO_UNITS = { 'NDX-USD-PERP': 2, 'SPX-USD-PERP': 5, 'RTY-USD-PERP': 5 };
 
   // ───────────────────────── jwt / token capture ─────────────────────────
   // The page's own tokens are read from its requests; nothing is stored. A user token (no accountId claim) lists
@@ -215,7 +234,7 @@
     if (missing.length)
       logEvent(
         'warn',
-        `Vest's ${action} order has changed — missing ${missing.join(', ')}. Copies may be wrong: disarm, run the site check (health bar), send Diag.`,
+        `Vest's ${action} order has changed — missing ${missing.join(', ')}. Copies may be wrong: stop copying, run the site check (the status dot), send Diag.`,
       );
     const fresh = extra.filter((k) => !_seenNewFields.has(action + '|' + k));
     fresh.forEach((k) => _seenNewFields.add(action + '|' + k));
@@ -940,7 +959,10 @@
     const role = wasMaster ? 'the master' : 'a follower';
     if (S.armed && (wasMaster || !S.followers.size)) {
       disarm();
-      logEvent('warn', `${name} (${role}) is no longer active — disarmed${wasMaster ? '' : ': no followers left'}.`);
+      logEvent(
+        'warn',
+        `${name} (${role}) is no longer active — copying stopped${wasMaster ? '' : ': no followers left'}.`,
+      );
     } else
       logEvent(
         'warn',
@@ -1187,7 +1209,7 @@
   let _liveRenderAt = 0,
     _liveRenderTimer = null,
     _pointerDown = false;
-  // A stop or target the price sits past without Vest filling it (a stop triggers on the bid, not the mark) would ask
+  // A stop or target the price sits past without Vest filling it (stops and targets trigger on the mid, not the mark) would ask
   // for a read on every new state: at most one per account per CROSSED_COOLDOWN_MS. State older than LIVE_STALE_MS
   // (reads failing) isn't re-priced: its positions may be gone.
   const CROSSED_COOLDOWN_MS = 15000,
@@ -1821,7 +1843,7 @@
     const untracked = (what) => {
       logEvent(
         'warn',
-        `↳ that position isn't tracked (opened while disarmed and not adopted) — the ${what} was NOT copied.`,
+        `↳ that position isn't tracked (opened while not copying, and not adopted) — the ${what} was NOT copied.`,
       );
       diag(action, {
         symbol: req.symbol,
@@ -2229,7 +2251,7 @@
           resting: !isImmediate(pending.req),
           leverage: pending.lev,
         }));
-        raiseOrphans(pending.sym, list, 'the copier was disarmed while they were being opened', S.master);
+        raiseOrphans(pending.sym, list, 'copying was stopped while they were being opened', S.master);
       });
       return;
     }
@@ -2293,7 +2315,7 @@
     if (masterIn)
       logEvent('warn', `The master may hold ${symLabel(sym)} itself — check it before flattening the followers.`);
     diag('orphan', { symbol: sym, followersOpened: n, why, autoFlatten: S.autoFlatten, masterMayBeIn: masterIn });
-    const items = list.map((o) => ({ ...o, symbol: sym, hold: masterIn }));
+    const items = list.map((o) => ({ ...o, symbol: sym, hold: masterIn, why }));
     S.orphan = { list: [...((S.orphan && S.orphan.list) || []), ...items] };
     if (S.autoFlatten && !masterIn) flattenOrphans(true);
     else {
@@ -2388,7 +2410,7 @@
     render();
     logEvent(
       'warn',
-      `FLATTEN ALL — closing every position and cancelling every order on ${ids.length} account(s).${S.armed ? ' The copier stays armed for your next trade.' : ''}`,
+      `FLATTEN ALL — closing every position and cancelling every order on ${ids.length} account(s).${S.armed ? ' Copying keeps running for your next trade.' : ''}`,
     );
     diag('flatten_all', { accounts: ids.length, armed: S.armed });
     try {
@@ -2558,6 +2580,12 @@
       pts = (room - 0.01 - 2 * qty * price * f) / (qty * (1 - f));
     return pts > 0 ? +(Math.floor(pts / tick + 1e-9) * tick).toFixed(decimalsOf(tick)) : 0;
   };
+  /**
+   * The size step for the unit the Trade tab sizes in. Vest sizes NQ, ES and RTY in whole minis or micros as well as
+   * units: `micro` is how many units one micro is on this market (a mini is 10). Units keep the market's own step.
+   */
+  const unitStep = (step, micro, unit) =>
+    micro > 0 && unit === 'micro' ? micro : micro > 0 && unit === 'mini' ? micro * 10 : step;
   /** What a stop-out costs from the price now: the move to the stop on the whole position, plus both fees. */
   const stopOutLoss = ({ side, qty, price, stopPrice, openFee, takerFee }) =>
     (side === 'long' ? 1 : -1) * qty * (price - stopPrice) + (openFee || 0) + qty * stopPrice * (takerFee || 0);
@@ -2579,13 +2607,15 @@
       maxRiskAt,
       maxRiskForRoom,
       maxStopForRoom,
+      unitStep,
     };
 
   // ───────────────────────── live price (public market data, read-only) ─────────────────────────
   // Vest's public socket streams, per market: `@ticker` (mark and margin mark price, about every 750 ms), `@depth_<tick>`
   // (the order book: best bid and ask on every change) and `@trades` (every trade as it prints). The price the copier uses
   // is Vest's own reference: the book's mid (open P&L, fail prices and targets are all measured on it), else the last
-  // trade, else the mark. Stops trigger on the bid (longs) or ask (shorts), so breakeven is checked against those. This is
+  // trade, else the mark. Stops trigger on the mid (Vest, 2026-10-10; before: the bid or ask); breakeven is checked against
+  // the bid (longs) or ask (shorts), a little stricter than the mid, so Vest never refuses the stop. This is
   // the copier's own read-only connection, open only while something needs a price (the Trade tab, breakeven, an open
   // position's P&L). A socket that goes quiet is closed and reopened, with backoff.
   const WS_URL = 'wss://ws.hz.vestmarkets.com/ws?version=1.0';
@@ -2611,7 +2641,8 @@
     if (recentAt(p.lastAt)) return p.last;
     return recentAt(p.at) ? p.px : null;
   };
-  // The price a stop on this side triggers on: the best bid for a long, the best ask for a short (null without a live book).
+  // The side of the book a breakeven stop is checked against: the best bid for a long, the best ask for a short (null
+  // without a live book). Vest triggers stops on the mid since 2026-10-10; the bid / ask is the stricter, safe check.
   const stopRefOf = (sym, side) => {
     const p = S.price[sym];
     return p && recentAt(p.bookAt) ? (side === 'long' ? p.bid : p.ask) : null;
@@ -2823,6 +2854,36 @@
       /* best effort: nothing to do if this fails */
     }
   }
+  // The unit the Trade tab sizes in on this market: the trader's pick, else Vest's own order-form choice (its
+  // localStorage "vest-trade" sizeUnit: USD, token, mini or micro), else units. Only NQ, ES and RTY have minis and micros.
+  function vestSizeUnit() {
+    try {
+      const v = JSON.parse(localStorage.getItem('vest-trade') || 'null');
+      const u = v && v.state && v.state.sizeUnit;
+      return u === 'mini' || u === 'micro' ? u : 'units';
+    } catch {
+      return 'units';
+    }
+  }
+  const tradeUnit = (sym = S.trade.symbol) =>
+    MICRO_UNITS[sym] ? (sym === S.trade.symbol && S.trade.unit) || vestSizeUnit() : 'units';
+  const unitSize = (sym = S.trade.symbol) => unitStep((SYMBOLS[sym] || {}).step, MICRO_UNITS[sym], tradeUnit(sym));
+  // A size in the chosen unit: "3 micros", "1 mini", or the units as they are ("2.5").
+  function fmtUnits(q, sym = S.trade.symbol, words = true) {
+    const u = tradeUnit(sym);
+    if (u === 'units') return fmtQty(q, sym);
+    const n = q / unitSize(sym),
+      whole = Math.abs(n - Math.round(n)) < 1e-6;
+    const txt = whole ? String(Math.round(n)) : '≈' + +n.toFixed(2);
+    return words ? `${txt} ${u}${whole && Math.round(n) === 1 ? '' : 's'}` : txt;
+  }
+  // Following Vest's own micros / minis choice with a size saved in units smaller than one of them: one whole one (as
+  // picking Micros or Minis here does), so the tab never opens at a size it can't send. When the tab opens and when the
+  // market changes, never while typing.
+  function fitQtyToUnit() {
+    if (S.trade.sizeMode === 'qty' && !S.trade.unit && tradeUnit() !== 'units' && +S.trade.qty < unitSize())
+      S.trade.qty = unitSize();
+  }
   const symLabel = (sym) => (SYMBOLS[sym] && SYMBOLS[sym].label) || String(sym).replace(/-USD-PERP$|-PERP$/, '');
 
   // ── The Trade tab trades the market Vest is showing: the page address is /trade/<display name> ("ES-PERP"), which Vest
@@ -2882,6 +2943,7 @@
     for (const k of ['qty', 'risk', 'stopPts', 'beTrigger', 'beOffset']) if (ok(m[k])) out[k] = m[k];
     if (['qty', 'risk', 'max'].includes(m.sizeMode)) out.sizeMode = m.sizeMode;
     if (['even', 'start', 'end'].includes(m.scale)) out.scale = m.scale;
+    if (['units', 'micro', 'mini'].includes(m.unit)) out.unit = m.unit;
     if (Array.isArray(m.targets) && m.targets.length && m.targets.every((x) => ok(+x) && +x > 0))
       out.targets = m.targets.map(Number);
     return out;
@@ -2899,8 +2961,10 @@
       scale: t.scale,
       beTrigger: t.beTrigger,
       beOffset: t.beOffset,
+      unit: t.unit,
     };
     const saved = cleanMarket(all[sym]);
+    t.unit = null; // a market without a saved unit follows Vest's own choice
     stopPick(true);
     S.addPick = null;
     t.symbol = sym;
@@ -3068,7 +3132,7 @@
         } else if (openSymbols.has(sym)) {
           logEvent(
             'info',
-            `Left ${accLabel(f)} ${symLabel(sym)} leverage at ${show(had)} (position open) — re-arm when flat to sync.`,
+            `Left ${accLabel(f)} ${symLabel(sym)} leverage at ${show(had)} (position open) — stop and start copying when flat to sync.`,
           );
           out.push({ ...rec, action: 'skipped-open-position' });
         } else {
@@ -3108,7 +3172,7 @@
       if (!m.id || m.id === TAB_ID) return;
       if (m.type === 'hello') tabSay('state');
       if (m.type === 'bye') return delete _peers[m.id];
-      if (!_peers[m.id]) logEvent('warn', 'The copier is open in another Vest tab too. Arm it in one tab only.');
+      if (!_peers[m.id]) logEvent('warn', 'The copier is open in another Vest tab too. Copy from one tab only.');
       _peers[m.id] = { armed: !!m.armed, at: Date.now() };
     };
     window.addEventListener('pagehide', () => tabSay('bye'));
@@ -3138,7 +3202,7 @@
     try {
       if (sessionStorage.getItem(WAS_ARMED_KEY) !== '1') return;
       sessionStorage.removeItem(WAS_ARMED_KEY);
-      logEvent('warn', 'The page reloaded while the copier was armed: it is disarmed now. Arm again to keep copying.');
+      logEvent('warn', 'The page reloaded while copying, so copying stopped. Press Start copying to continue.');
     } catch {
       /* best effort: nothing to do if this fails */
     }
@@ -3156,14 +3220,14 @@
     if (!S.followers.size) return toast('Pick at least one follower.');
     if (S.placing || S.adjusting || claimBusy()) return toast('Wait for the current order or claim to finish.');
     if (armedElsewhere())
-      return toast('The copier is armed in another Vest tab. Disarm it there first: two would copy every trade twice.');
+      return toast('The copier is copying in another Vest tab. Stop it there first: two would copy every trade twice.');
     if (healthState().changed) {
       // Vest shipped an update the site check hasn't passed (it runs by itself)
       logEvent(
         'warn',
         siteGate() === 'failed'
-          ? 'Not armed — Vest changed something the copier relies on. Copying is off until a copier update.'
-          : 'Not armed — Vest updated its site and the check is still running.',
+          ? 'Not started — Vest changed something the copier relies on. Copying is off until a copier update.'
+          : 'Not started — Vest updated its site and the check is still running.',
       );
       return render();
     }
@@ -3178,7 +3242,7 @@
       logEvent('info', 'Checking open positions…');
       const plan = await planArm(master, followers);
       if (plan.error) {
-        logEvent('warn', 'Not armed — ' + plan.error + '.');
+        logEvent('warn', 'Not started — ' + plan.error + '.');
         diag('arm', { outcome: 'blocked', reason: plan.error });
         return;
       }
@@ -3189,11 +3253,11 @@
         await refreshBalances();
       }
       if (epoch !== _armEpoch) {
-        logEvent('warn', 'Not armed — disarmed or flattened while arming.');
+        logEvent('warn', 'Not started — stopped or flattened while starting.');
         return;
       }
       if (!unchanged()) {
-        logEvent('warn', 'Not armed — the selection changed while arming. Click ARM again.');
+        logEvent('warn', 'Not started — the accounts changed while starting. Press Start copying again.');
         return;
       }
 
@@ -3203,8 +3267,8 @@
       dropClaimReview();
       const trades = Object.values(plan.adopted);
       logEvent(
-        'warn',
-        `ARMED · copying live${S.capFit ? ' · cap-to-fit' : ''}. Master ${accLabel(master)} → ${followers.map(accLabel).join(', ')}.`,
+        'ok',
+        `Started copying ${accLabel(master)} to ${followers.map(accLabel).join(', ')}${S.capFit ? ' (cap-to-fit)' : ''}.`,
       );
       for (const t of trades) {
         const inIt = Object.keys(t.followers).map(accLabel);
@@ -3251,7 +3315,7 @@
     S.posMap = {};
     S.orphan = null;
     noteArmed(false);
-    logEvent('info', 'Disarmed.');
+    logEvent('info', 'Stopped copying.');
     if (open)
       logEvent(
         'warn',
@@ -3262,9 +3326,9 @@
   }
 
   // ───────────────────────── selection ─────────────────────────
-  const LOCKED_MSG = 'Disarm first to change the master, followers or Cap-to-fit.';
+  const LOCKED_MSG = 'Stop copying first to change the master, followers or Cap-to-fit.';
   function setMaster(id) {
-    if (S.arming) return toast('Wait for arming to finish.');
+    if (S.arming) return toast('Wait for copying to start.');
     if (S.armed) return toast(LOCKED_MSG);
     S.master = S.master === id ? null : id;
     S.followers.delete(id);
@@ -3279,7 +3343,7 @@
     render();
   }
   function toggleFollower(id) {
-    if (S.arming) return toast('Wait for arming to finish.');
+    if (S.arming) return toast('Wait for copying to start.');
     if (S.armed) return toast(LOCKED_MSG);
     if (!S.master || !S.byId[S.master] || !S.byId[id]) return toast('Pick a master first.');
     if (!S.capFit && S.byId[id].groupKey !== S.byId[S.master].groupKey) {
@@ -3374,6 +3438,7 @@
     Object.assign(S.trade, cleanMarket(t), {
       symbol: SYMBOLS[t.symbol] ? t.symbol : S.trade.symbol, // another market comes back via followVestMarket
       ...(['off', 'tp1', 'points'].includes(t.beMode) ? { beMode: t.beMode } : {}),
+      ...(['market', 'limit'].includes(t.orderType) ? { orderType: t.orderType } : {}),
     });
   }
   function saveTrade() {
@@ -3634,6 +3699,7 @@
   async function checkForUpdate(manual = false) {
     if (!S.checkUpdates && !manual) return;
     clearTimeout(_updateNoteTimer);
+    S.update.manual = manual; // "Checking…" and "Up to date" show only for Check now
     S.update.state = 'checking';
     renderUpdate();
     try {
@@ -3681,20 +3747,20 @@
   function renderUpdate() {
     const bar = _root && _root.querySelector('.update');
     if (!bar || !S.update) return;
-    const { state, latest, dismissed } = S.update;
+    const { state, latest, dismissed, manual } = S.update;
     let html = '';
-    if (state === 'checking') html = '<span class="utext">Checking for updates…</span>';
-    else if (state === 'current') html = `<span class="utext">Up to date · v${VERSION}</span>`;
-    else if (state === 'error')
-      html = '<span class="utext">Couldn\'t check for updates — try Settings → Check now later.</span>';
+    if (state === 'checking' && manual) html = '<span class="utext">Checking for updates…</span>';
+    else if (state === 'current' && manual) html = `<span class="utext">Up to date · v${VERSION}</span>`;
+    else if (state === 'error' && manual)
+      html = '<span class="utext">Couldn\'t check for updates. Try Check now again later.</span>';
     else if (state === 'installing')
       html = S.armed
-        ? `<span class="utext">After updating in Tampermonkey, reload Vest to run v${esc(latest)}. Reloading disarms the
-            copier; arm again afterwards (an open trade is adopted).</span>
+        ? `<span class="utext">After updating in Tampermonkey, reload Vest to run v${esc(latest)}. Reloading stops copying;
+            start again afterwards (an open trade is adopted).</span>
           <button class="ubtn" data-act="update-reload">Reload now</button>`
         : '<span class="utext">Click <b>Update</b> in Tampermonkey, then come back: Vest reloads by itself.</span>';
     else if (state === 'available' && dismissed !== latest) {
-      html = `<span class="utext"><b>Update available: v${esc(latest)}</b> (you have v${VERSION})${S.armed ? ' · install when flat' : ''}</span>
+      html = `<span class="utext"><b>v${esc(latest)}</b> ready${S.armed ? ' · install when flat' : ` · you have v${VERSION}`}</span>
       <a class="ubtn" href="${esc(S.update.installUrl || SCRIPT_URL)}" target="_blank" rel="noopener" title="Opens Tampermonkey's update page; then reload Vest">Install</a>
       <a class="ubtn ghost" href="${REPO_URL}/blob/main/CHANGELOG.md" target="_blank" rel="noopener">What's new</a>
       <button class="ubtn ghost" data-act="update-later" aria-label="Hide until the next version">Later</button>`;
@@ -4463,30 +4529,32 @@
       --bg: #0c0c0d;
       --elev: #141416;
       --elev2: #1a1a1d;
+      --s1: #121214;
+      --s2: #18181b;
+      --s3: #202024;
       --sunk: #080809;
+      --hair: rgba(255, 255, 255, 0.06);
       --line: rgba(255, 255, 255, 0.09);
-      --line2: rgba(255, 255, 255, 0.18);
+      --line2: rgba(255, 255, 255, 0.16);
       --text: #f0f0f1;
       --dim: #a1a1a8;
-      --faint: #66666e;
+      --faint: #6b6b73;
       --accent: #c8f542;
       --ink: #0c0c0d;
       --accent-dim: rgba(200, 245, 66, 0.1);
-      --accent-line: rgba(200, 245, 66, 0.45);
+      --accent-line: rgba(200, 245, 66, 0.4);
       --danger: #ff5a4f;
       --danger-dim: rgba(255, 90, 79, 0.1);
-      --danger-line: rgba(255, 90, 79, 0.45);
+      --danger-line: rgba(255, 90, 79, 0.42);
       --warn: #f5b942;
       --warn-dim: rgba(245, 185, 66, 0.1);
       --warn-line: rgba(245, 185, 66, 0.4);
-      --blue: #7ab8ff;
-      --blue-dim: rgba(122, 184, 255, 0.12);
       --sans: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
       --mono: 'JetBrains Mono', ui-monospace, 'SF Mono', 'Cascadia Mono', Consolas, Menlo, monospace;
       position: fixed;
       top: 16px;
       right: 16px;
-      width: 368px;
+      width: 340px;
       max-height: calc(100vh - 32px);
       /* above the chart and Vest's page (its header is 40), below every Vest menu, dropdown and dialog (50) */
       z-index: 45;
@@ -4498,27 +4566,56 @@
       border: 1px solid var(--line2);
       box-shadow: 0 24px 70px rgba(0, 0, 0, 0.6);
       font-size: 13px;
+      line-height: 1.4;
+      -webkit-font-smoothing: antialiased;
       overflow: hidden;
     }
-    /* Labels: small mono capitals, like stratuh.com */
-    .group-h,
+    button {
+      font-family: inherit;
+    }
+    /* Small section labels: mono capitals, like stratuh.com. Everything else is sentence case. */
+    .eyebrow,
     .set-h,
-    .logh,
     .tr-lbl,
     .tr-pxl,
-    .tab,
     .title {
       font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.12em;
       text-transform: uppercase;
+      color: var(--faint);
+    }
+    .hint {
+      font-size: 11.5px;
+      line-height: 1.45;
+      color: var(--faint);
+    }
+    .amber {
+      color: var(--warn);
+    }
+    .lnk {
+      cursor: pointer;
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: 12px;
+      color: var(--dim);
+      text-decoration: underline;
+      text-decoration-color: var(--line2);
+      text-underline-offset: 3px;
+    }
+    .lnk:hover {
+      color: var(--text);
     }
     .hdr {
       display: flex;
       align-items: center;
-      gap: 6px;
-      height: 46px;
+      gap: 8px;
+      height: 44px;
       padding: 0 6px 0 12px;
       cursor: move;
-      border-bottom: 1px solid var(--line2);
+      border-bottom: 1px solid var(--hair);
       flex: none;
       touch-action: none;
       user-select: none;
@@ -4526,7 +4623,7 @@
     .brand {
       display: flex;
       align-items: center;
-      gap: 7px;
+      gap: 5px;
       flex: none;
     }
     .brand svg {
@@ -4534,48 +4631,61 @@
     }
     .sep {
       width: 1px;
-      height: 16px;
+      height: 14px;
       background: var(--line2);
       flex: none;
     }
     .title {
-      font-size: 10.5px;
-      letter-spacing: 0.12em;
-      color: var(--dim);
+      letter-spacing: 0.2em;
       white-space: nowrap;
-    }
-    .armtag {
-      font-family: var(--mono);
-      font-size: 9.5px;
-      font-weight: 700;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      padding: 3px 6px;
-      border: 1px solid;
-      white-space: nowrap;
-      line-height: 1.2;
-    }
-    .armtag.off {
-      color: var(--dim);
-      border-color: var(--line2);
-    }
-    .armtag.on {
-      color: var(--ink);
-      border-color: var(--accent);
-      background: var(--accent);
-    }
-    .opttag {
-      font-family: var(--mono);
-      font-size: 9px;
-      font-weight: 600;
-      color: var(--faint);
-      letter-spacing: 0.08em;
-      white-space: nowrap;
-      overflow: hidden;
-      min-width: 0;
     }
     .spacer {
       flex: 1;
+    }
+    /* the state, top right: lime copying, grey not copying, amber needs you, red check failed */
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      height: 22px;
+      padding: 0 8px;
+      background: var(--s2);
+      color: var(--dim);
+      font-size: 11.5px;
+      font-weight: 500;
+      white-space: nowrap;
+      flex: none;
+    }
+    .pdot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--faint);
+    }
+    .pill.live {
+      background: var(--accent-dim);
+      color: var(--accent);
+    }
+    .pill.warn {
+      background: var(--warn-dim);
+      color: var(--warn);
+    }
+    .pill.bad {
+      background: var(--danger-dim);
+      color: var(--danger);
+    }
+    .pill.live .pdot {
+      background: var(--accent);
+    }
+    .pill.warn .pdot {
+      background: var(--warn);
+    }
+    .pill.bad .pdot {
+      background: var(--danger);
+    }
+    .pillv,
+    .pillbtn {
+      display: none;
     }
     .iconbtn {
       cursor: pointer;
@@ -4584,72 +4694,170 @@
       border: 1px solid transparent;
       font-family: var(--mono);
       font-size: 11px;
-      font-weight: 600;
+      font-weight: 500;
       line-height: 1;
       padding: 5px 7px;
       transition: 0.12s;
     }
     .iconbtn:hover {
       color: var(--text);
-      border-color: var(--line2);
-    }
-    .iconbtn.active {
-      color: var(--accent);
-      border-color: var(--accent-line);
-    }
-    .iconbtn.ico {
-      display: inline-flex;
-      align-items: center;
-      padding: 5px 6px;
+      background: var(--s2);
     }
     .hdr .iconbtn {
-      padding: 5px 5px; /* the pin, reload and minimise fit beside ARMED · LIVE at the narrowest width */
+      display: inline-grid;
+      place-items: center;
+      width: 28px;
+      height: 28px;
+      padding: 0;
       flex: none;
     }
-    .tabs {
-      display: flex;
-      padding: 0 6px;
-      border-bottom: 1px dashed var(--line2);
-      flex: none;
-      overflow-x: auto; /* a narrow panel scrolls the tabs instead of squashing them */
-      scrollbar-width: none;
+    .hdr .iconbtn svg {
+      display: block;
     }
-    .tabs::-webkit-scrollbar {
+    /* a sheet (Settings, Help, the site check, Share): back arrow and its title in place of the logo and state */
+    .panel:not(.sheet) .hdr .back,
+    .sheett {
       display: none;
     }
-    .tab {
+    .sheet .hdr .back {
+      display: inline-grid;
+      margin-left: -6px;
+    }
+    .sheet .sheett {
+      display: block;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .sheet .hdr .brand,
+    .sheet .hdr .sep,
+    .sheet .hdr .title,
+    .sheet .hdr .pill,
+    .sheet .status,
+    .sheet .tabs,
+    .first .tabs,
+    .first .ctl {
+      display: none !important;
+    }
+    /* the ⋯ menu */
+    .menu {
+      position: absolute;
+      top: 40px;
+      right: 8px;
+      z-index: 4;
+      width: 214px;
+      padding: 4px;
+      display: grid;
+      background: var(--s2);
+      border: 1px solid var(--line2);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+    }
+    .menu[hidden] {
+      display: none;
+    }
+    .mi {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      height: 32px;
+      padding: 0 10px;
+      background: none;
+      border: none;
+      color: var(--text);
+      font-size: 13px;
+      text-align: left;
+      cursor: pointer;
+    }
+    .mi:hover {
+      background: var(--s3);
+    }
+    .mi svg {
+      color: var(--faint);
       flex: none;
+    }
+    .mi .mt {
+      flex: 1;
+    }
+    .mi .mk {
+      display: none;
+      color: var(--accent);
+    }
+    .mi.on .mk {
+      display: block;
+    }
+    .mi .mk svg {
+      color: var(--accent);
+    }
+    .mhr {
+      height: 1px;
+      margin: 4px 6px;
+      background: var(--hair);
+    }
+    /* the status block: one sentence, what last happened, Start / Stop copying and Flatten all */
+    .status {
+      padding: 13px 14px 12px;
+      display: grid;
+      gap: 10px;
+      flex: none;
+    }
+    .say {
+      font-size: 15.5px;
+      font-weight: 500;
+      line-height: 1.3;
+      letter-spacing: -0.005em;
+    }
+    .say em {
+      font-style: normal;
+      color: var(--accent);
+    }
+    .ssub {
+      font-size: 12px;
+      color: var(--faint);
+      margin-top: -6px;
+    }
+    .ssub:empty {
+      display: none;
+    }
+    .tabs {
+      padding: 0 14px 12px;
+      border-bottom: 1px solid var(--hair);
+      flex: none;
+    }
+    .tabseg {
+      display: flex;
+      gap: 2px;
+      padding: 2px;
+      background: var(--s1);
+      border: 1px solid var(--hair);
+    }
+    .tab {
+      flex: 1;
       cursor: pointer;
       background: none;
       border: none;
-      border-bottom: 2px solid transparent;
-      color: var(--faint);
-      font-size: 10px;
+      color: var(--dim);
+      font-size: 12.5px;
       font-weight: 500;
-      letter-spacing: 0.08em;
-      padding: 11px 7px 9px;
-      margin-bottom: -1px;
+      padding: 6px 4px;
     }
     .tab:hover {
       color: var(--text);
     }
     .tab.on {
+      background: var(--s3);
       color: var(--text);
-      border-bottom-color: var(--accent);
-    }
-    .tab.tab-support {
-      color: var(--accent);
     }
     .dot {
-      width: 6px;
-      height: 6px;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
       flex: none;
       display: inline-block;
     }
     .green {
       background: var(--accent);
     }
-    .amber {
+    .amber.dot,
+    .dot.amber {
       background: var(--warn);
     }
     .red {
@@ -4661,7 +4869,7 @@
     .body {
       flex: 1 1 auto;
       overflow: auto;
-      min-height: 96px; /* a short panel squeezes the open log first, then this; the bottom bar always shows */
+      min-height: 96px; /* a short panel squeezes the open log first, then this; the footer always shows */
     }
     .body::-webkit-scrollbar,
     .log::-webkit-scrollbar {
@@ -4671,275 +4879,331 @@
     .log::-webkit-scrollbar-thumb {
       background: #2a2a2e;
     }
+    /* one-time and only-when-it-applies bars: an update, the support question, the theme intro */
+    .alertzone {
+      flex: none;
+    }
     .update {
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 8px;
       flex-wrap: wrap;
-      padding: 8px 14px;
-      border-bottom: 1px dashed var(--line2);
-      background: var(--accent-dim);
-      color: var(--accent);
-      font-size: 11px;
-      flex: 0 1 auto; /* a short panel scrolls a long bar rather than losing the bottom bar */
-      min-height: 44px;
+      margin: 0 14px 10px;
+      padding: 9px 10px 9px 12px;
+      background: var(--s1);
+      color: var(--dim);
+      font-size: 12px;
+      line-height: 1.45;
+      max-height: 40vh;
       overflow: auto;
-      align-content: flex-start;
+    }
+    .update b {
+      color: var(--text);
+      font-weight: 500;
     }
     .utext {
-      flex-basis: 100%;
-      line-height: 1.5;
+      flex: 1 1 180px;
     }
     .update.muted {
-      background: none;
       color: var(--faint);
-      font-family: var(--mono);
-      font-size: 10px;
+      font-size: 11.5px;
     }
     .update[hidden] {
       display: none;
     }
+    .alertzone > .update:first-child:not([hidden]),
+    .alertzone > .update:not([hidden]) {
+      margin-top: 10px;
+    }
+    .alertzone > .update:not([hidden]) ~ .update:not([hidden]) {
+      margin-top: 0;
+    }
     .ubtn {
       cursor: pointer;
-      font-family: var(--mono);
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 0.04em;
-      padding: 5px 9px;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 6px 10px;
       border: 1px solid var(--accent);
       background: var(--accent);
       color: var(--ink);
       text-decoration: none;
+      white-space: nowrap;
     }
     .ubtn.ghost {
       border-color: var(--line2);
       background: none;
-      color: var(--dim);
+      color: var(--text);
+      font-weight: 500;
     }
     .ubtn:hover {
       filter: brightness(1.1);
     }
 
-    /* Accounts */
-    .group {
-      padding: 12px 14px 4px;
-    }
-    .group-h {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 9.5px;
-      font-weight: 500;
-      letter-spacing: 0.1em;
-      color: var(--faint);
-      margin-bottom: 8px;
-    }
-    .group-h .lime {
-      color: var(--accent);
-    }
-    .group-h .gr {
-      margin-left: auto;
-      text-transform: none;
-      letter-spacing: 0.02em;
-    }
-    .row {
+    /* Copier tab: one line per account (number, name, room to the floor, a dot), and Edit */
+    .cop {
+      padding: 12px 14px 14px;
       display: grid;
-      grid-template-columns: auto minmax(0, 1fr) auto auto;
       gap: 10px;
-      align-items: center;
-      padding: 10px 0;
-      border-top: 1px dashed var(--line);
+      align-content: start;
     }
-    .row:last-child {
-      border-bottom: 1px dashed var(--line);
-    }
-    .row.master {
-      gap: 8px;
-      padding: 10px 8px;
-      border: 1px solid var(--line2);
-      border-left: 2px solid var(--accent);
-      background: var(--elev);
-    }
-    .badge {
-      width: 30px;
-      height: 30px;
-      color: var(--dim);
+    .sech {
       display: flex;
+      justify-content: space-between;
       align-items: center;
-      justify-content: center;
-      font-weight: 600;
-      font-size: 11px;
-      border: 1px solid var(--line2);
+      gap: 10px;
+      min-height: 18px;
+    }
+    .sech .h {
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .sech + .accts,
+    .acct.head + .accts {
+      margin-top: -6px;
+    }
+    .accts {
+      display: grid;
+    }
+    .acct {
+      display: grid;
+      grid-template-columns: 24px minmax(0, 1fr) 96px 8px;
+      column-gap: 10px;
+      align-items: center;
+      min-height: 38px;
+      border-bottom: 1px solid var(--hair);
+    }
+    .acct:last-child {
+      border-bottom: 0;
+    }
+    .tile {
+      width: 24px;
+      height: 24px;
+      display: inline-grid;
+      place-items: center;
       font-family: var(--mono);
-    }
-    .row.master .badge {
-      color: var(--ink);
-      border-color: var(--accent);
-      background: var(--accent);
-      font-weight: 700;
-    }
-    .row.follower .badge {
-      color: var(--blue);
-      border-color: rgba(122, 184, 255, 0.45);
-    }
-    .meta {
-      min-width: 0;
-    }
-    .name {
+      font-size: 10.5px;
       font-weight: 600;
+      background: var(--s3);
+      color: var(--dim);
+      flex: none;
+    }
+    .tile.m {
+      background: var(--accent);
+      color: var(--ink);
+    }
+    .nm {
       font-size: 13px;
+      font-weight: 500;
       display: flex;
       align-items: center;
       gap: 6px;
       white-space: nowrap;
-      overflow: hidden; /* never runs into the balance column */
+      overflow: hidden;
+      min-width: 0;
     }
+    .nm small,
     .chip {
       font-family: var(--mono);
-      font-size: 8.5px;
+      font-size: 9.5px;
       font-weight: 500;
       letter-spacing: 0.08em;
       text-transform: uppercase;
       color: var(--dim);
-      border: 1px solid var(--line2);
-      padding: 1px 4px;
+      border: 1px solid var(--line);
+      padding: 2px 4px;
+      line-height: 1;
     }
-    .sub {
-      color: var(--faint);
-      font-size: 10px;
-      margin-top: 3px;
+    .room {
+      display: grid;
+      gap: 4px;
+      justify-items: end;
+    }
+    .room > span:first-child {
       font-family: var(--mono);
-      line-height: 1.45;
+      font-size: 12px;
+      font-weight: 500;
     }
-    .meta .sub {
-      white-space: nowrap;
+    .meter {
+      width: 100%;
+      height: 3px;
+      background: var(--s3);
       overflow: hidden;
-      text-overflow: ellipsis;
+      display: block;
     }
-    .right {
-      text-align: right;
-    }
-    .right .room {
-      font-weight: 600;
-      font-family: var(--mono);
-      font-size: 13px;
-    }
-    .used {
-      font-family: var(--mono);
-      font-size: 9.5px;
-      color: var(--faint);
-      margin-top: 2px;
-      white-space: nowrap;
-    }
-    .bar {
-      height: 2px;
-      background: var(--line2);
-      margin-top: 5px;
-      overflow: hidden;
-    }
-    .bar > i {
+    .meter i {
       display: block;
       height: 100%;
+      background: var(--dim);
     }
-    .bar-ok {
-      background: var(--accent);
-    }
-    .bar-warn {
+    .meter i.warn {
       background: var(--warn);
     }
-    .bar-hot {
-      background: var(--danger);
-    }
-    .sel {
-      display: flex;
-      border: 1px solid var(--line2);
-    }
-    .selbtn {
-      cursor: pointer;
-      font-family: var(--mono);
-      font-size: 9.5px;
-      font-weight: 700;
-      letter-spacing: 0.04em;
-      padding: 5px 0;
-      border: none;
-      background: none;
+    .acct.off .nm,
+    .acct.off .room > span:first-child {
       color: var(--faint);
-      min-width: 30px;
-      text-align: center;
-      transition: 0.12s;
     }
-    .selbtn + .selbtn {
-      border-left: 1px solid var(--line2);
+    .acct .note {
+      grid-column: 2 / -1;
+      font-size: 11.5px;
+      color: var(--warn);
+      margin: -6px 0 8px;
     }
-    .selbtn:hover:not(:disabled) {
-      color: var(--text);
+    .acct .note.dim {
+      color: var(--faint);
     }
-    .selbtn.m.on {
-      background: var(--accent);
-      color: var(--ink);
-    }
-    .selbtn.f.on {
-      background: var(--blue-dim);
-      color: var(--blue);
-    }
-    .selbtn:disabled {
-      opacity: 0.3;
-      cursor: not-allowed;
-    }
-    .selbtn.on:disabled {
-      opacity: 1; /* locked while armed: the picks stay clearly shown */
-    }
-
-    /* Arm / Flatten All */
-    .ctl {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      padding: 10px 14px;
-      border-top: 1px solid var(--line2);
+    .sdot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--faint);
+      display: inline-block;
       flex: none;
     }
-    .armbtn {
-      flex: 1;
-      cursor: pointer;
-      font-family: var(--mono);
-      font-weight: 700;
-      font-size: 11.5px;
-      letter-spacing: 0.1em;
-      padding: 9px;
-      border: 1px solid var(--text);
-      background: var(--text);
-      color: var(--ink);
-      transition: 0.12s;
+    .sdot.live {
+      background: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-dim);
     }
-    .armbtn:hover:not(:disabled) {
-      background: #fff;
+    .sdot.bad {
+      background: var(--danger);
     }
-    .armbtn.armed {
+    .sdot.hollow {
+      background: transparent;
+      border: 1px solid var(--faint);
+    }
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 14px;
+      font-size: 11px;
+      color: var(--faint);
+      align-items: center;
+    }
+    .legend span {
+      display: inline-flex;
+      gap: 6px;
+      align-items: center;
+    }
+    .legend .sdot {
+      width: 6px;
+      height: 6px;
+      box-shadow: none;
+    }
+    /* Edit: radio = master, box = follower */
+    .acct.ed {
+      grid-template-columns: 24px minmax(0, 1fr) 44px 36px;
+    }
+    .acct.ed.head {
+      min-height: 22px;
+      border-bottom: 0;
+    }
+    .acct.ed.head .eyebrow:nth-child(n + 3) {
+      text-align: center;
+      letter-spacing: 0.08em;
+    }
+    .rd,
+    .ck {
+      justify-self: center;
+      width: 16px;
+      height: 16px;
+      padding: 0;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--line2);
       background: none;
-      border-color: var(--danger);
-      color: var(--danger);
+      color: var(--ink);
+      cursor: pointer;
     }
-    .armbtn.armed:hover:not(:disabled) {
-      background: var(--danger-dim);
+    .rd {
+      border-radius: 50%;
     }
-    .armbtn:disabled {
+    .rd.on::after {
+      content: '';
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+    .ck svg {
+      width: 11px;
+      height: 11px;
+      stroke-width: 2.6;
+      visibility: hidden;
+    }
+    .ck.on {
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+    .ck.on svg {
+      visibility: visible;
+    }
+    .rd:disabled,
+    .ck:disabled {
       opacity: 0.35;
       cursor: not-allowed;
     }
+    .ck.on:disabled,
+    .rd.on:disabled {
+      opacity: 1;
+    }
+    .ckm {
+      justify-self: center;
+      color: var(--faint);
+      font-family: var(--mono);
+    }
+
+    /* Start / Stop copying and Flatten all */
+    .ctl {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+    }
+    .armbtn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      height: 34px;
+      padding: 0 14px;
+      border: 1px solid var(--accent);
+      background: var(--accent);
+      color: var(--ink);
+      transition: 0.12s;
+      white-space: nowrap;
+    }
+    .armbtn:hover:not(:disabled) {
+      filter: brightness(1.08);
+    }
+    /* stopping is routine, not danger: neutral */
+    .armbtn.armed {
+      background: var(--s2);
+      border-color: var(--line2);
+      color: var(--text);
+      font-weight: 500;
+    }
+    .armbtn.armed:hover:not(:disabled) {
+      background: var(--s3);
+      filter: none;
+    }
+    .armbtn:disabled {
+      background: var(--s2);
+      border-color: var(--line);
+      color: var(--faint);
+      cursor: not-allowed;
+    }
     .armbtn.sm {
-      flex: none;
-      padding: 8px 14px;
-      font-size: 10.5px;
+      height: 28px;
+      padding: 0 12px;
+      font-size: 12px;
     }
     .dangerbtn {
       cursor: pointer;
-      font-family: var(--mono);
-      font-weight: 700;
-      font-size: 10.5px;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      padding: 9px 14px;
+      font-size: 13px;
+      font-weight: 500;
+      height: 34px;
+      padding: 0 14px;
       border: 1px solid var(--danger-line);
       background: none;
       color: var(--danger);
@@ -4956,41 +5220,37 @@
     }
     .ghostbtn {
       cursor: pointer;
-      font-family: var(--mono);
-      font-size: 10.5px;
-      font-weight: 600;
-      letter-spacing: 0.03em;
-      padding: 7px 11px;
+      font-size: 12px;
+      font-weight: 500;
+      height: 28px;
+      padding: 0 10px;
       border: 1px solid var(--line2);
-      background: none;
-      color: var(--dim);
+      background: var(--s2);
+      color: var(--text);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
     }
     .ghostbtn:hover {
-      color: var(--text);
-      border-color: var(--text);
+      background: var(--s3);
     }
     a.ghostbtn {
       text-decoration: none;
-      display: inline-block;
     }
 
-    /* Settings */
+    /* Settings: one line per option, the full text behind ? */
     .settings {
       padding: 4px 14px 14px;
     }
     .set-h {
-      font-size: 9.5px;
-      font-weight: 500;
-      letter-spacing: 0.1em;
-      color: var(--accent);
-      padding: 14px 0 4px;
+      padding: 14px 0 2px;
     }
     .opt {
       display: flex;
-      align-items: flex-start;
-      gap: 12px;
-      padding: 11px 0;
-      border-bottom: 1px dashed var(--line);
+      align-items: center;
+      gap: 14px;
+      padding: 9px 0;
+      border-bottom: 1px solid var(--hair);
     }
     .opt:last-child {
       border-bottom: none;
@@ -4998,203 +5258,247 @@
     .opt.dep-off {
       opacity: 0.45;
     }
+    .opt[hidden] {
+      display: none;
+    }
     .opt-txt {
       flex: 1;
+      min-width: 0;
     }
     .opt-name {
-      font-weight: 600;
-      font-size: 12.5px;
-      margin-bottom: 3px;
+      font-weight: 500;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .opt-short {
+      color: var(--faint);
+      font-size: 11.5px;
+      line-height: 1.35;
+      margin-top: 2px;
     }
     .opt-desc {
+      display: none;
       color: var(--dim);
-      font-size: 11px;
+      font-size: 11.5px;
       line-height: 1.5;
+      margin-top: 6px;
+    }
+    .opt.open .opt-desc {
+      display: block;
+    }
+    .opt-desc b {
+      color: var(--text);
+      font-weight: 500;
+    }
+    .qm {
+      cursor: pointer;
+      width: 15px;
+      height: 15px;
+      border-radius: 50%;
+      border: 1px solid var(--line2);
+      background: none;
+      color: var(--faint);
+      font-family: var(--mono);
+      font-size: 9px;
+      line-height: 1;
+      padding: 0;
+      display: inline-grid;
+      place-items: center;
+    }
+    .qm:hover,
+    .opt.open .qm {
+      color: var(--text);
+      border-color: var(--text);
     }
     .switch {
       flex: none;
       position: relative;
-      width: 38px;
-      height: 20px;
-      border: 1px solid var(--line2);
-      background: none;
+      width: 30px;
+      height: 17px;
+      border: 1px solid var(--line);
+      background: var(--s3);
       cursor: pointer;
       padding: 0;
       transition: 0.15s;
-      margin-top: 2px;
     }
     .switch .knob {
       position: absolute;
-      top: 3px;
-      left: 3px;
-      width: 12px;
-      height: 12px;
+      top: 2px;
+      left: 2px;
+      width: 11px;
+      height: 11px;
       background: var(--faint);
       transition: 0.15s;
     }
     .switch.on {
-      border-color: var(--accent);
+      border-color: var(--accent-line);
       background: var(--accent-dim);
     }
     .switch.on .knob {
-      transform: translateX(18px);
+      transform: translateX(13px);
       background: var(--accent);
     }
     .set-row {
       display: flex;
-      gap: 6px;
-      padding: 4px 0 6px;
+      gap: 8px;
+      padding: 8px 0 4px;
     }
 
-    /* Activity: one line until opened; the orphan prompt and notices stay above it */
+    /* Alerts (only when they apply): the orphan prompt, notices, toasts. Then the footer: the latest log line (it opens into
+       the log) and the status dot (it opens the status card). */
     .alerts:empty {
       display: none;
     }
     .alerts {
-      padding: 10px 14px 0;
-      border-top: 1px solid var(--line2);
+      padding: 0 14px 10px;
+      display: grid;
+      gap: 8px;
       flex: none;
     }
+    .alerts:first-child,
+    .update[hidden] + .update[hidden] + .update[hidden] + .alerts {
+      padding-top: 10px;
+    }
     .orphan {
-      margin: 0 0 10px;
-      padding: 9px 10px;
-      background: var(--danger-dim);
-      border: 1px solid var(--danger-line);
-      color: var(--danger);
-      font-size: 11px;
+      padding: 11px 12px;
+      display: grid;
+      gap: 10px;
+      background: var(--warn-dim);
+      border: 1px solid var(--warn-line);
+      font-size: 12.5px;
       line-height: 1.45;
     }
-    .orphan .obtn {
-      cursor: pointer;
-      margin-left: 6px;
-      font-family: var(--mono);
-      font-size: 10px;
-      font-weight: 700;
-      padding: 3px 9px;
-      border: 1px solid var(--danger);
-      background: var(--danger);
-      color: var(--ink);
+    .orphan b {
+      font-weight: 600;
     }
-    .orphan .obtn.keep {
-      border-color: var(--line2);
+    .obtns {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .obtns .lnk {
+      margin-left: auto;
+    }
+    .obtn {
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 500;
+      height: 28px;
+      padding: 0 10px;
+      border: 1px solid var(--danger-line);
       background: none;
-      color: var(--dim);
+      color: var(--danger);
+    }
+    .obtn:hover {
+      background: var(--danger-dim);
+    }
+    .obtn.keep {
+      border-color: var(--line2);
+      background: var(--s2);
+      color: var(--text);
     }
     .toast {
-      margin: 0 0 10px;
-      padding: 8px 10px;
+      padding: 9px 12px;
       background: var(--warn-dim);
       border: 1px solid var(--warn-line);
       color: var(--warn);
-      font-size: 11px;
+      font-size: 12px;
+      line-height: 1.45;
     }
     .logwrap {
-      border-top: 1px solid var(--line2);
-      flex: 0 10 auto; /* gives up its height before the accounts do, down to its header line */
-      min-height: 30px;
+      border-top: 1px solid var(--hair);
+      flex: 0 10 auto; /* gives up its height before the body does, down to its one line */
+      min-height: 34px;
       display: flex;
       flex-direction: column;
       overflow: hidden;
     }
     .logh {
       flex: none;
-    }
-    .logh {
-      font-size: 9.5px;
-      font-weight: 500;
-      letter-spacing: 0.1em;
-      color: var(--faint);
-      padding: 8px 10px 8px 14px;
       display: flex;
       align-items: center;
       gap: 8px;
+      height: 34px;
+      padding: 0 8px 0 12px;
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--dim);
       cursor: pointer;
       user-select: none;
     }
-    .logh:hover .logt {
-      color: var(--text);
-    }
     .caret {
-      width: 8px;
+      display: grid;
+      color: var(--faint);
       flex: none;
     }
     .logt {
-      flex: none;
+      display: none;
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--faint);
+      flex: 1;
     }
     .loglast {
       flex: 1;
       min-width: 0;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+    .loglast .ts {
+      color: var(--faint);
+      flex: none;
+    }
+    .loglast .lm {
       overflow: hidden;
       text-overflow: ellipsis;
-      white-space: nowrap;
-      text-transform: none;
-      letter-spacing: 0;
-      font-size: 10.5px;
-      color: var(--dim);
+      min-width: 0;
     }
-    .loglast.ok {
+    .loglast.ok .lm {
       color: var(--accent);
     }
-    .loglast.warn {
+    .loglast.warn .lm {
       color: var(--warn);
     }
+    .loglast .lnk {
+      flex: none;
+      font-family: var(--sans);
+      font-size: 11.5px;
+    }
+    .logh:hover .lm {
+      color: var(--text);
+    }
     .logwrap.open .loglast {
-      visibility: hidden;
+      display: none;
+    }
+    .logwrap.open .logt {
+      display: block;
     }
     .loghbtns {
       display: none;
       gap: 2px;
-      text-transform: none;
     }
     .logwrap.open .loghbtns {
       display: flex;
     }
     .iconbtn.sm {
-      font-size: 10px;
-      padding: 2px 5px;
+      font-family: var(--sans);
+      font-size: 11.5px;
+      padding: 4px 6px;
     }
-    .log {
-      max-height: calc(5 * (1.55em + 2px) + 10px); /* five lines; the rest scrolls (CSV / Diag export it all) */
-      min-height: 0;
-      overflow: auto;
-      padding: 0 14px 10px;
-      font-size: 10.5px;
-      line-height: 1.55;
-      font-family: var(--mono);
-    }
-    .logwrap:not(.open) .log {
-      max-height: 0;
-      padding: 0;
-      overflow: hidden;
-    }
-    .le {
-      display: flex;
-      gap: 8px;
-      padding: 1px 0;
-      color: var(--dim);
-    }
-    .le .ts {
-      color: var(--faint);
-      flex: none;
-    }
-    .le.ok {
-      color: var(--accent);
-    }
-    .le.warn {
-      color: var(--warn);
-    }
-    .le.info {
-      color: var(--dim);
-    }
-
-    /* Bottom bar: the code on the left, Vest's build + version + API budget on the right (click = site check) */
+    /* the bottom bar: the code on the left; Vest's build · version · API budget on the right (click = status card) */
     .reportbar {
       display: flex;
       align-items: center;
-      gap: 8px;
-      padding: 8px 18px 8px 14px; /* clear of the resize grip in the corner */
+      gap: 10px;
+      height: 30px;
+      padding: 0 18px 0 12px; /* clear of the resize grip in the corner */
       background: var(--sunk);
-      border-top: 1px solid var(--line2);
+      border-top: 1px solid var(--hair);
       flex: none;
       white-space: nowrap;
     }
@@ -5203,11 +5507,11 @@
       background: none;
       border: none;
       padding: 0;
-      font-size: 10.5px;
+      font-size: 11px;
       color: var(--dim);
       display: inline-flex;
       align-items: center;
-      gap: 4px;
+      gap: 5px;
       flex: none;
     }
     .codebtn b {
@@ -5216,11 +5520,8 @@
       font-family: var(--mono);
       font-weight: 700;
       letter-spacing: 0.06em;
-      padding: 2px 5px;
+      padding: 1px 5px;
       font-size: 10.5px;
-    }
-    .codebtn .off {
-      color: var(--text);
     }
     .codebtn:hover b {
       filter: brightness(1.1);
@@ -5233,39 +5534,99 @@
       margin-left: auto;
       display: flex;
       align-items: center;
-      gap: 4px;
+      gap: 6px;
       min-width: 0;
-      font-family: var(--mono);
-      font-size: 9px;
-      color: var(--faint);
+      padding: 0;
+      background: none;
+      border: none;
       cursor: pointer;
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--faint);
     }
     .reportbar.alert .health {
       margin-left: 0;
-      flex: 1;
     }
-    .htext {
-      color: var(--dim);
+    .hsum {
       overflow: hidden;
       text-overflow: ellipsis;
     }
-    .health:hover .htext {
+    .health:hover .hsum {
       color: var(--text);
     }
-    .health.amber-bar .htext {
+    .reportbar.alert .hsum {
       color: var(--warn);
     }
-    .ver,
-    .rate {
-      flex: none;
+    .health .dot.green {
+      opacity: 0.85;
     }
-    .ver::before,
-    .rate:not(:empty)::before {
-      content: '· ';
+    .log {
+      max-height: calc(6 * (1.5em + 4px) + 8px); /* six lines; the rest scrolls (CSV / Diag export it all) */
+      min-height: 0;
+      overflow: auto;
+      padding: 0 12px 8px;
+      font-size: 11px;
+      line-height: 1.5;
+      font-family: var(--mono);
+    }
+    .logwrap:not(.open) .log {
+      max-height: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+    .le {
+      display: grid;
+      grid-template-columns: 58px 1fr;
+      gap: 8px;
+      padding: 2px 0;
+      color: var(--dim);
+    }
+    .le .ts {
       color: var(--faint);
     }
-    .r-ok {
-      color: var(--faint);
+    .le.ok {
+      color: var(--accent);
+    }
+    .le.warn {
+      color: var(--warn);
+    }
+    /* the status card: Vest's build, this version, the API budget, the site check */
+    .scard {
+      position: absolute;
+      right: 8px;
+      bottom: 34px;
+      z-index: 4;
+      width: 262px;
+      padding: 12px;
+      display: grid;
+      gap: 8px;
+      background: var(--s2);
+      border: 1px solid var(--line2);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+    }
+    .scard[hidden] {
+      display: none;
+    }
+    .kv {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 12px;
+      font-size: 12px;
+    }
+    .kv > span:first-child {
+      color: var(--dim);
+    }
+    .kv > span:last-child {
+      font-family: var(--mono);
+      text-align: right;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .scard .ghostbtn {
+      justify-self: start;
+      margin-top: 4px;
     }
     .r-amber {
       color: var(--warn);
@@ -5279,7 +5640,7 @@
       border: none;
       padding: 2px 0;
       color: var(--dim);
-      font-size: 10.5px;
+      font-size: 11.5px;
       text-decoration: underline;
       text-underline-offset: 2px;
     }
@@ -5314,42 +5675,46 @@
       line-height: 1.5;
     }
 
-    /* Rules, site check, support */
-    .rules {
+    /* Rules (first run), Help, the site check */
+    .rules,
+    .help {
       padding: 14px;
+      display: grid;
+      gap: 12px;
+      align-content: start;
     }
     .rules-h {
-      font-weight: 600;
-      margin: 2px 0 10px;
+      font-weight: 500;
       font-size: 13.5px;
-      letter-spacing: -0.01em;
+    }
+    .rules-h.big {
+      font-size: 15px;
     }
     .rules-list {
-      margin: 0 0 14px;
+      margin: 0;
       padding-left: 16px;
       color: var(--dim);
       font-size: 12px;
-      line-height: 1.6;
+      line-height: 1.55;
     }
     .rules-list li {
-      margin-bottom: 8px;
+      margin-bottom: 7px;
     }
     .rules-list li::marker {
-      color: var(--accent);
+      color: var(--faint);
     }
     .rules-list b {
       color: var(--text);
-      font-weight: 600;
+      font-weight: 500;
     }
     .rules-accept {
       display: flex;
       gap: 9px;
       align-items: flex-start;
-      margin: 4px 0 14px;
-      padding: 10px;
-      border: 1px solid var(--line2);
-      background: var(--elev);
-      font-size: 11.5px;
+      padding: 10px 12px;
+      background: var(--s1);
+      border: 1px solid var(--line);
+      font-size: 12px;
       line-height: 1.5;
       color: var(--text);
       cursor: pointer;
@@ -5359,65 +5724,109 @@
       accent-color: var(--accent);
     }
     .rules-terms {
-      font-size: 11px;
-      color: var(--dim);
-      margin: -6px 0 14px;
+      font-size: 11.5px;
+      color: var(--faint);
     }
     .rules-terms a,
-    .support-tab .sc-sub a {
-      color: var(--accent);
+    .sc-sub a {
+      color: var(--dim);
+      text-underline-offset: 3px;
     }
     .rules-btns {
       display: flex;
-      gap: 6px;
+      gap: 8px;
+    }
+    .help .grp {
+      display: grid;
+      gap: 8px;
+    }
+    .links {
+      font-size: 12px;
+      color: var(--faint);
+      line-height: 1.6;
+    }
+    .lrow {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      height: 36px;
+      padding: 0;
+      background: none;
+      border: none;
+      border-bottom: 1px solid var(--hair);
+      color: var(--text);
+      font-size: 13px;
+      text-align: left;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    .lrow:last-child {
+      border-bottom: 0;
+    }
+    .lrow .hint {
+      margin-left: auto;
+    }
+    .lrow svg {
+      color: var(--faint);
+      flex: none;
+    }
+    .lrow:hover > span:first-child {
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+    .code {
+      font-family: var(--mono);
+      font-weight: 500;
+      color: var(--accent);
+    }
+    .help .ghostbtn {
+      justify-self: start;
     }
     .sc-sub {
-      font-size: 11px;
+      font-size: 12px;
       color: var(--dim);
-      margin: -4px 0 12px;
       line-height: 1.5;
     }
     .sc-list {
       display: flex;
       flex-direction: column;
-      margin-bottom: 14px;
-      border-top: 1px dashed var(--line);
     }
     .sc-row {
       display: grid;
       grid-template-columns: auto 1fr;
-      gap: 9px;
+      gap: 10px;
       align-items: start;
       padding: 8px 0;
-      border-bottom: 1px dashed var(--line);
+      border-bottom: 1px solid var(--hair);
+    }
+    .sc-row:last-child {
+      border-bottom: 0;
     }
     .sc-row .dot {
       margin-top: 5px;
     }
     .sc-name {
-      font-weight: 600;
-      font-size: 12px;
+      font-weight: 500;
+      font-size: 12.5px;
     }
     .sc-detail {
       font-family: var(--mono);
-      font-size: 10px;
+      font-size: 10.5px;
       color: var(--dim);
       margin-top: 2px;
       line-height: 1.45;
     }
     .sc-note {
-      font-size: 10.5px;
+      font-size: 11.5px;
       color: var(--dim);
-      margin-top: 12px;
       line-height: 1.5;
     }
     .sc-h {
       font-family: var(--mono);
-      font-size: 9.5px;
-      letter-spacing: 0.08em;
+      font-size: 10px;
+      letter-spacing: 0.12em;
       text-transform: uppercase;
-      color: var(--dim);
-      margin: -4px 0 4px;
+      color: var(--faint);
     }
     .dot.pending {
       animation: vc-blink 1s ease-in-out infinite;
@@ -5427,18 +5836,27 @@
         opacity: 0.25;
       }
     }
-    /* Vest updated: the site check takes the panel (Flatten All, alerts, the log and a copier update stay) */
+    /* Vest updated: the site check takes the body (the status block, alerts and the footer stay) */
     .panel.gated .tabs,
     .panel.gated .support,
-    .panel.gated .themeintro,
-    .panel.gated [data-act='arm'] {
+    .panel.gated .themeintro {
       display: none !important;
     }
+    .gate {
+      margin: 12px 14px;
+      background: var(--s1);
+      border: 1px solid var(--line);
+    }
+    .gate .rules {
+      padding: 12px;
+    }
+    .gate-failed {
+      background: var(--danger-dim);
+      border-color: var(--danger-line);
+    }
     .gate-h {
-      font-weight: 700;
-      font-size: 15px;
-      letter-spacing: -0.01em;
-      margin: 2px 0 10px;
+      font-weight: 600;
+      font-size: 13.5px;
       color: var(--warn);
     }
     .gate-failed .gate-h {
@@ -5447,34 +5865,19 @@
     .gate-clear .gate-h {
       color: var(--accent);
     }
-    .sup-card {
-      border: 1px solid var(--line2);
-      padding: 12px;
-      margin-bottom: 10px;
-    }
-    .sup-h {
-      font-family: var(--mono);
-      font-size: 10px;
-      font-weight: 500;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: var(--accent);
-      margin-bottom: 8px;
-    }
     .report-note {
       width: 100%;
-      margin: 2px 0 10px;
       background: var(--sunk);
-      border: 1px solid var(--line2);
+      border: 1px solid var(--line);
       color: var(--text);
       font: inherit;
       font-size: 12px;
-      padding: 9px 10px;
+      padding: 8px 10px;
       resize: vertical;
       outline: none;
     }
     .report-note:focus {
-      border-color: var(--accent);
+      border-color: var(--accent-line);
     }
 
     /* Trade */
@@ -5586,36 +5989,35 @@
       margin-left: auto;
       color: var(--danger);
     }
+    /* segmented controls: the picked one is lifted, not lime (lime means live / buy / gain) */
     .seg {
       display: inline-flex;
-      border: 1px solid var(--line2);
+      gap: 2px;
+      padding: 2px;
+      background: var(--s1);
+      border: 1px solid var(--hair);
+      flex: none;
     }
     .seg button {
       background: none;
       border: none;
       color: var(--dim);
-      font-family: var(--mono);
-      font-size: 10.5px;
+      font-size: 12px;
       font-weight: 500;
       padding: 5px 9px;
       cursor: pointer;
-      text-transform: none;
-      letter-spacing: 0;
-    }
-    .seg button + button {
-      border-left: 1px solid var(--line2);
+      white-space: nowrap;
     }
     .seg button:hover {
       color: var(--text);
     }
     .seg button.on {
-      background: var(--accent);
-      color: var(--ink);
-      font-weight: 700;
+      background: var(--s3);
+      color: var(--text);
     }
-    .tr-lbl .seg button {
-      padding: 3px 8px;
-      font-size: 9.5px;
+    .tr-lh .seg button {
+      padding: 2px 7px;
+      font-size: 11px;
     }
     /* label + control rows */
     .tr-f {
@@ -5999,14 +6401,13 @@
     .tr-buy,
     .tr-sell {
       cursor: pointer;
-      font-weight: 700;
-      font-size: 12px;
-      padding: 11px;
-      font-family: var(--mono);
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
+      font-weight: 600;
+      font-size: 14px;
+      height: 42px;
+      padding: 0 12px;
       color: var(--ink);
       transition: 0.12s;
+      white-space: nowrap;
     }
     .tr-buy {
       border: 1px solid var(--accent);
@@ -6260,12 +6661,10 @@
     }
     .tr-redbtn {
       cursor: pointer;
-      font-family: var(--mono);
-      font-weight: 700;
-      font-size: 12px;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      padding: 11px;
+      font-weight: 500;
+      font-size: 13px;
+      height: 36px;
+      padding: 0 12px;
       border: 1px solid var(--line2);
       background: var(--elev);
       color: var(--text);
@@ -6281,18 +6680,17 @@
     .tr-bebtn,
     .tr-close {
       cursor: pointer;
-      font-family: var(--mono);
-      font-weight: 700;
-      font-size: 11px;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-      padding: 9px;
+      font-weight: 500;
+      font-size: 13px;
+      height: 36px;
+      padding: 0 10px;
       transition: 0.12s;
+      white-space: nowrap;
     }
     .tr-bebtn {
-      border: 1px solid var(--text);
-      background: var(--text);
-      color: var(--ink);
+      border: 1px solid var(--line2);
+      background: var(--s2);
+      color: var(--text);
     }
     .tr-close {
       border: 1px solid var(--danger);
@@ -6346,16 +6744,31 @@
       color: var(--dim);
     }
 
-    /* P&L */
+    /* P&L: today on top, what you keep, each account (today, then equity and total since start), claims */
     .summary {
       padding: 14px;
+      display: grid;
+      gap: 12px;
+      align-content: start;
+    }
+    .mono {
+      font-family: var(--mono);
+    }
+    .sum-hero {
+      position: relative;
+    }
+    .sum-share {
+      position: absolute;
+      right: 0;
+      top: 2px;
     }
     .sum-total {
-      font-size: 34px;
-      font-weight: 700;
+      font-size: 38px;
+      font-weight: 600;
       line-height: 1;
-      letter-spacing: -0.04em;
+      letter-spacing: -0.03em;
       font-stretch: condensed;
+      padding-right: 84px;
     }
     .sum-total.pos {
       color: var(--accent);
@@ -6363,130 +6776,136 @@
     .sum-total.neg {
       color: var(--danger);
     }
-    .sum-sub {
-      font-family: var(--mono);
-      font-size: 10px;
-      color: var(--faint);
-      margin: 6px 0 14px;
+    .sum-day {
+      font-size: 12px;
+      color: var(--dim);
+      margin-top: 8px;
+      line-height: 1.5;
     }
-    .sum-top {
-      display: flex;
-      align-items: flex-end;
-      justify-content: space-between;
-      gap: 12px;
+    .sum-day .mono,
+    .sum-sub .mono {
+      color: var(--text);
+    }
+    .sum-sub {
+      font-size: 11.5px;
+      color: var(--faint);
+      margin-top: -4px;
     }
     .sum-keep {
-      border-left: 2px solid var(--accent);
-      padding-left: 10px;
+      background: var(--s1);
+      padding: 10px 12px;
+      font-size: 12px;
+      color: var(--dim);
     }
     .sum-keep-v {
-      font-size: 17px;
-      font-weight: 700;
       font-family: var(--mono);
+      font-weight: 600;
       color: var(--text);
-      line-height: 1.1;
-    }
-    .sum-keep-l {
-      font-family: var(--mono);
-      font-size: 9.5px;
-      color: var(--faint);
-      margin-top: 3px;
     }
     .sum-list {
       display: flex;
       flex-direction: column;
-      border-top: 1px dashed var(--line);
     }
     .sum-row {
       display: grid;
-      grid-template-columns: auto minmax(0, 1fr) auto auto;
+      grid-template-columns: 24px minmax(0, 1fr) auto;
       gap: 10px;
       align-items: center;
-      padding: 9px 0;
-      border-bottom: 1px dashed var(--line);
+      padding: 7px 0;
+      border-bottom: 1px solid var(--hair);
     }
-    .badge.sm {
-      width: 26px;
-      height: 26px;
-      font-size: 10px;
+    .sum-row:last-child {
+      border-bottom: 0;
     }
-    .sum-left {
+    .sum-left,
+    .sum-right {
       display: flex;
       flex-direction: column;
       min-width: 0;
+      gap: 2px;
+    }
+    .sum-right {
+      align-items: flex-end;
     }
     .sum-name {
-      font-weight: 600;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      min-width: 0;
+      font-weight: 500;
       white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     .sum-k {
-      font-size: 9.5px;
+      font-size: 11px;
       color: var(--faint);
       font-family: var(--mono);
-      margin-top: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
-    .sum-eq {
-      font-size: 10.5px;
-      color: var(--dim);
+    .sum-td {
       font-family: var(--mono);
+      font-weight: 600;
+      font-size: 13px;
+    }
+    .sum-td:empty {
+      display: none;
+    }
+    .sum-tot {
+      font-family: var(--mono);
+      font-size: 10.5px;
+      color: var(--faint);
+      white-space: nowrap;
     }
     .sum-pnl {
-      font-weight: 600;
-      font-family: var(--mono);
-      font-size: 12px;
+      font-weight: 500;
     }
-    .sum-pnl.pos {
+    .sum-row .pos,
+    .sum-td.pos {
       color: var(--accent);
     }
-    .sum-pnl.neg {
+    .sum-row .neg,
+    .sum-td.neg {
       color: var(--danger);
     }
+    .sum-tot .sum-pnl.pos,
+    .sum-tot .sum-pnl.neg {
+      color: var(--dim);
+    }
     .sum-note {
-      font-size: 10.5px;
+      font-size: 11.5px;
       color: var(--faint);
       line-height: 1.5;
-      margin-top: 10px;
     }
     .claim {
-      margin-top: 14px;
-      padding: 12px;
-      border: 1px dashed var(--line2);
       display: flex;
       flex-direction: column;
-      gap: 6px;
-      font-size: 11px;
+      gap: 8px;
+      font-size: 12px;
     }
     .claim-go {
-      align-self: flex-start;
-      background: var(--text);
-      border-color: var(--text);
-      color: var(--ink);
-      font-weight: 700;
+      align-self: stretch;
+      justify-content: center;
+      height: 34px;
+      font-size: 13px;
     }
-    .claim-go:hover {
-      background: #fff;
-      color: var(--ink);
+    .claim-go:disabled {
+      color: var(--faint);
+      cursor: not-allowed;
     }
     .claim-h {
       font-family: var(--mono);
       font-size: 10px;
-      font-weight: 500;
-      letter-spacing: 0.1em;
+      letter-spacing: 0.12em;
       text-transform: uppercase;
-      color: var(--accent);
+      color: var(--faint);
     }
     .claim-row {
       display: flex;
       justify-content: space-between;
       gap: 10px;
       padding: 5px 0;
-      border-bottom: 1px dashed var(--line);
+      border-bottom: 1px solid var(--hair);
       font-family: var(--mono);
-      font-size: 10.5px;
+      font-size: 11px;
     }
     .claim-row .pos,
     .claim .pos {
@@ -6502,9 +6921,8 @@
     }
     .claim-btns {
       display: flex;
-      gap: 6px;
+      gap: 8px;
       flex-wrap: wrap;
-      margin-top: 4px;
     }
 
     button:focus-visible,
@@ -6725,32 +7143,390 @@
     .tr-addpv b {
       color: var(--text);
     }
-    .collapsed .reportbar,
-    .collapsed .body,
-    .collapsed .tabs,
-    .collapsed .update,
-    .collapsed .ctl,
-    .collapsed .alerts,
-    .collapsed .logwrap,
-    .collapsed .grip,
-    .collapsed .spacer,
-    .collapsed .opttag,
-    .collapsed .hdr .iconbtn {
+    /* ── Trade tab, Focus (v0.38): order switch, units, one-sided ladder, folds, the position card's bracket ── */
+    .tr-f {
+      grid-template-columns: 52px 1fr;
+    }
+    .tr-k {
+      font-size: 10px;
+      letter-spacing: 0.12em;
+    }
+    .tr-in {
+      height: 30px;
+      font-size: 12.5px;
+    }
+    .tr-in.tr-pt,
+    .tr-in.sm {
+      height: auto;
+    }
+    .tr-u {
+      font-size: 10.5px;
+      white-space: nowrap;
+    }
+    .tr-lad {
+      border-color: var(--hair);
+    }
+    .tr-lh {
+      background: var(--s1);
+      border-bottom-color: var(--hair);
+      padding: 3px 7px;
+    }
+    .tr-lad.side-long:not(.one) .tr-lr,
+    .tr-lad.side-long:not(.one) .tr-lh,
+    .tr-lad.side-short:not(.one) .tr-lr,
+    .tr-lad.side-short:not(.one) .tr-lh {
+      grid-template-columns: minmax(0, 1fr) 78px;
+    }
+    .tr-lad.side-long:not(.one) .tr-sp,
+    .tr-lad.side-short:not(.one) .tr-bp {
       display: none;
     }
-    .panel.narrow .tabs {
-      padding: 0 3px;
+    .tr-lad.side-short:not(.one) .tr-sp {
+      order: 3;
+      text-align: right;
     }
-    .panel.narrow .tab {
-      padding-left: 4px;
-      padding-right: 4px;
-      letter-spacing: 0.03em;
+    .tr-lad:not(.one) .tr-lh .tr-flip {
+      order: 0;
+      text-transform: none;
+      letter-spacing: 0;
+      font-family: var(--sans);
+      font-size: 11.5px;
+      font-weight: 500;
     }
-    .panel.narrow .row .chip,
-    .panel.narrow .codebtn .off,
-    .panel.narrow .rate,
+    .tr-flip.long {
+      color: var(--accent);
+    }
+    .tr-flip.short {
+      color: var(--danger);
+    }
+    .tr-lad:not(.one) .tr-lh {
+      grid-template-columns: auto minmax(0, 1fr) 78px !important;
+      column-gap: 8px;
+    }
+    .tr-lad:not(.one) #tr-lhm {
+      text-align: center;
+    }
+    .tr-lr {
+      border-bottom-color: var(--hair);
+      border-bottom-style: solid;
+    }
+    .tr-en {
+      background: var(--s1);
+    }
+    .tr-fold {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 30px;
+      font-size: 12px;
+      color: var(--dim);
+      border-bottom: 1px solid var(--hair);
+    }
+    .tr-fold > span:first-child {
+      flex: 1;
+      min-width: 0;
+    }
+    .tr-foldbox {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .tr-foldbox[hidden] {
+      display: none;
+    }
+    .tr-foldbox .tr-row {
+      flex-wrap: wrap;
+    }
+    .tr-disc {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 34px;
+      padding: 0;
+      background: none;
+      border: none;
+      border-top: 1px solid var(--hair);
+      border-bottom: 1px solid var(--hair);
+      color: var(--dim);
+      font-size: 12.5px;
+      cursor: pointer;
+    }
+    .tr-disc:hover {
+      color: var(--text);
+    }
+    .tr-disc svg {
+      transition: transform 0.12s;
+    }
+    .tr-disc.open svg {
+      transform: rotate(90deg);
+    }
+    .tr-addbox {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+    .tr-addbox[hidden] {
+      display: none;
+    }
+    .tr-copies {
+      font-size: 11.5px;
+      color: var(--faint);
+      text-align: center;
+    }
+    .tr-copies:empty {
+      display: none;
+    }
+    .tr-who {
+      text-align: center;
+      font-size: 11.5px;
+    }
+    .tr-poscard {
+      border: none;
+      border-left: none;
+      background: var(--s1);
+      padding: 12px;
+      gap: 6px;
+    }
+    .tr-lvls {
+      display: none;
+    }
+    .tr-side {
+      font-size: 10px;
+      padding: 3px 6px;
+    }
+    .tr-poscard .tr-pq {
+      font-size: 15px;
+      font-weight: 600;
+    }
+    .tr-poscard .tr-ppl {
+      font-size: 20px;
+    }
+    .tr-pmeta {
+      font-size: 11px;
+      color: var(--dim);
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    /* the bracket bar */
+    .bk {
+      position: relative;
+      height: 46px;
+      margin: 6px 4px 0;
+    }
+    .bk-tr,
+    .bk-r,
+    .bk-g,
+    .bk-l {
+      position: absolute;
+      top: 12px;
+      height: 4px;
+    }
+    .bk-tr {
+      left: 0;
+      right: 0;
+      background: var(--s3);
+    }
+    .bk-r {
+      background: var(--danger);
+      opacity: 0.45;
+    }
+    .bk-g {
+      background: var(--accent);
+    }
+    .bk-l {
+      background: var(--danger);
+    }
+    .bk-t {
+      position: absolute;
+      top: 6px;
+      width: 2px;
+      height: 16px;
+      margin-left: -1px;
+      background: var(--dim);
+    }
+    .bk-t.bad {
+      background: var(--danger);
+    }
+    .bk-t.up {
+      background: var(--accent);
+      opacity: 0.7;
+    }
+    .bk-now {
+      position: absolute;
+      top: 9px;
+      width: 9px;
+      height: 9px;
+      margin-left: -4.5px;
+      transform: rotate(45deg);
+      background: var(--text);
+      border: 2px solid var(--s1);
+    }
+    .bk-lb {
+      position: absolute;
+      top: 26px;
+      transform: translateX(-50%);
+      font-family: var(--mono);
+      font-size: 9.5px;
+      line-height: 1.25;
+      color: var(--faint);
+      text-align: center;
+      white-space: nowrap;
+    }
+    .bk-lb b {
+      display: block;
+      font-weight: 600;
+      color: var(--dim);
+      letter-spacing: 0.06em;
+    }
+    .bk-lb b.bad {
+      color: var(--danger);
+    }
+    .bk-lb b.up {
+      color: var(--accent);
+    }
+    .bk-lb.l {
+      transform: none;
+      text-align: left;
+    }
+    .bk-lb.r {
+      transform: translateX(-100%);
+      text-align: right;
+    }
+
+    /* Share */
+    .share {
+      padding: 12px 14px 14px;
+      display: grid;
+      gap: 12px;
+      align-content: start;
+    }
+    .prev {
+      box-shadow: 0 0 0 1px var(--line);
+      background: #0c0c0d;
+      line-height: 0;
+    }
+    .prev canvas {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+    .sh-name {
+      width: 116px;
+      flex: none;
+    }
+    .sh-btns {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+    }
+    .sh-btns .ghostbtn {
+      height: 34px;
+    }
+    .share .tabseg .tab {
+      padding: 5px 4px;
+    }
+    .share .tabseg[hidden] {
+      display: none;
+    }
+    #sh-sort {
+      margin-top: -4px;
+    }
+    #sh-sort .tab {
+      font-size: 12px;
+      padding: 4px;
+    }
+    .sh-list {
+      max-height: 210px;
+      overflow: auto;
+      display: grid;
+      border: 1px solid var(--hair);
+    }
+    .sh-list[hidden] {
+      display: none;
+    }
+    .sh-list .hint {
+      padding: 10px;
+    }
+    .sh-tr {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto auto;
+      gap: 8px;
+      align-items: center;
+      min-height: 34px;
+      padding: 0 10px;
+      background: none;
+      border: none;
+      border-bottom: 1px solid var(--hair);
+      color: var(--text);
+      font-size: 12px;
+      text-align: left;
+      cursor: pointer;
+    }
+    .sh-tr:hover {
+      background: var(--s1);
+    }
+    .sh-tr.on {
+      background: var(--s3);
+    }
+    .sh-side {
+      font-family: var(--mono);
+      font-size: 9.5px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      padding: 2px 5px;
+      color: var(--ink);
+      background: var(--text);
+    }
+    .sh-side.long {
+      background: var(--accent);
+    }
+    .sh-what {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .sh-what small {
+      margin-left: 6px;
+      font-family: var(--mono);
+      color: var(--faint);
+    }
+    .sh-when {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--faint);
+      white-space: nowrap;
+    }
+    .sh-pnl {
+      font-family: var(--mono);
+      font-weight: 600;
+      color: var(--accent);
+      white-space: nowrap;
+    }
+    .armbtn.done {
+      background: var(--accent-dim);
+      border-color: var(--accent-line);
+      color: var(--accent);
+    }
+    .collapsed .body,
+    .collapsed .tabs,
+    .collapsed .status,
+    .collapsed .alertzone,
+    .collapsed .logwrap,
+    .collapsed .reportbar,
+    .collapsed .grip,
+    .collapsed .menu,
+    .collapsed .scard,
+    .collapsed .spacer,
+    .collapsed .hdr .iconbtn,
+    .collapsed .hdr .sep,
+    .collapsed .hdr .title,
+    .collapsed .brand svg + svg {
+      display: none !important;
+    }
     .panel.narrow .hdr .title,
-    .panel.narrow .hdr .sep {
+    .panel.narrow .hdr .sep,
+    .panel.narrow .codebtn .off {
       display: none;
     }
     /* a chart menu or dialog (drawn inside the chart's frame, which can't rise above the panel) is open over it */
@@ -6758,17 +7534,67 @@
       opacity: 0;
       pointer-events: none;
     }
-    /* minimised: the pill (click opens it, press and move drags it) */
+    /* minimised: the pill. The mark, the state, one number and one button; press and move drags it, a click opens it. */
     .panel.collapsed {
       width: auto;
       max-height: none;
-      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
     }
     .collapsed .hdr {
-      height: 36px;
-      padding: 0 12px;
+      height: 40px;
+      gap: 10px;
+      padding: 0 6px 0 12px;
       border-bottom: none;
       cursor: pointer;
+    }
+    .collapsed .pill {
+      background: none;
+      padding: 0;
+      font-size: 13px;
+      color: var(--text);
+    }
+    .collapsed .pill.warn {
+      color: var(--warn);
+    }
+    .collapsed .pill.bad {
+      color: var(--danger);
+    }
+    .collapsed .pillv:not(:empty) {
+      display: block;
+      font-family: var(--mono);
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .pillv.pos {
+      color: var(--accent);
+    }
+    .pillv.neg {
+      color: var(--danger);
+    }
+    .collapsed .pillbtn:not([hidden]) {
+      display: block;
+      cursor: pointer;
+      height: 28px;
+      padding: 0 10px;
+      font-size: 12px;
+      font-weight: 500;
+      border: 1px solid var(--line2);
+      background: var(--s2);
+      color: var(--text);
+    }
+    .collapsed .pillbtn:not([hidden]):hover {
+      background: var(--s3);
+    }
+    .collapsed .pillbtn.flatten {
+      background: none;
+      border-color: var(--danger-line);
+      color: var(--danger);
+    }
+    .collapsed .pillbtn.start {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: var(--ink);
+      font-weight: 600;
     }
     .collapsed .hdr:focus-visible {
       outline: 1px solid var(--accent);
@@ -6780,45 +7606,63 @@
     .panel.collapsed.attn-amber {
       border-color: var(--warn-line);
     }
-    .attn {
-      display: none;
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      flex: none;
-    }
-    .collapsed .attn.red {
-      display: block;
-      background: var(--danger);
-      box-shadow: 0 0 0 3px var(--danger-dim);
-    }
-    .collapsed .attn.amber {
-      display: block;
-      background: var(--warn);
-      box-shadow: 0 0 0 3px var(--warn-dim);
-    }
-    /* the pin: lime while docked on the chart, struck through while floating */
-    [data-act='dock'] .unpin {
-      display: none;
-    }
-    [data-act='dock']:not(.active) .unpin {
-      display: inline;
-    }
-    /* docked, but floating for now: the chart is too small to hold the panel */
-    [data-act='dock'].active.auto {
-      color: var(--warn);
-      border-color: var(--warn-line);
-    }
   `;
 
-  // STRATUH logo: the five-bar profile mark (lime point of control) and the "stratuh" wordmark (Instrument Sans,
-  // condensed, as on stratuh.com) drawn as paths, so nothing is downloaded.
+  // STRATUH logo (brand pack, 2026-10-09): the five-bar profile mark, each bar over a muted echo of itself with a soft
+  // shadow where they overlap (lime gradient on the point of control), and the STRATUH wordmark (Instrument Sans 700,
+  // width 75) outlined as one path by tools/wordmark.mjs, so nothing is downloaded. `h` is the mark's height in px.
   const LOG_OPEN_KEY = 'vc-log-open';
-  const BRAND_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="vc-poc" x1="0" x2="1">
-      <stop offset="0" stop-color="#9fe02f"/><stop offset="1" stop-color="#e4ff7a"/></linearGradient></defs>
-      <rect x="1" y="1" width="10" height="3.4" fill="#77777d"/><rect x="1" y="5.65" width="16" height="3.4" fill="#f0f0f1"/>
-      <rect x="1" y="10.3" width="22" height="3.4" fill="url(#vc-poc)"/><rect x="1" y="14.95" width="15" height="3.4" fill="#f0f0f1"/>
-      <rect x="1" y="19.6" width="8" height="3.4" fill="#77777d"/></svg><svg height="16" viewBox="0 -73 237.9 75" aria-hidden="true"><path fill="#f0f0f1" d="M18.3 1L18.3 1Q10.9 1 6.8-3.4Q2.7-7.8 2.3-15.7L2.3-15.7L11.7-15.7Q12-11.7 13.8-9.7Q15.6-7.6 18.5-7.6L18.5-7.6Q20.9-7.6 22.2-8.8Q23.5-10.1 23.5-12.5L23.5-12.5Q23.5-14.4 22.5-16.1Q21.5-17.8 18.3-19.8L18.3-19.8L12.4-23.5Q8.4-26.1 6.2-29.6Q4-33.1 4-38L4-38Q4-44.2 7.9-48.1Q11.8-52 18.2-52L18.2-52Q24.9-52 28.7-48.1Q32.4-44.1 32.8-36.9L32.8-36.9L23.4-36.9Q23.1-40.4 21.9-41.9Q20.6-43.4 18.5-43.4L18.5-43.4Q16.4-43.4 15.2-42.2Q13.9-41 13.9-38.7L13.9-38.7Q13.9-36.9 15.0-35.3Q16-33.6 18.8-31.8L18.8-31.8L25.2-27.8Q28.9-25.5 31.2-21.7Q33.4-17.9 33.4-13L33.4-13Q33.4-6.7 29.4-2.9Q25.4 1 18.3 1ZM54.2 1L54.2 1Q47 1 43.5-2.5Q40-5.9 40-12.9L40-12.9L40-60.6L51.4-65.6L51.4-13Q51.4-10.5 52.8-9.3Q54.1-8.1 57-8.1L57-8.1Q58.1-8.1 59.0-8.3Q60-8.5 60.7-8.9L60.7-8.9L60.7-0.1Q59.7 0.5 58.0 0.8Q56.2 1 54.2 1ZM60.4-41.9L33.4-41.9L33.4-51L60.4-51L60.4-41.9ZM75.6 0L64.2 0L64.2-51L75.1-51L75.1-39.1L75.6-39.1L75.6 0ZM75.6-30.3L75.6-30.3L74-38.8Q75.7-45.8 78.6-48.9Q81.5-52 85.6-52L85.6-52Q86.7-52 87.6-51.7L87.6-51.7L87.6-40.3Q87.3-40.4 86.7-40.5Q86.1-40.5 85.2-40.5L85.2-40.5Q80.8-40.5 78.2-38Q75.6-35.5 75.6-30.3ZM123.3 0L112.8 0Q112.2-1.8 111.9-4.0Q111.7-6.1 111.7-8.5L111.7-8.5L111.2-8.5L111.2-36.6Q111.2-40.1 109.9-41.7Q108.7-43.3 106.3-43.3L106.3-43.3Q103.6-43.3 102.2-41.3Q100.8-39.3 100.8-35.8L100.8-35.8L90.7-35.8Q90.7-42.9 95.1-47.5Q99.5-52 107.2-52L107.2-52Q114.4-52 118.3-48Q122.3-44 122.3-36.7L122.3-36.7L122.3-8.5Q122.3-6.4 122.5-4.3Q122.7-2.1 123.3 0L123.3 0ZM100.6 1L100.6 1Q95.8 1 92.7-2.5Q89.6-6 89.6-12L89.6-12Q89.6-17.4 92.1-21.2Q94.7-24.9 101-28L101-28L113.9-34.5L113.9-25.7L106.9-22Q103.6-20.3 102.1-18.2Q100.6-16 100.6-13.2L100.6-13.2Q100.6-10.5 101.9-9.1Q103.3-7.7 105.5-7.7L105.5-7.7Q108-7.7 109.6-9.5Q111.2-11.2 111.2-13.9L111.2-13.9L112.2-7.6Q110.7-3.2 107.7-1.1Q104.7 1 100.6 1ZM145.8 1L145.8 1Q138.6 1 135.1-2.5Q131.6-5.9 131.6-12.9L131.6-12.9L131.6-60.6L143-65.6L143-13Q143-10.5 144.3-9.3Q145.7-8.1 148.6-8.1L148.6-8.1Q149.7-8.1 150.6-8.3Q151.6-8.5 152.3-8.9L152.3-8.9L152.3-0.1Q151.3 0.5 149.5 0.8Q147.8 1 145.8 1ZM152-41.9L125.0-41.9L125.0-51L152-51L152-41.9ZM166.7 1L166.7 1Q163.3 1 160.7-0.5Q158.1-1.9 156.8-4.8Q155.4-7.6 155.4-11.6L155.4-11.6L155.4-51L166.8-51L166.8-14.1Q166.8-11.3 168.1-9.9Q169.4-8.4 171.7-8.4L171.7-8.4Q173.9-8.4 175.5-9.7Q177.1-10.9 178-13.0Q178.9-15 178.9-17.3L178.9-17.3L180.4-9.4Q178.5-4.5 175-1.8Q171.5 1 166.7 1ZM190.4 0L179.5 0L179.5-9.5L178.9-9.5L178.9-51L190.4-51L190.4 0ZM208.9 0L197.5 0L197.5-72L208.9-72L208.9 0ZM233.3 0L221.8 0L221.8-36.4Q221.8-39.7 220.5-41.2Q219.2-42.6 216.6-42.6L216.6-42.6Q214.2-42.6 212.4-41.4Q210.7-40.1 209.8-38.1Q208.9-36 208.9-33.5L208.9-33.5L207.4-41.4Q209.4-46.5 213.0-49.3Q216.6-52 221.7-52L221.7-52Q227.1-52 230.2-48.6Q233.3-45.1 233.3-39L233.3-39L233.3 0Z"/></svg>`;
+  const MARK_BARS = [
+    [8, '#77777d', '#4a4a50'],
+    [12.8, '#f0f0f1', '#8a8a90'],
+    [17.6, 'poc', '#6b8e1a'],
+    [12, '#f0f0f1', '#8a8a90'],
+    [6.4, '#77777d', '#4a4a50'],
+  ];
+  const markSvg = (h, id = 'vc-poc') =>
+    `<svg width="${+((h * 22.4) / 24).toFixed(2)}" height="${h}" viewBox="-2.8 0 22.4 24" aria-hidden="true"><defs>` +
+    `<linearGradient id="${id}" x1="0" x2="1"><stop offset="0" stop-color="#9fe02f"/><stop offset="1" stop-color="#e4ff7a"/></linearGradient>` +
+    `<linearGradient id="${id}-s" x1="0" x2="1"><stop offset="0" stop-color="#000" stop-opacity="0"/><stop offset=".55" stop-color="#000" stop-opacity=".073"/><stop offset="1" stop-color="#000" stop-opacity=".22"/></linearGradient></defs>` +
+    MARK_BARS.map(([w, fill, echo], i) => {
+      const y = +(1 + i * 4.65).toFixed(2);
+      return `<rect x="-1.8" y="${y}" width="3.8" height="3.4" fill="${echo}"/><rect x="-0.7" y="${y}" width="1.7" height="3.4" fill="url(#${id}-s)"/><rect x="1" y="${y}" width="${w}" height="3.4" fill="${fill === 'poc' ? `url(#${id})` : fill}"/>`;
+    }).join('') +
+    '</svg>';
+  const WORDMARK_D =
+    'M232 10Q129 10 76.5 -53.5Q24 -117 24 -230L157 -230Q157 -166 179 -133Q201 -100 238 -100Q265 -100 282 -117.5Q299 -135 299 -167Q299 -196 283 -224Q267 -252 231 -279L157 -335Q100 -379 74 -429.5Q48 -480 48 -541Q48 -601 70.5 -643.5Q93 -686 135.5 -708Q178 -730 237 -730Q329 -730 377 -675Q425 -620 425 -514L295 -514Q295 -570 279 -595Q263 -620 234 -620Q210 -620 195 -604.5Q180 -589 180 -557Q180 -526 196.5 -501Q213 -476 246 -450L319 -394Q381 -347 406 -294Q431 -241 431 -181Q431 -90 377.5 -40Q324 10 232 10ZM574 0L574 -610L440 -610L440 -720L850 -720L850 -610L716 -610L716 0ZM897 0L897 -720L1078 -720Q1140 -720 1186.5 -693Q1233 -666 1259 -618.5Q1285 -571 1285 -508Q1285 -446 1259.5 -399Q1234 -352 1187.5 -325.5Q1141 -299 1078 -299L1007 -299L1007 -401L1071 -401Q1106 -401 1126.5 -429Q1147 -457 1147 -506Q1147 -555 1126.5 -582.5Q1106 -610 1071 -610L1039 -610L1039 0ZM1159 0L1019 -374L1154 -374L1313 0ZM1317 0L1458 -720L1563 -720L1450 0ZM1640 0L1527 -720L1642 -720L1783 0ZM1415 -265L1685 -265L1685 -155L1415 -155ZM1883 0L1883 -610L1749 -610L1749 -720L2159 -720L2159 -610L2025 -610L2025 0ZM2406 10Q2306 10 2254.5 -48.5Q2203 -107 2203 -207L2203 -720L2345 -720L2345 -174Q2345 -138 2361.5 -120Q2378 -102 2406 -102Q2435 -102 2451 -120Q2467 -138 2467 -174L2467 -720L2609 -720L2609 -207Q2609 -107 2557.5 -48.5Q2506 10 2406 10ZM2695 0L2695 -720L2837 -720L2837 0ZM2967 0L2967 -720L3109 -720L3109 0ZM2767 -430L3037 -430L3037 -320L2767 -320Z';
+  // `cap` is the capitals' height in px; the box takes the S's overshoot above and below
+  const wordmarkSvg = (cap) =>
+    `<svg width="${+((cap * 3159) / 720).toFixed(2)}" height="${+((cap * 755) / 720).toFixed(2)}" viewBox="0 -740 3159 755" aria-hidden="true"><path fill="#f0f0f1" d="${WORDMARK_D}"/></svg>`;
+  // In a lockup the mark's bars stand 1.2 × the capitals (bars fill 22 of the mark's 24 units), centred on them
+  const BRAND_CAP = 11;
+  const BRAND_SVG = markSvg(+((BRAND_CAP * 1.2 * 24) / 22).toFixed(2)) + wordmarkSvg(BRAND_CAP);
+
+  // Line icons (14 px, the text colour), drawn inline like the logo.
+  const ico = (d, w = 14) =>
+    `<svg width="${w}" height="${w}" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+  const ICON = {
+    more: ico(
+      '<circle cx="5" cy="12" r="1.3" fill="currentColor"/><circle cx="12" cy="12" r="1.3" fill="currentColor"/><circle cx="19" cy="12" r="1.3" fill="currentColor"/>',
+    ),
+    min: ico('<path d="M6 12h12"/>'),
+    left: ico('<path d="M15 5l-7 7 7 7"/>'),
+    right: ico('<path d="M9 5l7 7-7 7"/>', 12),
+    down: ico('<path d="M5 9l7 7 7-7"/>', 12),
+    check: ico('<path d="M5 12.5l4.5 4.5L19 7.5"/>'),
+    dock: ico('<rect x="3" y="4" width="18" height="16"/><path d="M3 9h18"/>'),
+    refresh: ico('<path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/>'),
+    gear: ico('<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>'),
+    help: ico(
+      '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .8-1 1.5v.7M12 17h.01"/>',
+    ),
+    alert: ico('<path d="M12 3l9.5 17h-19z"/><path d="M12 10v4M12 17h.01"/>'),
+    play: ico('<path d="M7 5l12 7-12 7z"/>', 12),
+    pause: ico('<path d="M8 5v14M16 5v14"/>', 12),
+    share: ico('<path d="M12 15V3M7 8l5-5 5 5"/><path d="M5 13v7h14v-7"/>', 13),
+    ext: ico('<path d="M14 4h6v6M20 4l-9 9"/><path d="M18 14v6H4V6h6"/>', 12),
+    copy: ico('<rect x="8" y="8" width="12" height="12"/><path d="M16 8V4H4v12h4"/>', 13),
+    save: ico('<path d="M12 4v11M7 10l5 5 5-5"/><path d="M5 20h14"/>', 13),
+  };
 
   function buildPanel() {
     const host = document.createElement('div');
@@ -6828,47 +7672,63 @@
     root.innerHTML = `<style>${CSS}</style>
       <div class="panel">
         <div class="hdr">
+          <button class="iconbtn back" data-act="back" title="Back" aria-label="Back">${ICON.left}</button><span class="sheett" id="sheett"></span>
           <span class="brand" role="img" aria-label="STRATUH">${BRAND_SVG}</span><span class="sep"></span><span class="title">Copier</span>
-          <span class="armtag off" id="armtag">idle</span><span class="opttag" id="opttag"></span><span class="attn" id="attn"></span>
           <span class="spacer"></span>
-          <button class="iconbtn ico" data-act="dock" title="Docked on the chart: click to float it anywhere" aria-label="Detach from the chart" aria-pressed="true">
-            <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6l-1 6 4 3v2H6v-2l4-3-1-6zM12 14v7" fill="none" stroke="currentColor"
-              stroke-width="2" stroke-linejoin="round"/><path class="unpin" d="M4 4l16 16" fill="none" stroke="currentColor" stroke-width="2"/></svg></button>
-          <button class="iconbtn ico" data-act="refresh" title="Reload accounts" aria-label="Reload accounts">
-            <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 10-2.3 5.7M20 4v7h-7" fill="none" stroke="currentColor"
-              stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-          <button class="iconbtn" data-act="collapse" title="Minimise" aria-label="Minimise" aria-expanded="true">–</button>
+          <span class="pill" id="armtag"><i class="pdot"></i><span class="ptext">Not copying</span></span>
+          <span class="pillv" id="pillv"></span>
+          <button class="pillbtn" data-act="pillgo" hidden></button>
+          <button class="iconbtn" data-act="menu" title="More" aria-label="More" aria-haspopup="menu" aria-expanded="false">${ICON.more}</button>
+          <button class="iconbtn" data-act="collapse" title="Minimise" aria-label="Minimise" aria-expanded="true">${ICON.min}</button>
         </div>
-        <div class="tabs" role="tablist">
-          <button class="tab" role="tab" data-tab="accounts">Accounts</button>
+        <div class="menu" role="menu" hidden>
+          <button class="mi" role="menuitemcheckbox" data-act="dock" aria-checked="true">${ICON.dock}<span class="mt">Docked on chart</span><span class="mk">${ICON.check}</span></button>
+          <button class="mi" role="menuitem" data-act="refresh">${ICON.refresh}<span class="mt">Reload accounts</span></button>
+          <div class="mhr"></div>
+          <button class="mi" role="menuitem" data-tab="settings">${ICON.gear}<span class="mt">Settings</span></button>
+          <button class="mi" role="menuitem" data-tab="support">${ICON.help}<span class="mt">Help and rules</span></button>
+          <button class="mi" role="menuitem" data-act="report">${ICON.alert}<span class="mt">Report a problem</span></button>
+        </div>
+        <div class="status">
+          <div class="say" id="st-say">Loading your accounts…</div>
+          <div class="ssub" id="st-sub"></div>
+          <div class="ctl">
+            <button class="armbtn" data-act="arm" disabled>Start copying</button>
+            <button class="dangerbtn" data-act="flatall" title="Instantly closes every position and cancels every order on every account. No confirmation. Copying keeps running.">Flatten all</button>
+          </div>
+        </div>
+        <div class="tabs" role="tablist"><div class="tabseg">
+          <button class="tab" role="tab" data-tab="accounts">Copier</button>
           <button class="tab" role="tab" data-tab="trade" title="Order panel: stop &amp; targets in points">Trade</button>
           <button class="tab" role="tab" data-tab="summary" title="Profit and loss per account">P&amp;L</button>
-          <button class="tab" role="tab" data-tab="settings">Settings</button>
-          <button class="tab" role="tab" data-tab="rules">Rules</button>
-          <button class="tab tab-support" role="tab" data-tab="support" title="Report a problem, share ideas, get help">Support</button>
-        </div>
-        <div class="update" hidden></div>
-        <div class="support update" hidden></div>
-        <div class="themeintro update" hidden></div>
+        </div></div>
         <div class="body"><div class="empty">Waiting for your Vest session…</div></div>
-        <div class="ctl">
-          <button class="armbtn" data-act="arm" disabled>ARM</button>
-          <button class="dangerbtn" data-act="flatall" title="Instantly closes every position and cancels every order on every account. No confirmation. The copier stays armed.">Flatten All</button>
+        <div class="alertzone">
+          <div class="update" hidden></div>
+          <div class="support update" hidden></div>
+          <div class="themeintro update" hidden></div>
+          <div class="alerts"></div>
         </div>
-        <div class="alerts"></div>
         <div class="logwrap">
           <div class="logh" role="button" tabindex="0" aria-expanded="false" title="Show or hide the activity log">
-            <span class="caret">▸</span><span class="logt">Activity</span><span class="loglast"></span><span class="loghbtns">
+            <span class="caret">${ICON.right}</span><span class="logt">Activity</span><span class="loglast"></span><span class="loghbtns">
             <button class="iconbtn sm" data-act="dldiag" title="Download diagnostics (JSON) for troubleshooting">Diag</button>
             <button class="iconbtn sm" data-act="dllog" title="Download the activity log (CSV)">CSV</button>
             <button class="iconbtn sm" data-act="clearlog" title="Clear the activity log">Clear</button>
           </span></div>
           <div class="log" aria-live="polite"></div>
         </div>
-        <div class="reportbar"><button class="codebtn" data-act="code" title="Click to copy the code" hidden>Use code <b>${SUPPORT_CODE}</b><span class="off"> · 5% off</span></button>
-          <div class="health" role="button" tabindex="0" title="Vest's build, this version and the API budget. Click to run the site check.">
-            <span class="dot gray"></span><span class="htext">Starting…</span><span class="ver">v${VERSION}</span><span class="rate" id="rate"></span>
-          </div></div>
+        <div class="reportbar">
+          <button class="codebtn" data-act="code" title="Click to copy the code" hidden>Use code <b>${SUPPORT_CODE}</b><span class="off"> · 5% off</span></button>
+          <button class="health" data-act="health" title="Vest's build, this version and the API budget. Click for the status card and the site check." aria-label="Status" aria-expanded="false"><span class="dot gray"></span><span class="hsum">Starting…</span></button>
+        </div>
+        <div class="scard" hidden>
+          <div class="kv"><span>Vest build</span><span class="htext">Starting…</span></div>
+          <div class="kv"><span>Copier</span><span class="ver">v${VERSION}</span></div>
+          <div class="kv" title="Vest allows 200 requests a second; this is what's left this second"><span>API this second</span><span class="rate" id="rate">—</span></div>
+          <div class="kv" title="How long Vest took to answer a follower order (it leaves with the master's own order in fast mode)"><span>Vest's answer, slowest today</span><span id="slowest">—</span></div>
+          <button class="ghostbtn" data-act="sitecheck">Run site check</button>
+        </div>
         <div class="grip" title="Drag to resize"></div>
       </div>`;
     const panel = root.querySelector('.panel');
@@ -6880,7 +7740,12 @@
     // even when the cursor passes over the chart's frame.
     let drag = null;
     hdr.addEventListener('pointerdown', (e) => {
-      if (e.button !== 0 || (e.target.closest('.iconbtn') && !panel.classList.contains('collapsed'))) return;
+      if (
+        e.button !== 0 ||
+        e.target.closest('.pillbtn') ||
+        (e.target.closest('.iconbtn') && !panel.classList.contains('collapsed'))
+      )
+        return;
       const r = panel.getBoundingClientRect();
       drag = { sx: e.clientX, sy: e.clientY, ox: r.left, oy: r.top, moved: false };
       try {
@@ -6950,25 +7815,47 @@
     const on = (sel, fn) => {
       root.querySelector(sel).onclick = fn;
     };
+    // The ⋯ menu: docked / floating, reload, Settings, Help, Report a problem. Closes on a pick, Escape or a click elsewhere.
+    const menu = root.querySelector('.menu'),
+      menuBtn = root.querySelector('[data-act="menu"]');
+    const setMenu = (open) => {
+      menu.hidden = !open;
+      menuBtn.setAttribute('aria-expanded', String(open));
+    };
+    menuBtn.onclick = () => setMenu(menu.hidden);
+    menu.addEventListener('click', (e) => e.target.closest('.mi') && setMenu(false));
+    root.addEventListener('pointerdown', (e) => {
+      if (!menu.hidden && !e.target.closest('.menu, [data-act="menu"]')) setMenu(false);
+      if (!scard.hidden && !e.target.closest('.scard, .health')) setCard(false);
+    });
+    root.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      setMenu(false);
+      setCard(false);
+    });
     on('[data-act="collapse"]', () => setOpen(false));
     on('[data-act="dock"]', () => toggleDock());
     on('[data-act="refresh"]', () => refresh());
+    on('[data-act="report"]', () => openReport());
+    on('[data-act="back"]', () => closeSheet());
+    on('[data-act="pillgo"]', () => pillAction());
     root.querySelectorAll('[data-tab]').forEach((b) => (b.onclick = () => setView(b.dataset.tab)));
-    const health = root.querySelector('.health');
-    const toggleSite = () => {
+    // The status card (the dot at the end of the footer): Vest's build, this version, the API budget, and the site check.
+    const scard = root.querySelector('.scard'),
+      health = root.querySelector('.health');
+    const setCard = (open) => {
+      scard.hidden = !open;
+      health.setAttribute('aria-expanded', String(open));
+    };
+    health.onclick = (e) => {
+      e.stopPropagation(); // not a click on the log line
+      setCard(scard.hidden);
+    };
+    on('[data-act="sitecheck"]', () => {
+      setCard(false);
       if (siteGate()) return; // the check already fills the panel
-      if (S.siteOpen) {
-        S.siteOpen = false;
-        render();
-      } else openSiteCheck();
-    };
-    health.onclick = toggleSite;
-    health.onkeydown = (e) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        toggleSite();
-      }
-    };
+      openSiteCheck();
+    });
     on('[data-act="arm"]', () => (S.armed ? disarm() : arm()));
     on('[data-act="flatall"]', () => flattenAll()); // acts at once, no confirmation
     // The activity log folds to one line (the latest event); open or closed is remembered.
@@ -6977,7 +7864,7 @@
     const setLogOpen = (open) => {
       logwrap.classList.toggle('open', open);
       logh.setAttribute('aria-expanded', String(open));
-      logh.querySelector('.caret').textContent = open ? '▾' : '▸';
+      logh.querySelector('.caret').innerHTML = open ? ICON.down : ICON.right;
       store.set(LOG_OPEN_KEY, open);
     };
     setLogOpen(store.get(LOG_OPEN_KEY, false) === true);
@@ -7005,15 +7892,37 @@
     if (!_root) return;
     const h = healthState(),
       g = siteGate();
-    _root.querySelector('.health .dot').className = 'dot ' + (g === 'failed' ? 'red' : h.level);
+    const level = g === 'failed' ? 'red' : h.level;
+    _root.querySelector('.health .dot').className = 'dot ' + level;
+    _root.querySelector('.health').title =
+      level === 'green'
+        ? 'Status: all good. Click for the details and the site check.'
+        : 'Status: Vest updated its site';
     _root.querySelector('.htext').textContent =
       g === 'failed' ? 'Vest changed — copying off' : g === 'waiting' ? 'Vest updated — check waiting' : h.text;
-    _root.querySelector('.health').classList.toggle('amber-bar', h.changed);
-    _root.querySelector('.reportbar').classList.toggle('alert', h.level !== 'green');
+    _root.querySelector('.reportbar').classList.toggle('alert', level !== 'green');
     renderRate();
+    renderHealthSum();
     renderUpdate();
     renderSupport();
     renderThemeIntro();
+  }
+  // The bottom bar's right side: this version · the API budget, or what Vest's update means for copying.
+  function renderHealthSum() {
+    const el = _root && _root.querySelector('.hsum');
+    if (!el) return;
+    const h = healthState(),
+      g = siteGate(),
+      { remaining, limit } = S.rate;
+    const api = remaining == null ? '' : ` · API ${remaining}${limit ? '/' + limit : ''}`;
+    el.textContent =
+      g === 'failed'
+        ? 'Vest changed — copying off'
+        : g === 'waiting'
+          ? 'Vest updated — check waiting'
+          : h.changed
+            ? h.text
+            : `v${VERSION}${api}`; // Vest's build is on the status card
   }
   function renderRate() {
     if (!_root) return;
@@ -7021,29 +7930,34 @@
     if (!el) return;
     const { remaining, limit } = S.rate;
     if (remaining == null) {
-      el.textContent = '';
+      el.textContent = '—';
       return;
     }
-    el.textContent = `API ${remaining}${limit ? '/' + limit : ''}`;
+    el.textContent = `${remaining}${limit ? ' / ' + limit : ''}`;
     const frac = limit ? remaining / limit : 1;
     el.className = 'rate ' + (frac < 0.05 ? 'r-red' : frac < 0.2 ? 'r-amber' : 'r-ok');
+    renderHealthSum();
   }
 
-  // One view at a time. Tabs: accounts · trade · summary · settings · rules (site check opens from the health bar).
+  // One view at a time. Tabs: accounts (Copier) · trade · summary (P&L). Sheets over the card, with a back arrow:
+  // settings · support (Help) · site (the site check, from the status card) · share. Rules = the first-run terms.
   const currentView = () =>
     S.siteOpen
       ? 'site'
-      : S.supportOpen
-        ? 'support'
-        : S.tradeOpen
-          ? 'trade'
-          : S.summaryOpen
-            ? 'summary'
-            : S.settingsOpen
-              ? 'settings'
-              : S.rulesOpen
-                ? 'rules'
-                : 'accounts';
+      : S.shareOpen
+        ? 'share'
+        : S.supportOpen
+          ? 'support'
+          : S.tradeOpen
+            ? 'trade'
+            : S.summaryOpen
+              ? 'summary'
+              : S.settingsOpen
+                ? 'settings'
+                : S.rulesOpen
+                  ? 'rules'
+                  : 'accounts';
+  const SHEETS = { settings: 'Settings', support: 'Help', site: 'Site check', share: 'Share' };
   // ── Placement. Docked (the default), the panel lives on Vest's chart: just right of the chart's drawing toolbar and
   // below its top toolbar, kept inside the chart whatever resizes (the window, Vest's order book or positions area), its
   // spot remembered relative to the chart. Detached (the pin), it floats anywhere in the window. Minimised, it's a pill:
@@ -7052,7 +7966,7 @@
   const DOCK_KEY = 'vc-dock'; // { docked, open, at: {x,y} from the chart's corner, free: {x,y} in the window }
   const PANEL_MIN_W = 300,
     PANEL_MAX_W = 700,
-    PANEL_MIN_H = 350; // header, tabs, a one-time bar, an account row, ARM, the log's header line and the bottom bar
+    PANEL_MIN_H = 350; // header, the status block, tabs, an account row and the footer
   const HDR_FULL_W = 350; // narrower than this, the header leaves out the "COPIER" label
   const DOCK_INSET = 6, // px kept between the panel and the chart's edges (and the window's)
     DRAG_PX = 4, // a press on the pill that moves less than this is a click
@@ -7198,46 +8112,59 @@
     renderDock();
     place();
   }
-  // The pin's state, and the pill's dot: red when followers wait on Flatten / Keep or, armed, Vest's live feed is lost;
-  // amber when Vest updated its site (run the site check).
+  // The ⋯ menu's dock item, and the minimised pill: its state, one number (the open P&L while copying) and one button.
+  // Red border when followers wait on Flatten / Keep, Vest changed something the copier needs or, copying, Vest's live
+  // feed is lost; amber when Vest updated its site (the check runs by itself).
   const _bootAt = Date.now();
   function renderDock() {
     if (!_root || !S.dock) return;
     const pin = _root.querySelector('[data-act="dock"]');
-    pin.classList.toggle('active', S.dock.docked);
-    pin.setAttribute('aria-pressed', String(S.dock.docked));
-    pin.classList.toggle('auto', S.dock.docked && _autoFloat);
+    pin.setAttribute('aria-checked', String(S.dock.docked));
+    pin.classList.toggle('on', S.dock.docked);
+    pin.classList.toggle('auto', S.dock.docked && _autoFloat); // docked, but floating for now: the chart is too small
+    pin.querySelector('.mt').textContent = !S.dock.docked
+      ? 'Dock on the chart'
+      : _autoFloat
+        ? 'Docked (floating: chart too small)'
+        : 'Docked on chart';
     pin.title = !S.dock.docked
-      ? 'Floating: click to dock it on the chart'
+      ? 'Floating anywhere: click to dock it on the chart'
       : _autoFloat
         ? 'The chart is too small to hold the panel, so it floats until the chart is bigger. Click to float it for good.'
         : 'Docked on the chart: click to float it anywhere';
-    pin.setAttribute('aria-label', S.dock.docked ? 'Detach from the chart' : 'Dock on the chart');
     const orphans = !!(S.orphan && S.orphan.list.length),
       siteOff = siteGate() === 'failed';
     const red = orphans || siteOff || (S.armed && !feedLive() && Date.now() - _bootAt > FEED_QUIET_MS / 5);
     const amber = !red && healthState().changed;
-    const panel = _root.querySelector('.panel'),
-      dot = _root.querySelector('#attn');
-    dot.className = 'attn' + (red ? ' red' : amber ? ' amber' : '');
-    dot.title = red
-      ? orphans
-        ? 'Followers are waiting on Flatten / Keep'
-        : siteOff
-          ? 'Vest changed something the copier relies on: copying is off'
-          : "Vest's live feed is down"
-      : amber
-        ? 'Vest updated its site: checking'
-        : '';
+    const panel = _root.querySelector('.panel');
     panel.classList.toggle('attn-red', red);
     panel.classList.toggle('attn-amber', amber);
+    const collapsed = panel.classList.contains('collapsed');
+    const p = pillState();
+    // minimised: an orphan names the account; copying shows the open P&L across the accounts in the trade
+    const tag = _root.querySelector('#armtag .ptext');
+    if (collapsed && orphans) {
+      const o = S.orphan.list[0];
+      tag.textContent =
+        S.orphan.list.length > 1
+          ? `${S.orphan.list.length} followers need you`
+          : `${o.label || accLabel(o.accountId)} needs you`;
+    }
+    let pnl = null;
+    if (S.armed)
+      for (const id of [S.master, ...S.followers]) {
+        const r = S.byId[id];
+        if (r && inTrade(id) && Number.isFinite(r.upnl)) pnl = (pnl || 0) + r.upnl;
+      }
+    const v = _root.querySelector('#pillv');
+    v.textContent = collapsed && pnl !== null ? (pnl >= 0 ? '+' : '−') + money(Math.abs(pnl)) : '';
+    v.className = 'pillv ' + (pnl === null ? '' : pnl >= 0 ? 'pos' : 'neg');
+    const btn = _root.querySelector('[data-act="pillgo"]');
+    btn.hidden = !collapsed || !p.act;
+    btn.textContent = p.label || '';
+    btn.className = 'pillbtn ' + (p.act || '');
     const hdr = _root.querySelector('.hdr');
-    hdr.setAttribute(
-      'aria-label',
-      panel.classList.contains('collapsed')
-        ? `Open STRATUH Copier (${_root.querySelector('#armtag').textContent})`
-        : '',
-    );
+    hdr.setAttribute('aria-label', collapsed ? `Open STRATUH Copier (${tag.textContent})` : '');
   }
   // Keep the panel in place as the page changes: the window resizing at once, and Vest's own layout (the chart, the
   // order book, the positions area, a page with no chart) checked a few times a second.
@@ -7549,127 +8476,335 @@
 
   function setView(v) {
     if (v !== 'trade') stopPick(true);
+    if (['accounts', 'trade', 'summary'].includes(v)) S.lastTab = v;
     S.tradeOpen = v === 'trade';
     S.summaryOpen = v === 'summary';
     S.settingsOpen = v === 'settings';
     S.rulesOpen = v === 'rules';
     S.supportOpen = v === 'support';
+    S.shareOpen = v === 'share';
     S.siteOpen = false;
     if (!S.tradeOpen) unwatchUnused(); // the price feed is only needed by the Trade tab and breakeven
     render();
+  }
+  // Back from a sheet (Settings, Help, the site check, Share) to the tab it was opened from.
+  function closeSheet() {
+    setView(S.lastTab || 'accounts');
+  }
+  // ⋯ › Report a problem: Help, scrolled to the report box.
+  function openReport() {
+    setView('support');
+    const note = _root && _root.querySelector('#rp-note');
+    if (!note) return;
+    note.scrollIntoView({ block: 'center' });
+    note.focus();
+  }
+  // The minimised pill's button: Flatten while copying, Open when something needs you, Start when ready.
+  function pillAction() {
+    const a = pillState().act;
+    if (a === 'flatten') flattenAll();
+    else if (a === 'start') arm();
+    else setOpen(true);
+  }
+
+  // ── The status block: one sentence saying who copies to whom, a line saying what last happened, and the two buttons.
+  // Vest's trading day starts at 20:00 ET (its daily loss resets then): "today" is since then.
+  const ET_TZ = 'America/New_York';
+  let _etFmt = null;
+  function etOffset(d) {
+    // ET's offset from UTC at the instant d, in ms (negative: behind UTC)
+    _etFmt =
+      _etFmt ||
+      new Intl.DateTimeFormat('en-US', {
+        timeZone: ET_TZ,
+        hourCycle: 'h23',
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: 'numeric',
+        second: 'numeric',
+      });
+    const p = {};
+    for (const x of _etFmt.formatToParts(d)) p[x.type] = +x.value;
+    return Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second) - Math.floor(d.getTime() / 1000) * 1000;
+  }
+  function vestDayStart(now = Date.now()) {
+    const off = etOffset(new Date(now)),
+      et = new Date(now + off); // ET wall time, read with the UTC getters
+    let wall = Date.UTC(et.getUTCFullYear(), et.getUTCMonth(), et.getUTCDate(), 20);
+    if (et.getUTCHours() < 20) wall -= 86400000;
+    return wall - etOffset(new Date(wall - off));
+  }
+  // Follower actions today (from the diagnostics record): done, missed, and the latest batch. `complete` is false when the
+  // record no longer reaches back to the day's start (it keeps the latest 2,000 events), so the counts would be short.
+  const COPY_TYPES = {
+    open: 'filled',
+    append: 'added',
+    reduce: 'reduced',
+    close: 'closed',
+    cancel: 'cancelled',
+    bracket: 'moved',
+  };
+  function dayStats() {
+    const start = vestDayStart(),
+      recs = S.diag.filter((d) => COPY_TYPES[d.type] && d.outcome !== 'skipped' && Date.parse(d.t) >= start);
+    const oldest = S.diag.length ? Date.parse(S.diag[0].t) : 0;
+    const out = {
+      copies: recs.filter((d) => d.met === true).length,
+      missed: recs.filter((d) => d.met === false).length,
+      complete: S.diag.length < DIAG_MAX || oldest < start,
+      last: null,
+      slowest: Math.max(0, ...recs.map((d) => +(d.sendMs || d.ms) || 0)),
+    };
+    const lastRec = recs[recs.length - 1];
+    if (lastRec) {
+      const at = Date.parse(lastRec.t);
+      const batch = recs.filter((d) => d.type === lastRec.type && Math.abs(Date.parse(d.t) - at) < 3000);
+      out.last = {
+        at,
+        verb: lastRec.type === 'open' && lastRec.expected === 'rest' ? 'placed' : COPY_TYPES[lastRec.type],
+        done: batch.filter((d) => d.met === true).length,
+        of: batch.length,
+        pending: batch.some((d) => d.met == null),
+      };
+    }
+    return out;
+  }
+  const hhmm = (t) => new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+  // The header pill (and the minimised pill's button): what state the copier is in, and the one thing to do from the pill.
+  function pillState() {
+    const gate = siteGate(),
+      orphans = !!(S.orphan && S.orphan.list.length);
+    if (gate === 'failed') return { cls: 'bad', text: 'Check failed', act: 'open', label: 'Open' };
+    if (orphans) return { cls: 'warn', text: 'Needs you', act: 'open', label: 'Open' };
+    if (S.armed) return { cls: 'live', text: 'Copying', act: 'flatten', label: 'Flatten' };
+    if (gate && gate !== 'clear') return { cls: '', text: 'Checking Vest', act: 'open', label: 'Open' };
+    if (S.arming) return { cls: '', text: 'Starting…', act: null };
+    const ready = S.ack && S.master && S.followers.size && !S.flattening;
+    return { cls: '', text: 'Not copying', act: ready ? 'start' : 'open', label: ready ? 'Start' : 'Open' };
+  }
+  function renderStatus(gate) {
+    const say = _root.querySelector('#st-say'),
+      sub = _root.querySelector('#st-sub');
+    const m = S.master && S.byId[S.master],
+      nf = S.followers.size;
+    const who = m ? `<em>${esc(m.label)}</em> to ${nf} follower${nf === 1 ? '' : 's'}` : '';
+    const st = dayStats(),
+      opts = [S.fast && 'fast mode', S.capFit && 'cap-to-fit'].filter(Boolean);
+    let sayHtml, subTxt;
+    if (gate === 'failed') {
+      sayHtml = "Copying is off until Vest's site passes the check.";
+      subTxt = 'Your accounts and positions are untouched';
+    } else if (gate && gate !== 'clear') {
+      sayHtml = "Checking Vest's update…";
+      subTxt = 'Copying waits until the check passes';
+    } else if (!Object.keys(S.byId).length) {
+      sayHtml = 'Loading your accounts…';
+      subTxt = '';
+    } else if (S.armed || S.arming) {
+      sayHtml = `${S.arming ? 'Starting to copy' : 'Copying'} ${who}`;
+      const l = st.last;
+      subTxt = l
+        ? `Last copy ${l.pending ? 'sending…' : `${l.done} of ${l.of} ${l.verb}`} · ${hhmm(l.at)}`
+        : "Waiting for the master's next order";
+    } else if (m && nf) {
+      sayHtml = `Ready to copy ${who}`;
+      subTxt =
+        st.copies || st.missed
+          ? `${st.copies}${st.complete ? '' : '+'} copies today, ${st.missed} missed`
+          : 'Nothing copied yet today';
+    } else if (m) {
+      sayHtml = `Pick followers for <em>${esc(m.label)}</em>`;
+      subTxt = 'Tick the accounts that copy it';
+    } else {
+      sayHtml = 'Pick a master and followers';
+      subTxt = 'The master is the account you trade on';
+    }
+    if (subTxt && opts.length) subTxt += ' · ' + opts.join(' · ');
+    if (say.dataset.html !== sayHtml) say.innerHTML = say.dataset.html = sayHtml;
+    if (sub.textContent !== subTxt) sub.textContent = subTxt;
+    const armBtn = _root.querySelector('[data-act="arm"]');
+    // Stop copying is never blocked; Start needs a master, a follower and no gate (from any view).
+    armBtn.disabled = S.armed ? false : S.arming || !!gate || !(S.master && S.followers.size);
+    const label = S.armed ? 'Stop copying' : S.arming ? 'Starting…' : 'Start copying';
+    if (armBtn.dataset.label !== label) {
+      armBtn.dataset.label = label;
+      armBtn.innerHTML = `${S.armed ? ICON.pause : ICON.play}<span>${label}</span>`;
+    }
+    armBtn.classList.toggle('armed', S.armed);
+    const flat = _root.querySelector('[data-act="flatall"]');
+    flat.disabled = S.flattening;
+    flat.textContent = S.flattening ? 'Flattening…' : 'Flatten all';
+    const p = pillState(),
+      tag = _root.querySelector('#armtag');
+    tag.className = 'pill ' + p.cls;
+    tag.querySelector('.ptext').textContent = p.text;
+    const slow = _root.querySelector('#slowest');
+    if (slow) slow.textContent = st.slowest ? `${st.slowest} ms` : '—';
+  }
+
+  // The Copier tab: the master, its followers and the accounts left out, one line each (room to the floor and a dot);
+  // the picks change in Edit, only while not copying. With nothing picked yet, it opens in Edit.
+  const NEAR_FLOOR = 0.3; // less than 30% of an account's drawdown allowance left: flagged (it still copies)
+  const roomFrac = (r) => {
+    const allow = r.size - r.floor;
+    return allow > 0 && !isNaN(r.room) ? Math.max(0, Math.min(1, r.room / allow)) : NaN;
+  };
+  const inTrade = (id) => {
+    const st = S.acctState[id];
+    return !!(st && st.positions && st.positions.length);
+  };
+  // Whole dollars from $1,000 up (rounded down, so room is never overstated); cents below, where they matter.
+  const moneyShort = (n) =>
+    isNaN(n)
+      ? '—'
+      : Math.abs(n) >= 1000
+        ? (n < 0 ? '−' : '') + '$' + Math.floor(Math.abs(n)).toLocaleString('en-US')
+        : money(n);
+  // An account row's tooltip: balance, the floor that applies (the daily one when it's higher) and the room to it.
+  const acctTip = (r) =>
+    `Balance ${money(r.equity)} · ${r.dailyFloor > r.floor ? 'daily floor' : 'floor'} ${money(floorOf(r))} · ${money(r.room)} to go` +
+    (r.canTrade === false ? ' · trading disabled' : '');
+  function renderCopier(body) {
+    const rows = Object.values(S.byId);
+    if (!rows.length) {
+      body.innerHTML = `<div class="empty">No active accounts found.</div>`;
+      return;
+    }
+    if (S.armed || S.arming) S.editing = false;
+    else if (!S.master || !S.followers.size) S.editing = true; // nothing to copy yet: pick first
+    if (S.editing) return renderEdit(body);
+    const m = S.byId[S.master];
+    const row = (r, kind, note = '') => {
+      const f = roomFrac(r),
+        near = f < NEAR_FLOOR;
+      const live = S.armed && kind !== 'out' && inTrade(r.id);
+      const dot = r.canTrade === false ? 'bad' : kind === 'out' ? 'hollow' : live ? 'live' : '';
+      const dotTip =
+        r.canTrade === false ? 'Trading disabled' : kind === 'out' ? 'Not copied' : live ? 'In a trade' : 'Flat';
+      const tag = r.chip === 'Funded' ? '' : `<small>${esc(r.chip)}</small>`;
+      const warn = near && kind !== 'out' && !note ? `Only ${moneyShort(r.room)} to its floor.` : note;
+      return `<div class="acct${kind === 'm' ? ' master' : ''}${kind === 'out' ? ' off' : ''}" title="${esc(acctTip(r))}">
+          <span class="tile${kind === 'm' ? ' m' : ''}">${esc(acctNum(r.label))}</span><span class="nm">${esc(r.label)}${tag}</span>
+          <span class="room"><span class="${near ? 'amber' : ''}">${moneyShort(r.room)}</span><span class="meter"><i class="${near ? 'warn' : ''}" style="width:${isNaN(f) ? 0 : Math.round(f * 100)}%"></i></span></span>
+          <i class="sdot ${dot}" title="${dotTip}"></i>${warn ? `<span class="note${kind === 'out' ? ' dim' : ''}">${esc(warn)}</span>` : ''}</div>`;
+    };
+    const fl = rows.filter((r) => S.followers.has(r.id)).sort((a, b) => a.order - b.order);
+    const out = rows.filter((r) => r.id !== S.master && !S.followers.has(r.id)).sort((a, b) => a.order - b.order);
+    const why = (r) =>
+      r.canTrade === false
+        ? 'Trading is disabled on this account.'
+        : !S.capFit && m && r.groupKey !== m.groupKey
+          ? 'A different size: copying it needs Cap-to-fit.'
+          : 'Not picked.';
+    const locked = S.armed || S.arming;
+    body.innerHTML = `<div class="cop">
+        <div class="sech"><span class="eyebrow">Master</span><span class="eyebrow">Room to floor</span></div>
+        <div class="accts">${row(m, 'm')}</div>
+        <div class="sech"><span class="eyebrow">Followers · ${fl.length} ${S.armed ? 'copying' : 'ready'}</span>${
+          locked
+            ? '<span class="hint">Edit when not copying</span>'
+            : '<button class="lnk" data-act="edit">Edit</button>'
+        }</div>
+        <div class="accts">${fl.map((r) => row(r, 'f')).join('')}</div>
+        ${out.length ? `<div class="sech"><span class="eyebrow">Left out · ${out.length}</span></div><div class="accts">${out.map((r) => row(r, 'out', why(r))).join('')}</div>` : ''}
+        <div class="legend"><span><i class="sdot live"></i>in a trade</span><span><i class="sdot"></i>flat</span><span><i class="sdot hollow"></i>not copied</span></div>
+      </div>`;
+    const ed = body.querySelector('[data-act="edit"]');
+    if (ed)
+      ed.onclick = () => {
+        S.editing = true;
+        render();
+      };
+  }
+  // Edit: a radio for the master and a box per follower, by account size, plus the sizing switch. Only while not copying.
+  function renderEdit(body) {
+    const m = S.master && S.byId[S.master];
+    const groups = m ? [...S.groups].sort((a, b) => (b.key === m.groupKey) - (a.key === m.groupKey)) : S.groups;
+    const n = Object.keys(S.byId).length;
+    const row = (r, masterGroup) => {
+      const isM = S.master === r.id,
+        isF = S.followers.has(r.id);
+      const fDisabled = !S.master || isM || (!S.capFit && !masterGroup) || r.canTrade === false || S.armed;
+      const label = esc(r.label),
+        id = esc(r.id),
+        f = roomFrac(r);
+      const note =
+        r.canTrade === false
+          ? 'Trading is disabled on this account.'
+          : !isM && f < NEAR_FLOOR
+            ? `Only ${moneyShort(r.room)} to its floor.${isF ? '' : ' Tick to copy it anyway.'}`
+            : '';
+      return `<div class="acct ed${isM ? ' master' : ''}" title="${esc(acctTip(r))}">
+          <span class="tile${isM ? ' m' : ''}">${esc(acctNum(r.label))}</span><span class="nm">${label}${r.chip === 'Funded' ? '' : `<small>${esc(r.chip)}</small>`}</span>
+          <button class="rd${isM ? ' on' : ''}" data-m="${id}" role="radio" aria-checked="${isM}" aria-label="Make ${label} the master"
+            title="Make ${label} the master" ${r.canTrade === false || S.armed ? 'disabled' : ''}></button>
+          ${
+            isM
+              ? '<span class="ckm">—</span>'
+              : `<button class="ck${isF ? ' on' : ''}" data-f="${id}" role="checkbox" aria-checked="${isF}" aria-label="Copy the master to ${label}"
+            title="${!S.master ? 'Pick a master first' : !S.capFit && !masterGroup ? 'A different size: needs Cap-to-fit' : `Copy the master to ${label}`}" ${fDisabled ? 'disabled' : ''}>${ICON.check}</button>`
+          }${note ? `<span class="note">${esc(note)}</span>` : ''}</div>`;
+    };
+    body.innerHTML = `<div class="cop">
+        <div class="sech"><span class="h">Choose accounts</span>${
+          S.master && S.followers.size ? '<button class="armbtn sm" data-act="edit-done">Done</button>' : ''
+        }</div>
+        <div class="acct ed head"><span></span><span class="eyebrow">${n} account${n === 1 ? '' : 's'}</span><span class="eyebrow">Master</span><span class="eyebrow">Copy</span></div>
+        ${groups
+          .map((g) => {
+            const masterGroup = !!m && m.groupKey === g.key;
+            return `${S.groups.length > 1 ? `<div class="sech"><span class="eyebrow">${moneyShort(g.size)} · ${esc(g.type)}</span></div>` : ''}<div class="accts">${g.rows.map((r) => row(r, masterGroup)).join('')}</div>`;
+          })
+          .join('')}
+        <div class="sech"><span class="eyebrow">Sizing</span><div class="seg" data-sizing><button data-v="1" class="${S.capFit ? '' : 'on'}">1:1</button><button data-v="cap" class="${S.capFit ? 'on' : ''}">Cap-to-fit</button></div></div>
+        <div class="hint">${
+          S.capFit
+            ? 'Cap-to-fit: each follower is sized to its own equity, so different sizes can copy.'
+            : '1:1: followers copy the exact size, so they must be the same size and type as the master.'
+        } Followers are set to the master's leverage when you start.</div>
+      </div>`;
+    body.querySelectorAll('[data-m]').forEach((b) => (b.onclick = () => setMaster(b.getAttribute('data-m'))));
+    body.querySelectorAll('[data-f]').forEach((b) => (b.onclick = () => toggleFollower(b.getAttribute('data-f'))));
+    body
+      .querySelectorAll('[data-sizing] button')
+      .forEach((b) => (b.onclick = () => (b.dataset.v === 'cap') !== S.capFit && toggleCapFit()));
+    const done = body.querySelector('[data-act="edit-done"]');
+    if (done)
+      done.onclick = () => {
+        S.editing = false;
+        render();
+      };
   }
 
   function render() {
     if (!_root) return;
     renderHealth();
-    const body = _root.querySelector('.body');
-    const gate = siteGate(); // Vest updated: the check takes the whole panel
-    _root.querySelector('.panel').classList.toggle('gated', !!gate);
-    // the Trade, Support and first-run Rules views keep their DOM between renders (typing, a ticked box)
-    const keeps = !gate && (S.tradeOpen || S.supportOpen || (S.rulesOpen && !S.settingsOpen && !S.ack));
+    const panel = _root.querySelector('.panel'),
+      body = _root.querySelector('.body');
+    const gate = siteGate(); // Vest updated: the check takes the body
+    panel.classList.toggle('gated', !!gate);
+    const view = currentView(),
+      sheet = !gate && SHEETS[view] ? view : null;
+    panel.classList.toggle('sheet', !!sheet);
+    panel.classList.toggle('first', !gate && view === 'rules' && !S.ack);
+    _root.querySelector('#sheett').textContent = sheet ? SHEETS[sheet] : '';
+    // the Trade, Share, Help and first-run views keep their DOM between renders (typing, a ticked box)
+    const keeps = !gate && (S.tradeOpen || S.supportOpen || S.shareOpen || (S.rulesOpen && !S.settingsOpen && !S.ack));
     if (!keeps || S.siteOpen) body.dataset.view = '';
     if (!gate && !S.siteOpen) delete body.dataset.check;
-    if (gate) {
-      renderGate(body, gate);
-    } else if (S.siteOpen) {
-      renderSiteCheck(body);
-    } else if (S.supportOpen) {
-      renderSupportTab(body);
-    } else if (S.tradeOpen) {
-      renderTrade(body);
-    } else if (S.settingsOpen) {
-      renderSettings(body);
-    } else if (S.rulesOpen) {
-      renderRules(body);
-    } else if (S.summaryOpen) {
-      renderSummary(body);
-    } else if (!S.groups.length) {
-      body.innerHTML = `<div class="empty">No active accounts found.</div>`;
-    } else {
-      // Whole dollars from $1,000 up (rounded down, so room is never overstated); cents below, where they matter.
-      const moneyShort = (n) =>
-        Math.abs(n) >= 1000 ? (n < 0 ? '−' : '') + '$' + Math.floor(Math.abs(n)).toLocaleString('en-US') : money(n);
-      const bare = (n) => moneyShort(n).replace('$', ''); // the sub line: "bal 25,620 · floor 24,000"
-      // The master on top in its own block; then each account size, the master's first, with how many copy it.
-      const row = (r, masterGroup) => {
-        const td = r.canTrade === false ? 'red' : r.canTrade === true ? 'green' : 'gray';
-        const tdText =
-          r.canTrade === false ? 'Trading disabled' : r.canTrade === true ? 'Can trade' : 'Trading status unknown';
-        const isM = S.master === r.id,
-          isF = S.followers.has(r.id);
-        const fDisabled = !S.master || isM || (!S.capFit && !masterGroup) || r.canTrade === false || S.armed;
-        const bar = r.usedPct > 0.8 ? 'bar-hot' : r.usedPct > 0.5 ? 'bar-warn' : 'bar-ok';
-        const id = esc(r.id),
-          label = esc(r.label);
-        return `<div class="row ${isM ? 'master' : isF ? 'follower' : ''}">
-              <div class="badge">${esc(acctNum(r.label))}</div>
-              <div class="meta"><div class="name">${label} <span class="chip">${esc(r.chip)}</span> <span class="dot ${td}" title="${tdText}"></span></div>
-                <div class="sub" title="Balance ${money(r.equity)} · ${r.dailyFloor > r.floor ? 'daily ' : ''}floor ${money(floorOf(r))}">bal ${bare(r.equity)} · ${r.dailyFloor > r.floor ? '<span title="Daily loss floor, higher than the drawdown floor today">daily floor</span>' : 'floor'} ${bare(floorOf(r))}</div></div>
-              <div class="right" title="Room left before the floor: ${money(r.room)}"><div class="room">${moneyShort(r.room)}</div><div class="used">${pct(r.usedPct)} used</div>
-                <div class="bar"><i class="${bar}" style="width:${Math.round(r.usedPct * 100)}%"></i></div></div>
-              <div class="sel">
-                <button class="selbtn m ${isM ? 'on' : ''}" data-m="${id}" title="${S.armed ? 'Disarm to change the master' : `Make ${label} the master`}" aria-label="Make ${label} the master"
-                  aria-pressed="${isM}" ${r.canTrade === false || S.armed ? 'disabled' : ''}>M</button>
-                <button class="selbtn f ${isF ? 'on' : ''}" data-f="${id}" title="${S.armed ? 'Disarm to change followers' : `Copy the master to ${label}`}" aria-label="Copy the master to ${label}"
-                  aria-pressed="${isF}" ${fDisabled ? 'disabled' : ''}>FLW</button>
-              </div></div>`;
-      };
-      const m = S.master && S.byId[S.master];
-      const groups = m ? [...S.groups].sort((a, b) => (b.key === m.groupKey) - (a.key === m.groupKey)) : S.groups;
-      body.innerHTML =
-        (m
-          ? `<div class="group"><div class="group-h"><span class="lime">Master</span><span class="gr">${moneyShort(m.size)} · ${esc(m.type)}</span></div>${row(m, true)}</div>`
-          : '') +
-        groups
-          .map((g) => {
-            const masterGroup = !!m && m.groupKey === g.key;
-            const rest = g.rows.filter((r) => r.id !== S.master);
-            if (!rest.length) return '';
-            const copying = rest.filter((r) => S.followers.has(r.id)).length;
-            const n = g.rows.length;
-            const right =
-              masterGroup || (m && S.capFit)
-                ? `${copying} copying · ${S.capFit ? 'cap-to-fit' : '1:1'}`
-                : `${n} account${n > 1 ? 's' : ''}`;
-            const title = m
-              ? masterGroup
-                ? 'Followers'
-                : `${moneyShort(g.size)} · ${esc(g.type)}`
-              : `${moneyShort(g.size)} · ${esc(g.type)}`;
-            return `<div class="group"><div class="group-h"><span>${title}</span><span class="gr">${right}</span></div>${rest
-              .map((r) => row(r, masterGroup))
-              .join('')}</div>`;
-          })
-          .join('');
-      body.querySelectorAll('[data-m]').forEach((b) => (b.onclick = () => setMaster(b.getAttribute('data-m'))));
-      body.querySelectorAll('[data-f]').forEach((b) => (b.onclick = () => toggleFollower(b.getAttribute('data-f'))));
-    }
-
-    const armBtn = _root.querySelector('[data-act="arm"]');
-    // DISARM is never blocked; only ARM is gated on a valid selection and the accounts view.
-    const otherView = gate || S.rulesOpen || S.summaryOpen || S.settingsOpen || S.siteOpen || S.supportOpen;
-    armBtn.disabled = S.armed ? false : S.arming || otherView || !(S.master && S.followers.size);
-    armBtn.textContent = S.armed ? 'DISARM' : S.arming ? 'ARMING…' : 'ARM';
-    armBtn.classList.toggle('armed', S.armed);
-    const tag = _root.querySelector('#armtag');
-    tag.textContent = S.armed
-      ? 'Armed · live'
-      : gate === 'failed'
-        ? 'Off'
-        : gate && gate !== 'clear'
-          ? 'Checking'
-          : S.master
-            ? 'Ready'
-            : 'Idle';
-    tag.className = 'armtag ' + (S.armed ? 'on' : 'off');
-    const opts = _root.querySelector('#opttag');
-    opts.textContent = [S.fast && 'FAST', S.capFit && 'CAP'].filter(Boolean).join(' ');
-    opts.title = [S.fast && 'Fast mode', S.capFit && 'Cap-to-fit'].filter(Boolean).join(' · ');
-    const flat = _root.querySelector('[data-act="flatall"]');
-    flat.disabled = S.flattening;
-    flat.textContent = S.flattening ? 'Flattening…' : 'Flatten All';
-    const view = currentView();
-    _root.querySelectorAll('[data-tab]').forEach((b) => {
+    if (gate) renderGate(body, gate);
+    else if (S.siteOpen) renderSiteCheck(body);
+    else if (S.shareOpen) renderShare(body);
+    else if (S.supportOpen) renderSupportTab(body);
+    else if (S.tradeOpen) renderTrade(body);
+    else if (S.settingsOpen) renderSettings(body);
+    else if (S.rulesOpen) renderRules(body);
+    else if (S.summaryOpen) renderSummary(body);
+    else renderCopier(body);
+    renderStatus(gate);
+    _root.querySelectorAll('.tab[data-tab]').forEach((b) => {
       b.classList.toggle('on', b.dataset.tab === view);
       b.setAttribute('aria-selected', String(b.dataset.tab === view));
     });
@@ -7727,7 +8862,6 @@
       top = body.scrollTop;
     body.innerHTML = `
       <div class="rules">
-        <div class="rules-h">Site check</div>
         <div class="sc-sub">Vest build ${esc(fingerprint() || 'unknown')}. Runs by itself whenever Vest updates its site. Read-only: nothing is sent to your accounts.</div>
         ${siteRows(site)}
         <div class="rules-btns">
@@ -7759,31 +8893,33 @@
       ],
       failed: [
         'Copying is off',
-        "Vest changed something the copier relies on (in red below). Copying, Trade-tab orders, automatic breakeven and claims stay off until a copier update fixes it: trade from Vest's own panel meanwhile. Flatten All still works.",
+        "Vest changed something the copier relies on (in red below). Copying, Trade-tab orders, automatic breakeven and claims stay off until a copier update fixes it: trade from Vest's own panel meanwhile. Flatten all still works.",
       ],
       clear: ['All clear', "The copier works with Vest's update."],
     }[g];
     body.innerHTML = `
-      <div class="rules gate gate-${g}">
-        <div class="gate-h">${esc(title)}</div>
-        <div class="sc-sub">${esc(sub)}</div>
-        ${g === 'waiting' ? '' : siteRows(s)}
-        ${
-          g === 'failed'
-            ? `<div class="rules-btns">
-          <button class="armbtn sm" id="sc-run">Check again</button>
-          <button class="ghostbtn" id="sc-diag">Diag file</button>
-          <button class="ghostbtn" id="sc-help">Discord</button>
+      <div class="gate gate-${g}">
+        <div class="rules">
+          <div class="gate-h">${esc(title)}</div>
+          <div class="sc-sub">${esc(sub)}</div>
+          ${g === 'waiting' ? '' : siteRows(s)}
+          ${
+            g === 'failed'
+              ? `<div class="rules-btns">
+            <button class="ghostbtn" id="sc-run">Check again</button>
+            <button class="ghostbtn" id="sc-diag">Diag file</button>
+            <button class="lnk" id="sc-help">Get help</button>
+          </div>
+          <div class="sc-note">Send the Diag file on Discord or GitHub. The fix arrives as a copier update.</div>`
+              : ''
+          }
         </div>
-        <div class="sc-note">Send the Diag file on Discord or GitHub. The fix arrives as a copier update in the bar above.</div>`
-            : ''
-        }
       </div>`;
     followCheck(body, top, 'gate-' + g);
     if (g !== 'failed') return;
     body.querySelector('#sc-run').onclick = () => runSiteCheck();
     body.querySelector('#sc-diag').onclick = () => downloadDiag();
-    body.querySelector('#sc-help').onclick = () => window.open(DISCORD_URL, '_blank', 'noopener');
+    body.querySelector('#sc-help').onclick = () => openReport();
   }
 
   // ───────────────────────── trade panel UI ─────────────────────────
@@ -7856,7 +8992,8 @@
       meta = SYMBOLS[sym],
       price = priceOf(sym),
       fee = meta.takerFee || 0,
-      master = S.master && S.byId[S.master] ? S.master : null;
+      master = S.master && S.byId[S.master] ? S.master : null,
+      step = unitSize(sym); // whole minis or micros when sizing in them, else the market's step
     const st = master && S.acctState[master];
     const held = (stateFresh(st) && st.positions.find((p) => p.symbol === sym)) || null;
     const live = master ? liveAccount(master, sym, price) : null;
@@ -7875,7 +9012,7 @@
           break;
         }
         const upnl = id === master ? live.upnl : r.upnl;
-        const q = maxQtyFor(tradingPower({ free: r.free, upnl, leverage: lev, takerFee: fee }), mpx, meta.step);
+        const q = maxQtyFor(tradingPower({ free: r.free, upnl, leverage: lev, takerFee: fee }), mpx, step);
         if (maxQty === null || q < maxQty) [maxQty, limitedBy] = [q, id];
       }
     }
@@ -7939,10 +9076,10 @@
         best = lo;
       }
       chips = [
-        chip('25', '25', floorStep(held.qty * 0.25, meta.step)),
-        chip('50', '50', floorStep(held.qty * 0.5, meta.step)),
-        chip('100', '100', floorStep(held.qty, meta.step)),
-        chip('max', 'MAX', floorStep(best, meta.step)),
+        chip('25', '25', floorStep(held.qty * 0.25, step)),
+        chip('50', '50', floorStep(held.qty * 0.5, step)),
+        chip('100', '100', floorStep(held.qty, step)),
+        chip('max', 'MAX', floorStep(best, step)),
       ];
       pick = chips.find((x) => x.key === (S.addPick || '25')) || chips[0];
     }
@@ -7951,9 +9088,9 @@
       : t.sizeMode === 'max'
         ? maxQty || 0
         : t.sizeMode === 'risk'
-          ? riskQty(+t.risk, +t.stopPts, meta.pointValue, meta.step)
-          : floorStep(+t.qty || 0, meta.step);
-    const split = splitQty(qty, t.targets.length, t.scale, meta.step);
+          ? riskQty(+t.risk, +t.stopPts, meta.pointValue, step)
+          : floorStep(+t.qty || 0, step);
+    const split = splitQty(qty, t.targets.length, t.scale, step);
     const long = planPrices({
       side: 'long',
       entry: price,
@@ -8126,15 +9263,20 @@
         <div class="tr-poscard" id="tr-pos" hidden>
           <div class="tr-posbar"><span class="tr-side" id="tr-pside"></span><span class="tr-pq" id="tr-pqty"></span><span class="tr-ppl" id="tr-ppl"></span></div>
           <div class="tr-pmeta"><span id="tr-pavg"></span><span id="tr-ppts"></span></div>
+          <div class="tr-brk" id="tr-brk"></div>
           <div class="tr-lvls" id="tr-lvls"></div>
           <div class="tr-prisk" title="What the stop would lose from here, fees included, against the room left before the floor (tightest account)">
             <div class="tr-pn"><span>Risk</span><span id="tr-prisk"></span></div><div class="tr-track"><i id="tr-prnow"></i></div></div>
         </div>
         <div class="tr-pacts" id="tr-pacts" hidden>
           <div class="tr-go"><button class="tr-bebtn" id="tr-be">Breakeven</button><button class="tr-close" id="tr-close">Close</button></div>
-          <div class="tr-addrow"><span class="tr-k">Scale</span><div class="tr-chips" id="tr-chips"></div></div>
-          <div class="tr-go tr-scale"><button class="tr-buy" id="tr-addbtn">Add</button><button class="tr-redbtn" id="tr-reduce">Reduce</button></div>
-          <div class="tr-addpv" id="tr-addpv"></div>
+          <button class="tr-disc" id="tr-addfold" aria-expanded="false"><span>Add or reduce</span>${ICON.right}</button>
+          <div class="tr-addbox" id="tr-addbox" hidden>
+            <div class="tr-chips" id="tr-chips"></div>
+            <div class="tr-go tr-scale"><button class="tr-buy" id="tr-addbtn">Add</button><button class="tr-redbtn" id="tr-reduce">Reduce</button></div>
+            <div class="tr-addpv" id="tr-addpv"></div>
+          </div>
+          <div class="tr-copies" id="tr-copies"></div>
         </div>
         <div class="tr-lims" id="tr-lims">
           <div class="tr-lb"><div class="tr-ln"><span class="tr-lk">Margin</span><span class="tr-lt" id="tr-mtxt"></span></div>
@@ -8144,22 +9286,26 @@
           <div class="tr-tight" id="tr-tight"></div>
         </div>
         <div class="tr-setup" id="tr-setup">
+          <div class="tr-f"><span class="tr-k">Order</span><div class="tr-row">${seg('orderType', [
+            ['market', 'Market'],
+            ['limit', 'Limit'],
+          ])}</div></div>
           <div class="tr-f"><span class="tr-k">Size</span><div class="tr-row">${seg('sizeMode', [
             ['qty', 'Qty'],
             ['risk', 'Risk $'],
             ['max', 'Max'],
           ])}<input class="tr-in" id="tr-size" inputmode="decimal" aria-label="Size"><span class="tr-sizeq" id="tr-sizeq"></span></div></div>
+          <div class="tr-f" id="tr-unitrow" hidden><span class="tr-k">In</span><div class="tr-row">${seg('unit', [
+            ['units', 'Units'],
+            ['micro', 'Micros'],
+            ['mini', 'Minis'],
+          ])}<span class="tr-u" id="tr-unitnote"></span></div></div>
           <div class="tr-ind">
             <div class="tr-calc" id="tr-sizecalc"></div>
             <div class="tr-lim" id="tr-sizelim"></div>
           </div>
-          <div class="tr-f"><span class="tr-k">Targets</span><div class="tr-row">${seg('scale', [
-            ['start', 'Start'],
-            ['even', 'Even'],
-            ['end', 'End'],
-          ])}<button class="tr-add" id="tr-add" title="Add a target">+</button></div></div>
-          <div class="tr-lad" role="table" aria-label="Stop, entry and targets">
-            <div class="tr-lh"><span id="tr-lhs">Sell</span><span id="tr-lhm">pts · qty · $</span><span id="tr-lhb">Buy</span></div>
+          <div class="tr-lad side-long" role="table" aria-label="Stop, entry and targets">
+            <div class="tr-lh"><span class="tr-flip" id="tr-lhs">If you buy</span><span id="tr-lhm">pts · qty · $</span><span id="tr-lhb">Buy at</span></div>
             <div class="tr-lr tr-ps" id="tr-passrow"><span class="tr-sp" id="ls-pass"></span><span class="tr-mid">Pass</span><span class="tr-bp" id="lb-pass"></span></div>
             <div id="tr-targets"></div>
             <div class="tr-lr tr-mk" id="tr-mkrow" hidden><span class="tr-sp"></span><span class="tr-mid" id="tr-mk">Price</span><span class="tr-bp" id="lb-mk"></span></div>
@@ -8170,11 +9316,21 @@
             <div class="tr-lr tr-fl" id="tr-failrow"><span class="tr-sp" id="ls-fail"></span><span class="tr-mid">Fail</span><span class="tr-bp" id="lb-fail"></span></div>
           </div>
           <div class="tr-lim" id="tr-stoplim"></div>
-          <div class="tr-f"><span class="tr-k">Auto BE</span><div class="tr-row">${seg('beMode', [
-            ['off', 'Off'],
-            ['tp1', 'After TP1'],
-            ['points', '+pts'],
-          ])}<span class="tr-be">
+          <div class="tr-fold"><span id="tr-splittxt"></span><button class="lnk" data-fold="split">Change</button><button class="lnk" id="tr-add" title="Add a target">+ target</button></div>
+          <div class="tr-foldbox" data-foldbox="split" hidden><span class="tr-k">Split</span>${seg('scale', [
+            ['start', 'Start'],
+            ['even', 'Even'],
+            ['end', 'End'],
+          ])}</div>
+          <div class="tr-fold"><span id="tr-betxt"></span><button class="lnk" data-fold="be">Change</button></div>
+          <div class="tr-foldbox" data-foldbox="be" hidden><span class="tr-k">Auto BE</span><div class="tr-row">${seg(
+            'beMode',
+            [
+              ['off', 'Off'],
+              ['tp1', 'After TP1'],
+              ['points', '+pts'],
+            ],
+          )}<span class="tr-be">
             <span id="tr-betrigw">at <input class="tr-in sm" id="tr-betrig" inputmode="decimal" aria-label="Breakeven trigger, in points" value="${esc(t.beTrigger)}"></span>
             lock <input class="tr-in sm" id="tr-beoff" inputmode="decimal" aria-label="Profit to lock, in points" title="Points of profit beyond the entry (0 = exact breakeven)" value="${esc(t.beOffset)}"></span></div></div>
           <div class="tr-sum" id="tr-sum"></div>
@@ -8182,16 +9338,15 @@
         <div class="tr-warn" id="tr-warn"></div>
         <div class="tr-action">
           <div class="tr-err" id="tr-err"></div>
-          <div class="tr-who" id="tr-who"></div>
           <div class="tr-go" id="tr-mgo"><button class="tr-buy" id="tr-buy">Buy</button><button class="tr-sell" id="tr-sell">Sell</button></div>
-          <div class="tr-go tr-lgo" id="tr-lgo">
-            <button class="tr-lbuy" id="tr-lbuy" title="Buy limit: click Vest's chart for the price, or type it"><svg width="11" height="11" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1v4M8 11v4M1 8h4M11 8h4" stroke="currentColor" stroke-width="1.6" fill="none"/><circle cx="8" cy="8" r="1.4" fill="currentColor"/></svg> Buy LMT</button>
-            <button class="tr-lsell" id="tr-lsell" title="Sell limit: click Vest's chart for the price, or type it"><svg width="11" height="11" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1v4M8 11v4M1 8h4M11 8h4" stroke="currentColor" stroke-width="1.6" fill="none"/><circle cx="8" cy="8" r="1.4" fill="currentColor"/></svg> Sell LMT</button></div>
+          <div class="tr-go tr-lgo" id="tr-lgo" hidden>
+            <button class="tr-lbuy" id="tr-lbuy">Buy limit</button><button class="tr-lsell" id="tr-lsell">Sell limit</button></div>
           <div class="tr-pick" id="tr-pick" hidden>
             <div class="tr-pickbar"><span id="tr-picktxt"></span><span class="tr-esc">Esc to cancel</span></div>
             <div class="tr-pickrow"><input class="tr-in" id="tr-lpx" inputmode="decimal" aria-label="Limit price" placeholder="price">
               <button class="tr-place" id="tr-place">Place</button><button class="tr-pcancel" id="tr-pcancel">Cancel</button></div>
           </div>
+          <div class="tr-who" id="tr-who"></div>
         </div>
         <div class="tr-preview" id="tr-preview" hidden></div>
         <div class="tr-plans" id="tr-plans"></div>
@@ -8209,10 +9364,21 @@
         saveTrade();
         updateTrade();
       });
+    // The size box: dollars at risk, or the size in the chosen unit (kept in units: a micro of NQ is 2)
     const sizeEl = body.querySelector('#tr-size');
-    sizeEl.value = t.sizeMode === 'risk' ? t.risk : t.qty;
+    fitQtyToUnit();
+    const showSize = () =>
+      (sizeEl.value =
+        S.trade.sizeMode === 'risk'
+          ? S.trade.risk
+          : tradeUnit() === 'units'
+            ? S.trade.qty
+            : +((+S.trade.qty || 0) / unitSize()).toFixed(4));
+    showSize();
     sizeEl.addEventListener('input', () => {
-      S.trade[S.trade.sizeMode === 'risk' ? 'risk' : 'qty'] = parse(sizeEl) || 0;
+      const v = parse(sizeEl) || 0;
+      if (S.trade.sizeMode === 'risk') S.trade.risk = v;
+      else S.trade.qty = tradeUnit() === 'units' ? v : +(v * unitSize()).toFixed(8);
       saveTrade();
       updateTrade();
     });
@@ -8224,12 +9390,46 @@
         (b) =>
           (b.onclick = () => {
             S.trade[g.dataset.seg] = b.dataset.v;
+            if (g.dataset.seg === 'unit') {
+              // the same size, in whole micros or minis (at least one)
+              const u = unitSize();
+              S.trade.qty = Math.max(u, floorStep(+S.trade.qty || 0, u));
+            }
+            if (g.dataset.seg === 'orderType' && b.dataset.v === 'market') stopPick(true);
             saveTrade();
-            if (g.dataset.seg === 'sizeMode') sizeEl.value = S.trade.sizeMode === 'risk' ? S.trade.risk : S.trade.qty;
+            if (g.dataset.seg === 'sizeMode' || g.dataset.seg === 'unit') showSize();
             updateTrade();
           }),
       ),
     );
+    // The ladder shows one side's prices (the stop, targets and fail price differ for a buy and a sell): the side of the
+    // button the pointer is on, or that has the keyboard, else the side last traded.
+    const showSide = (side) => {
+      if (S.ladSide === side) return;
+      S.ladSide = side;
+      updateTrade();
+    };
+    for (const [id, side] of [
+      ['#tr-buy', 'long'],
+      ['#tr-sell', 'short'],
+    ]) {
+      const b = body.querySelector(id);
+      b.addEventListener('pointerenter', () => showSide(side));
+      b.addEventListener('focus', () => showSide(side));
+    }
+    // the split and Auto BE fold to one line each; Change opens the controls
+    body.querySelectorAll('[data-fold]').forEach(
+      (b) =>
+        (b.onclick = () => {
+          const box = body.querySelector(`[data-foldbox="${b.dataset.fold}"]`);
+          box.hidden = !box.hidden;
+          b.textContent = box.hidden ? 'Change' : 'Done';
+        }),
+    );
+    body.querySelector('#tr-addfold').onclick = () => {
+      S.addOpen = !S.addOpen;
+      updateTrade();
+    };
     body.querySelector('#tr-add').onclick = () => {
       const last = +S.trade.targets[S.trade.targets.length - 1] || 0;
       S.trade.targets.push(last ? last + (+S.trade.targets[0] || DEFAULT_TARGET_PTS) : DEFAULT_TARGET_PTS);
@@ -8237,8 +9437,13 @@
       renderTargets(body);
       updateTrade();
     };
-    body.querySelector('#tr-buy').onclick = () => placeTrade('long');
-    body.querySelector('#tr-sell').onclick = () => placeTrade('short');
+    // Buy / Sell: a market order, or with Limit picked, the price is picked on the chart (or typed)
+    const go = (side) => {
+      S.ladSide = side; // the ladder shows the side last traded
+      return S.trade.orderType === 'limit' ? startPick(side) : placeTrade(side);
+    };
+    body.querySelector('#tr-buy').onclick = () => go('long');
+    body.querySelector('#tr-sell').onclick = () => go('short');
     body.querySelector('#tr-be').onclick = () => breakevenNow();
     body.querySelector('#tr-lbuy').onclick = () => startPick('long');
     body.querySelector('#tr-lsell').onclick = () => startPick('short');
@@ -8324,7 +9529,7 @@
   async function placeTrade(side, limitPx = null) {
     if (S.placing || S.adjusting) return;
     if (S.flattening) return toast('Wait for Flatten All to finish.');
-    if (S.arming || claimBusy()) return toast('Wait for arming or the claim to finish.');
+    if (S.arming || claimBusy()) return toast('Wait for copying to start or the claim to finish.');
     const siteHeld = siteBlocks(); // Vest's update not checked yet, or the check failed
     if (siteHeld) return toast(siteHeld);
     if (!S.ack) {
@@ -8804,9 +10009,10 @@
   // ── Breakeven and Close by hand, for the master's open position in this market. Both go through the hooked fetch, so
   // an armed copier moves each follower's stop / closes each follower like the master. Breakeven = entry + the Auto BE
   // "lock" points, only once price is past it (a stop must stay on the losing side) and only if it tightens the stop.
-  // Vest triggers stops on the best bid (longs) / ask (shorts), and refuses a stop the bid has already passed (seen live:
-  // HTTP 400 with the mark a fraction above it). With Vest's book live, the bid (ask) itself must be BE_BOOK_CLEAR_TICKS
-  // clear of breakeven; without it, the mid or mark must be BE_CLEAR_TICKS clear (about a spread more).
+  // Vest refuses a stop the price has already passed (seen live: HTTP 400 with the mark a fraction above it). It triggers
+  // stops on the mid since 2026-10-10 (the bid / ask before); the check stays on the bid (longs) / ask (shorts), which is
+  // never more lenient than the mid: with Vest's book live, the bid (ask) must be BE_BOOK_CLEAR_TICKS clear of
+  // breakeven; without it, the mid or mark must be BE_CLEAR_TICKS clear (about a spread more).
   const BE_CLEAR_TICKS = 4,
     BE_BOOK_CLEAR_TICKS = 2;
   // The price a breakeven stop is checked against and how far clear it must be: { px, clear }.
@@ -8827,12 +10033,12 @@
           ? sl.price >= be
             ? 'The stop is already at or past breakeven.'
             : px <= be + clear
-              ? `Price needs to be above ${fmtPx(be + clear, tick)} first (stops trigger on the bid).`
+              ? `Price needs to be above ${fmtPx(be + clear, tick)} first, so Vest accepts the stop.`
               : null
           : sl.price <= be
             ? 'The stop is already at or past breakeven.'
             : px >= be - clear
-              ? `Price needs to be below ${fmtPx(be - clear, tick)} first (stops trigger on the ask).`
+              ? `Price needs to be below ${fmtPx(be - clear, tick)} first, so Vest accepts the stop.`
               : null;
     return { price: be, sl, why };
   }
@@ -8875,7 +10081,7 @@
     } catch (e) {
       const why =
         /HTTP 400/.test(e.message) && !e.message.includes('Price needs')
-          ? `Vest refused the stop (price was too close to breakeven: stops trigger on the bid/ask)`
+          ? `Vest refused the stop (price was too close to breakeven)`
           : e.message;
       logEvent('warn', `Breakeven: not moved — ${why}.`);
       diag('breakeven', {
@@ -9083,7 +10289,7 @@
       moveToBreakeven(p, px);
     }
   }
-  // Price must be clear of breakeven by BE_CLEAR_TICKS (Vest refuses a stop the bid/ask has passed). Before moving, the
+  // Price must be clear of breakeven by BE_CLEAR_TICKS (Vest refuses a stop the price has passed). Before moving, the
   // position is re-read: the stop is measured from the worse of the plan's entry and Vest's average (never locks in a
   // loss), and a stop already at or past breakeven (moved by hand, say) is left alone.
   const BE_WAIT_MS = 2000;
@@ -9207,6 +10413,47 @@
   if (window.__VC_TEST__) window.__vcRender = () => render();
 
   const DEFAULT_TARGET_PTS = 20;
+  // The position's bracket on one line, to scale: the stop on the left, the targets to the right, the entry and the price
+  // now between them (in the trade's favour to the right, long or short). Labels that would collide are left out.
+  function bracketHtml(h, sls, tps, price, tick) {
+    if (!sls.length && !tps.length) return '<div class="hint">No stop or targets on this position.</div>';
+    const dir = h.side === 'long' ? 1 : -1,
+      x = (v) => dir * (v - h.openPrice);
+    const marks = [
+      ...sls.map((l) => ({ k: 'SL', v: l.price, cls: 'bad' })),
+      { k: 'IN', v: h.openPrice, cls: '' },
+      ...tps.map((l, i) => ({ k: 'TP' + (i + 1), v: l.price, cls: 'up' })),
+    ];
+    const xs = marks.map((m) => x(m.v)).concat(price > 0 ? [x(price)] : []);
+    const lo = Math.min(...xs),
+      span = Math.max(...xs) - lo || 1;
+    const pos = (v) => Math.max(0, Math.min(100, ((x(v) - lo) / span) * 100));
+    // the last digits are enough on a small bar: 31,162.50 → 162.50
+    const short = (v) => {
+      const t = fmtPx(v, tick),
+        i = t.lastIndexOf(',');
+      return i >= 0 ? t.slice(i + 1) : t;
+    };
+    const e = pos(h.openPrice),
+      sl = sls.length ? pos(sls[0].price) : null,
+      now = price > 0 ? pos(price) : null;
+    let html = '<span class="bk-tr"></span>';
+    if (sl !== null) html += `<span class="bk-r" style="left:${Math.min(sl, e)}%;width:${Math.abs(e - sl)}%"></span>`;
+    if (now !== null)
+      html += `<span class="bk-${now >= e ? 'g' : 'l'}" style="left:${Math.min(now, e)}%;width:${Math.abs(now - e)}%"></span>`;
+    html += marks.map((m) => `<span class="bk-t ${m.cls}" style="left:${pos(m.v)}%"></span>`).join('');
+    if (now !== null)
+      html += `<span class="bk-now" style="left:${now}%" title="Price now ${fmtPx(price, tick)}"></span>`;
+    let lastAt = -100;
+    for (const m of [...marks].sort((a, b) => pos(a.v) - pos(b.v))) {
+      const p = pos(m.v);
+      if (p - lastAt < 13) continue;
+      lastAt = p;
+      const al = p < 8 ? ' l' : p > 92 ? ' r' : '';
+      html += `<span class="bk-lb${al}" style="left:${p}%"><b class="${m.cls}">${m.k}</b>${esc(short(m.v))}</span>`;
+    }
+    return `<div class="bk">${html}</div>`;
+  }
   function renderTargets(body) {
     const box = body.querySelector('#tr-targets');
     // ladder rows, farthest target on top (Buy prices rise up the right column, Sell prices fall down the left)
@@ -9268,6 +10515,21 @@
         g.querySelectorAll('button').forEach((b) => b.classList.toggle('on', S.trade[g.dataset.seg] === b.dataset.v)),
       );
     $('tr-size').style.display = c.t.sizeMode === 'max' ? 'none' : '';
+    // minis and micros (NQ, ES, RTY): which unit the size is in
+    const unit = tradeUnit(),
+      hasUnits = !!MICRO_UNITS[c.t.symbol];
+    $('tr-unitrow').hidden = !hasUnits || !!c.held;
+    body.querySelectorAll('[data-seg="unit"] button').forEach((b) => b.classList.toggle('on', b.dataset.v === unit));
+    set(
+      'tr-unitnote',
+      hasUnits && unit !== 'units'
+        ? `1 ${unit} = ${unitSize()} units`
+        : hasUnits
+          ? `micro = ${MICRO_UNITS[c.t.symbol]} units`
+          : '',
+    );
+    const uq = (q) => fmtUnits(q, c.t.symbol); // a size in the chosen unit, with its word
+    const uqn = (q) => fmtUnits(q, c.t.symbol, false); // just the number
     const maxNote =
       c.maxQty === null
         ? ''
@@ -9277,14 +10539,14 @@
       c.pick
         ? `Add uses ${c.pick.label} (${fmtQty(c.qty, c.t.symbol)}): click it again for this size`
         : c.t.sizeMode === 'max' && c.qty > 0
-          ? `= ${fmtQty(c.qty, c.t.symbol)} contracts · ${maxNote}`
+          ? `= ${unit === 'units' ? fmtQty(c.qty, c.t.symbol) + ' contracts' : uq(c.qty)} · ${maxNote}`
           : '',
     );
     set(
       'tr-sizeq',
       c.qty > 0 && c.t.sizeMode !== 'max'
         ? c.t.sizeMode === 'risk'
-          ? `= ${fmtQty(c.qty, c.t.symbol)} ct`
+          ? `= ${unit === 'units' ? fmtQty(c.qty, c.t.symbol) + ' ct' : uq(c.qty)}`
           : +c.t.stopPts > 0
             ? `${fmtUsd(c.risk)} at stop`
             : ''
@@ -9334,11 +10596,24 @@
       const q = c.qtys[i],
         qe = $('tq' + i),
         ge = $('tg' + i);
-      if (qe) qe.textContent = q ? fmtQty(q, c.t.symbol) : '—';
+      if (qe) qe.textContent = q ? uqn(q) : '—';
       if (ge) ge.textContent = q ? '+' + fmtUsd(q * (+p || 0) * c.meta.pointValue) : '';
     });
     $('tr-betrigw').style.display = c.t.beMode === 'points' ? '' : 'none';
     body.querySelector('.tr-be').style.display = c.t.beMode === 'off' ? 'none' : '';
+    // the folded lines: how the targets split, and when the stop moves to breakeven
+    set(
+      'tr-splittxt',
+      `Split ${c.t.scale === 'start' ? 'front-loaded' : c.t.scale === 'end' ? 'back-loaded' : 'even'}${
+        c.qtys.length > 1 ? ' · ' + c.qtys.map(uqn).join(' / ') : ''
+      }`,
+    );
+    set(
+      'tr-betxt',
+      c.t.beMode === 'off'
+        ? 'Auto breakeven off'
+        : `Breakeven ${c.t.beMode === 'tp1' ? 'after TP1' : `at +${c.t.beTrigger || 0} pts`}${+c.t.beOffset > 0 ? `, locks ${c.t.beOffset} pts` : ''}`,
+    );
     // in a trade the setup (size, stop, targets, Auto BE for a new trade) is put away: Scale and the trade's own
     // stop and targets apply
     const held = !!c.held;
@@ -9398,11 +10673,14 @@
     const h = c.held,
       busy = !!S.placing || !!S.adjusting || !!S.flattening || !!S.arming;
     const nf = S.armed ? S.followers.size : 0;
+    $('tr-who').hidden = !!c.held; // in a trade, the position card says it
     $('tr-who').textContent = S.master
-      ? `On ${accLabel(S.master)}${nf ? ` · copies to ${nf} follower${nf > 1 ? 's' : ''}` : ' · not copied (disarmed)'}`
+      ? `On ${accLabel(S.master)}${nf ? ` · copies to ${nf} follower${nf > 1 ? 's' : ''}` : ' · not copied (copying is off)'}`
       : '';
-    $('tr-buy').textContent = h && h.side === 'long' ? `Add ${q}` : `Buy ${q}`;
-    $('tr-sell').textContent = h && h.side === 'short' ? `Add ${q}` : `Sell ${q}`;
+    const lim = c.t.orderType === 'limit' && !h,
+      qw = c.qty > 0 ? (unit === 'units' ? q : uq(c.qty)) : '';
+    $('tr-buy').textContent = h && h.side === 'long' ? `Add ${qw}` : `Buy${lim ? ' limit' : ''} ${qw}`.trim();
+    $('tr-sell').textContent = h && h.side === 'short' ? `Add ${qw}` : `Sell${lim ? ' limit' : ''} ${qw}`.trim();
     $('tr-buy').hidden = !!h && h.side !== 'long';
     $('tr-sell').hidden = !!h && h.side !== 'short';
     $('tr-buy').disabled = $('tr-sell').disabled = !!c.error || !!c.blocked || busy;
@@ -9411,7 +10689,7 @@
     if (h && S.pick) stopPick(true);
     const pk = S.pick;
     $('tr-mgo').hidden = !!pk || !!h; // in a trade, ADD and REDUCE sit under the Scale chips
-    $('tr-lgo').hidden = !!h || !!pk;
+    $('tr-lgo').hidden = true; // Limit is the Order switch now; these stay for the chart pick's own code
     $('tr-lbuy').disabled = $('tr-lsell').disabled = !!c.error || !!c.blocked || busy;
     $('tr-pick').hidden = !pk;
     if (pk) {
@@ -9442,8 +10720,13 @@
       const accts = S.armed && entry ? 1 + Object.keys(entry.followers || {}).length : 1;
       set('tr-pside', h.side === 'long' ? 'Long' : 'Short');
       $('tr-pside').className = 'tr-side ' + h.side;
-      set('tr-pqty', `${fmtQty(h.qty, h.symbol)} ${c.meta.label}`);
-      set('tr-pavg', `avg ${fmtPx(h.openPrice, tick)} · ${accts} account${accts === 1 ? '' : 's'}`);
+      set('tr-pqty', `${fmtQty(h.qty, h.symbol)} ${c.meta.label}${unit !== 'units' ? ` · ${uq(h.qty)}` : ''}`);
+      set(
+        'tr-pavg',
+        `avg ${fmtPx(h.openPrice, tick)} · ${accts} account${accts === 1 ? '' : 's'}${
+          accts > 1 && pnl !== null && !S.capFit ? ` · ${pnl >= 0 ? '+' : '−'}${fmtUsd(pnl * accts)} total` : ''
+        }`,
+      );
       const ptsNow = c.price > 0 ? dir * (c.price - h.openPrice) : null;
       set(
         'tr-ppts',
@@ -9464,6 +10747,10 @@
         '<span class="tr-lv none">No stop or targets on this position</span>';
       const lvBox = $('tr-lvls');
       if (lvBox.dataset.html !== lvHtml) lvBox.innerHTML = lvBox.dataset.html = lvHtml;
+      // The bracket, drawn to scale: stop on the left, targets to the right, the entry and the price now between
+      const brk = $('tr-brk'),
+        brkHtml = bracketHtml(h, sls, tps, c.price, tick);
+      if (brk.dataset.html !== brkHtml) brk.innerHTML = brk.dataset.html = brkHtml;
       const K2 = c.risk2,
         usd2 = (n) => '$' + Math.round(Math.abs(n)).toLocaleString('en-US');
       const frac = K2.room > 0 && K2.now !== null ? K2.now / K2.room : 0;
@@ -9524,6 +10811,15 @@
           : key === '100'
             ? `Close the whole ${fmtQty(h.qty, h.symbol)}${S.armed ? ' (the copier closes the followers)' : ''}`
             : `Take ${fmtQty(redQ, h.symbol)} off at market${S.armed ? ' (the copier reduces each follower by the same share)' : ''}. The stop and targets stay where they are.`;
+      $('tr-addbox').hidden = !S.addOpen;
+      $('tr-addfold').setAttribute('aria-expanded', String(!!S.addOpen));
+      $('tr-addfold').classList.toggle('open', !!S.addOpen);
+      set(
+        'tr-copies',
+        S.armed && S.followers.size
+          ? `Every change copies to ${S.followers.size} follower${S.followers.size === 1 ? '' : 's'}`
+          : '',
+      );
       const addQ = c.qty > 0 ? c.qty : 0,
         tot = h.qty + addQ;
       const avgA = tot > 0 ? (h.qty * h.openPrice + addQ * c.price) / tot : 0;
@@ -9557,8 +10853,14 @@
       lad = body.querySelector('.tr-lad');
     const pk2 = !h2 && S.pick && S.pick.price > 0 ? S.pick : null;
     lad.classList.toggle('one', !!h2 || !!pk2);
-    set('tr-lhs', h2 || pk2 ? '' : 'Sell at');
-    set('tr-lhb', h2 ? 'Price' : pk2 ? (pk2.side === 'long' ? 'Buy at' : 'Sell at') : 'Buy at');
+    // one side at a time: the side of the Buy or Sell button you're pointing at (else the side last traded)
+    const lside = S.ladSide || 'long';
+    lad.classList.toggle('side-long', lside === 'long');
+    lad.classList.toggle('side-short', lside === 'short');
+    $('tr-lhs').hidden = !!(h2 || pk2);
+    set('tr-lhs', lside === 'long' ? 'If you buy' : 'If you sell');
+    $('tr-lhs').className = 'tr-flip ' + lside;
+    set('tr-lhb', h2 ? 'Price' : pk2 ? (pk2.side === 'long' ? 'Buy at' : 'Sell at') : 'Price');
     $('tr-mkrow').hidden = !(h2 || pk2) || !ok;
     if (pk2) {
       // a limit: its stop and targets measured from the limit price (it fills there or better)
@@ -9702,63 +11004,71 @@
     }
   }
 
+  // Settings: every option with one line under its name; the ? opens the full explanation in place.
   function renderSettings(body) {
-    const option = (key, on, name, desc, dim = false) => `
-        <div class="opt ${dim ? 'dep-off' : ''}">
-          <div class="opt-txt"><div class="opt-name">${name}</div><div class="opt-desc">${desc}</div></div>
+    const open = new Set([...body.querySelectorAll('.opt.open[data-o]')].map((e) => e.dataset.o));
+    const option = (key, on, name, short, long, dim = false) => `
+        <div class="opt ${dim ? 'dep-off' : ''} ${open.has(key) ? 'open' : ''}" data-o="${key}">
+          <div class="opt-txt"><div class="opt-name">${name}${long ? `<button class="qm" data-q="${key}" aria-label="More about ${name}" title="More about this">?</button>` : ''}</div>
+            <div class="opt-short">${short}</div>${long ? `<div class="opt-desc">${long}</div>` : ''}</div>
           <button class="switch ${on ? 'on' : ''}" data-opt="${key}" role="switch" aria-checked="${on}" aria-label="${name}"><span class="knob"></span></button>
         </div>`;
     body.innerHTML = `
       <div class="settings">
-        <div class="set-h">Execution</div>
+        <div class="set-h">Copying</div>
         ${option(
           'fast',
           S.fast,
           'Fast mode',
+          'Followers enter as soon as the master sends.',
           "Fire follower entries the instant the master sends, for the most simultaneous fills. They open before the master's order is confirmed.",
         )}
         ${option(
           'autoflat',
           S.autoFlatten,
           'Auto-flatten orphans',
+          "Close followers left in a trade the master isn't in.",
           "If followers end up in a trade the master isn't in (its entry was refused or didn't fill, or Vest closed the master), close them automatically instead of asking. Never used when the master might be in the trade.",
         )}
-        <div class="set-h">Sizing</div>
         ${option(
           'capfit',
           S.capFit,
           'Cap-to-fit size',
-          'Size each follower to its own equity instead of copying 1:1. Every account takes the same % risk with the same stop distance, ' +
-            'and <b>different-size followers</b> are allowed (e.g. a 25k master with 5k accounts). Off: strict 1:1, same-size accounts only.',
+          'Size each follower to its own equity, not 1:1.',
+          'Every account takes the same % risk with the same stop distance, and <b>different-size followers</b> are allowed (e.g. a 25k master with 5k accounts). Off: strict 1:1, same-size accounts only.',
         )}
         <div class="set-h">Chart</div>
         ${option(
           'hidemarks',
           S.hideMarks,
           'Hide marks on bars',
-          "Hide Vest's buy and sell marks on the chart each time it loads (the chart's right-click Hide marks on bars, which Vest forgets on every refresh). Show them again from that menu any time.",
+          "Hide Vest's buy and sell marks each load.",
+          "The chart's right-click Hide marks on bars, which Vest forgets on every refresh. Show them again from that menu any time.",
         )}
         ${option(
           'tradeonly',
           S.tradeOnly,
-          'Show only on the Trade page',
+          'Only on the Trade page',
+          'Hidden elsewhere; it keeps copying.',
           "Hide the panel on Vest's other pages (Portfolio, Markets, Affiliate…). It keeps running and copying there, and shows on any page when something needs you.",
         )}
         ${option(
           'hidesessions',
           S.hideSessions,
           'Hide session shading',
-          'Remove the pre-market, after-hours and overnight bands Vest draws on the chart (its Market Sessions indicator), every time it adds them.',
+          "Remove Vest's pre-market and overnight bands.",
+          'Removes the pre-market, after-hours and overnight bands Vest draws on the chart (its Market Sessions indicator), every time it adds them.',
         )}
         ${option(
           'theme',
           S.theme,
-          'STRATUH theme for Vest',
-          "Recolour Vest's own page and chart in STRATUH's colours: onyx, lime and greys, square corners, and drop the Volume indicator Vest adds to the chart by itself. Dark mode only; turn it off to go back to Vest's colours (the chart on the next refresh).",
+          'STRATUH theme',
+          "Onyx and lime for Vest's page and chart.",
+          "Recolours Vest's own page and chart in STRATUH's colours: onyx, lime and greys, square corners, and drops the Volume indicator Vest adds to the chart by itself. Dark mode only; turn it off to go back to Vest's colours (the chart on the next refresh).",
         )}
         <div class="opt ${S.theme ? '' : 'dep-off'}">
           <div class="opt-txt"><div class="opt-name">Shorts and losses</div>
-            <div class="opt-desc">Grey, as on STRATUH's DeepCharts theme, or red. Candles stay grey either way.</div></div>
+            <div class="opt-short">Candles stay grey either way.</div></div>
           <div class="seg" data-theme-down><button data-v="mono" class="${S.themeDown === 'mono' ? 'on' : ''}">Grey</button><button data-v="red" class="${S.themeDown === 'red' ? 'on' : ''}">Red</button></div>
         </div>
         <div class="set-h">Updates</div>
@@ -9766,20 +11076,23 @@
           'updates',
           S.checkUpdates,
           'Check for updates',
-          `Each time Vest loads, check GitHub for a newer version and offer a one-click install. You have v${VERSION}` +
-            (S.update && S.update.latest ? `; the latest published is v${esc(S.update.latest)}.` : '.'),
+          `You have v${VERSION} · checked when Vest loads.`,
+          'Each time Vest loads, check GitHub for a newer version and offer a one-click install' +
+            (S.update && S.update.latest ? `. The latest published is v${esc(S.update.latest)}.` : '.'),
         )}
         <div class="set-row"><button class="ghostbtn" data-act="check-now">Check now</button>
-          <a class="ghostbtn" href="${REPO_URL}" target="_blank" rel="noopener">GitHub</a></div>
-        <div class="set-h">Support</div>
+          <a class="ghostbtn" href="${REPO_URL}" target="_blank" rel="noopener">GitHub ${ICON.ext}</a></div>
+        <div class="set-h">Support the copier</div>
         ${option(
           'supportapply',
           supportApplies(),
-          `Use code ${SUPPORT_CODE} at checkout`,
-          `Switch the discount code in Vest's purchase window to <b>${SUPPORT_CODE}</b> (5% off) each time it opens. Thank you for supporting the free copier.`,
+          `Enter code ${SUPPORT_CODE} at checkout`,
+          '5% off Vest purchases. Keeps the copier free.',
+          `Switches the discount code in Vest's purchase window to <b>${SUPPORT_CODE}</b> (5% off) each time it opens. Thank you for supporting the free copier.`,
         )}
-        <div class="set-row"><button class="ghostbtn" data-act="copy-code">Copy code ${SUPPORT_CODE}</button></div>
+        <div class="set-row"><button class="ghostbtn" data-act="copy-code">${ICON.copy} Copy code ${SUPPORT_CODE}</button></div>
       </div>`;
+    body.querySelectorAll('[data-q]').forEach((b) => (b.onclick = () => b.closest('.opt').classList.toggle('open')));
     body.querySelectorAll('[data-opt]').forEach(
       (b) =>
         (b.onclick = () => {
@@ -9832,26 +11145,23 @@
       copySupportCode().then((ok) => toast(ok ? `Code ${SUPPORT_CODE} copied.` : `Code: ${SUPPORT_CODE}`));
   }
 
-  // Rules tab, and the one-time risk acknowledgement (shown on first load; required before arming or trading).
-  function renderRules(body) {
-    const first = !S.ack;
-    if (first && body.dataset.view === 'rules-first') return; // a re-render would untick the box
-    body.dataset.view = first ? 'rules-first' : '';
+  // How it works and the risk terms: the first-run acknowledgement (required before copying or trading) and Help.
+  function rulesHtml() {
     const how = `
         <ul class="rules-list">
-          <li><b>Live copying.</b> Arming copies your <b>master</b> account's orders to the selected <b>followers</b>
-            as <b>real orders</b> on live accounts.</li>
-          <li><b>Leverage is matched.</b> On arm, followers are set to the master's leverage. If you change leverage
-            or switch markets, <b>disarm and arm again</b>.</li>
-          <li><b>Flat, or already in the same trade.</b> Arm when everyone is flat, or when the master and followers
-            hold the same position (same market and side): arming <b>adopts</b> it, so exits and stop/target changes
+          <li><b>Live copying.</b> Start copying sends your <b>master</b> account's orders to the selected
+            <b>followers</b> as <b>real orders</b> on live accounts.</li>
+          <li><b>Leverage is matched.</b> When you start, followers are set to the master's leverage. If you change
+            leverage or switch markets, <b>stop and start copying again</b>.</li>
+          <li><b>Flat, or already in the same trade.</b> Start when everyone is flat, or when the master and followers
+            hold the same position (same market and side): starting <b>adopts</b> it, so exits and stop/target changes
             copy. It never opens a trade for a follower that isn't already in it.</li>
           <li><b>Only your orders are copied.</b> When Vest closes the master itself (a stop or target filling, a
             drawdown breach), nothing is copied: the log says what Vest did, and a follower still in the trade a few
             seconds later is offered to flatten.</li>
           <li><b>An account that fails drops out.</b> A follower is removed and the others keep copying; if the master
-            fails, the copier disarms.</li>
-          <li><b>Sizing.</b> Strict 1:1 copies the exact size (same-size accounts only). <b>Cap-to-fit</b> (Settings)
+            fails, copying stops.</li>
+          <li><b>Sizing.</b> Strict 1:1 copies the exact size (same-size accounts only). <b>Cap-to-fit</b> (Edit)
             sizes each follower to its own equity: same % risk, same stop distance, smaller size.</li>
           <li><b>Shared risk.</b> One bad trade hits <b>every</b> linked account at once. Size so a simultaneous loss
             is survivable.</li>
@@ -9871,46 +11181,38 @@
         </ul>
         <div class="rules-terms">Full terms: <a href="${REPO_URL}/blob/main/DISCLAIMER.md" target="_blank" rel="noopener">Disclaimer</a>
           · <a href="${REPO_URL}/blob/main/LICENSE" target="_blank" rel="noopener">License</a></div>`;
-    body.innerHTML = first
-      ? `
+    return { how, risk };
+  }
+  function renderRules(body) {
+    if (S.ack) return setView('support'); // accepted: the rules live in Help
+    if (body.dataset.view === 'rules-first') return; // a re-render would untick the box
+    body.dataset.view = 'rules-first';
+    const { how, risk } = rulesHtml();
+    body.innerHTML = `
       <div class="rules">
-        <div class="rules-h">Before you use STRATUH Copier</div>
+        <div class="rules-h big">Before you use STRATUH Copier</div>
         ${risk}
         <div class="rules-h">How it works</div>
         ${how}
         <label class="rules-accept"><input type="checkbox" id="rl-check">
           I have read this. I use STRATUH Copier entirely at my own risk, and its author is not responsible for any loss.</label>
         <div class="rules-btns"><button class="armbtn" id="rl-agree" disabled>Accept and continue</button></div>
-      </div>`
-      : `
-      <div class="rules">
-        <div class="rules-h">Before you arm</div>
-        ${how}
-        ${risk}
-        <div class="rules-btns"><button class="ghostbtn" id="rl-close">Close</button></div>
       </div>`;
-    if (first) {
-      const check = body.querySelector('#rl-check'),
-        agree = body.querySelector('#rl-agree');
-      check.onchange = () => (agree.disabled = !check.checked);
-      agree.onclick = () => {
-        if (!check.checked) return;
-        S.ack = true;
-        saveAck();
-        diag('terms_accepted', { version: TERMS_VERSION });
-        logEvent('info', 'Terms accepted.');
-        S.rulesOpen = false;
-        render();
-        if (S.ackThenArm) arm();
-        S.ackThenArm = false;
-        maybeOfferSupport();
-      };
-    } else {
-      body.querySelector('#rl-close').onclick = () => {
-        S.rulesOpen = false;
-        render();
-      };
-    }
+    const check = body.querySelector('#rl-check'),
+      agree = body.querySelector('#rl-agree');
+    check.onchange = () => (agree.disabled = !check.checked);
+    agree.onclick = () => {
+      if (!check.checked) return;
+      S.ack = true;
+      saveAck();
+      diag('terms_accepted', { version: TERMS_VERSION });
+      logEvent('info', 'Terms accepted.');
+      S.rulesOpen = false;
+      render();
+      if (S.ackThenArm) arm();
+      S.ackThenArm = false;
+      maybeOfferSupport();
+    };
   }
 
   // Account P&L summary — profit = equity − starting capital, per account and summed. Auto-updates with the balance poll.
@@ -10007,44 +11309,31 @@
     const params = new URLSearchParams({ template: 'feature_request.yml', title: 'Idea: ', version: VERSION });
     window.open(`${REPO_URL}/issues/new?${params}`, '_blank', 'noopener');
   }
+  // Help: report a problem (one report file + a pre-filled GitHub issue), Discord, ideas, the support code, and the rules.
+  // Built once, so a description being typed survives the panel's regular refreshes.
   function renderSupportTab(body) {
     if (body.dataset.view === 'support' && body.querySelector('.support-tab')) return;
     body.dataset.view = 'support';
-    const link = (href, text) => `<a href="${href}" target="_blank" rel="noopener">${text}</a>`;
+    const link = (href, text) => `<a class="lnk" href="${href}" target="_blank" rel="noopener">${text}</a>`;
+    const { how, risk } = rulesHtml();
     body.innerHTML = `
-      <div class="rules support-tab">
-        <div class="rules-h">Support</div>
-        <p class="sc-sub">STRATUH Copier v${VERSION} · ${link(`${REPO_URL}/blob/main/CHANGELOG.md`, "What's new")} ·
-          ${link(`${REPO_URL}/blob/main/docs/USER-GUIDE.md`, 'User guide')} ·
-          ${link('https://xamped.github.io/Vest-Copier/tutorial/', 'Tutorial')}</p>
-        <div class="sup-card">
-          <div class="sup-h">Report a problem</div>
-          <p class="sc-sub">Describe what happened and what you expected. The copier saves a report file and opens a
-            GitHub issue with your description filled in: drag the file into it and submit. Posting needs a free GitHub
-            account.</p>
-          <textarea class="report-note" id="rp-note" rows="5" aria-label="What happened"
+      <div class="help support-tab">
+        <div class="links">STRATUH Copier v${VERSION} · ${link(`${REPO_URL}/blob/main/CHANGELOG.md`, "What's new")} ·
+          ${link(`${REPO_URL}/blob/main/docs/USER-GUIDE.md`, 'Guide')} · ${link('https://xamped.github.io/Vest-Copier/tutorial/', 'Tutorial')}</div>
+        <div class="grp"><span class="eyebrow">Report a problem</span>
+          <textarea class="report-note" id="rp-note" rows="4" aria-label="What happened"
             placeholder="What happened, and what did you expect? Which accounts, roughly when?"></textarea>
-          <p class="sc-sub">The file holds the activity log, the diagnostics record, your settings, your copier version
-            and your accounts' balances. Account ids are replaced by their names. It never contains passwords or login
-            tokens.</p>
-          <button class="armbtn sm" id="rp-send">Save report &amp; open issue</button>
+          <div class="hint">Saves a report file and opens a GitHub issue with your description filled in: drag the file
+            into it and submit (a free GitHub account). The file holds the log, settings and balances, with account ids
+            replaced by their names. Never passwords or tokens.</div>
+          <button class="ghostbtn" id="rp-send">Save report &amp; open issue ${ICON.ext}</button></div>
+        <div class="grp">
+          <a class="lrow" href="${DISCORD_URL}" target="_blank" rel="noopener"><span>Join the Discord</span><span class="hint">questions, setup help</span>${ICON.ext}</a>
+          <button class="lrow" id="sp-idea"><span>Share an idea</span><span class="hint">on GitHub</span>${ICON.ext}</button>
+          <button class="lrow" id="sp-copy"><span>Support code <b class="code">${SUPPORT_CODE}</b></span><span class="hint">5% off at Vest · Copy</span>${ICON.copy}</button>
         </div>
-        <div class="sup-card">
-          <div class="sup-h">Help and community</div>
-          <p class="sc-sub">Questions, setup help, or just talking trades with other users: join the Discord.</p>
-          <a class="ghostbtn" href="${DISCORD_URL}" target="_blank" rel="noopener">Join the Discord</a>
-        </div>
-        <div class="sup-card">
-          <div class="sup-h">Ideas and feedback</div>
-          <p class="sc-sub">Something that could work better, or a feature you'd use? Ideas go on GitHub too.</p>
-          <button class="ghostbtn" id="sp-idea">Share an idea or feedback</button>
-        </div>
-        <div class="sup-card">
-          <div class="sup-h">Support the project</div>
-          <p class="sc-sub">STRATUH Copier is free. Code <b>${SUPPORT_CODE}</b> takes 5% off Vest purchases and helps keep it
-            maintained. Settings → Support can enter it at checkout for you.</p>
-          <button class="ghostbtn" id="sp-copy">Copy code ${SUPPORT_CODE}</button>
-        </div>
+        <div class="grp"><span class="eyebrow">Before you start</span>${how}</div>
+        <div class="grp">${risk}</div>
       </div>`;
     const note = body.querySelector('#rp-note');
     ['keydown', 'keyup', 'keypress'].forEach((ev) => note.addEventListener(ev, (e) => e.stopPropagation())); // not Vest's shortcuts
@@ -10052,6 +11341,1202 @@
     body.querySelector('#sp-idea').onclick = shareIdea;
     body.querySelector('#sp-copy').onclick = () =>
       copySupportCode().then((ok) => toast(ok ? `Code ${SUPPORT_CODE} copied.` : `Code: ${SUPPORT_CODE}`));
+  }
+
+  // ── Trade history: every account's closed positions (active accounts and finished ones: a passed evaluation, a
+  // closed or failed funded account), from Vest's own position history, the same one its Position History tab reads:
+  // GET /v3/positions?account_id=…&limit&offset → { positions, total }, each with its side, size, open / close price,
+  // P&L (as Vest reports it), times and close reason. Finished accounts come from /v3/capital/accounts/history. Positions
+  // on the same market and side, opened within seconds and closed within a minute or two of each other on different
+  // accounts, are one copied trade. Read only when Share needs it, cached for a few minutes. Read-only.
+  const HIST_DAYS = 30, // how far back the trade list goes
+    HIST_PAGE = 50,
+    HIST_PAGES = 4, // per account: up to 200 positions
+    HIST_ACCTS = 40, // finished accounts read, newest first
+    HIST_TTL_MS = 5 * 60000,
+    GROUP_OPEN_MS = 10000, // copies open within this of each other…
+    GROUP_CLOSE_MS = 90000; // …and close within this
+  S.hist = null; // { at, trades: [group], error }
+  let _histBusy = null;
+  const msOf = (v) => {
+    if (v == null || v === '') return null;
+    const n = typeof v === 'number' ? v : /^\d+(\.\d+)?$/.test(String(v)) ? +v : Date.parse(v);
+    return Number.isFinite(n) && n > 0 ? (n < 1e12 ? n * 1000 : n) : null;
+  };
+  // One closed position, in the shape the cards use (null for anything that isn't a closed position)
+  function normPos(x, acct) {
+    if (!x || typeof x !== 'object') return null;
+    const id = x.positionId || x.position_id || x.id,
+      symbol = x.symbol,
+      closedAt = msOf(x.closeDate ?? x.close_date ?? x.closedAt);
+    if (!id || !symbol || !closedAt) return null;
+    const open = num(x.openPrice ?? x.open_price),
+      close = num(x.closePrice ?? x.close_price),
+      pnl = num(x.pnl);
+    const side = String(x.side || '')
+        .toLowerCase()
+        .startsWith('s')
+        ? 'short'
+        : 'long',
+      dir = side === 'long' ? 1 : -1;
+    let qty = Math.abs(num(x.quantity));
+    // a closed position can report 0: the size follows from its P&L and prices ($1 a point per unit)
+    if (!(qty > 0) && open > 0 && close > 0 && close !== open && Number.isFinite(pnl))
+      qty = Math.abs(pnl / (dir * (close - open)));
+    return {
+      acct,
+      id,
+      symbol,
+      side,
+      qty: qty > 0 ? qty : NaN,
+      open,
+      close,
+      pnl: Number.isFinite(pnl) ? pnl : 0,
+      openedAt: msOf(x.openDate ?? x.open_date ?? x.openedAt ?? x.createdAt) || closedAt,
+      closedAt,
+      reason: x.closeReason ?? x.close_reason ?? null,
+    };
+  }
+  // A position list read with the user's session, else with the account's own token (Vest reads it per account)
+  async function readAs(path, acct) {
+    try {
+      return await api(path);
+    } catch (e) {
+      const { token } = await mintAccountToken(acct);
+      return api(path, token);
+    }
+  }
+  async function accountPositions(acct, since) {
+    const out = [];
+    let offset = 0;
+    for (let page = 0; page < HIST_PAGES; page++) {
+      const r = await readAs(
+        `/v3/positions?account_id=${encodeURIComponent(acct)}&limit=${HIST_PAGE}&offset=${offset}`,
+        acct,
+      );
+      const ps = (r && Array.isArray(r.positions) && r.positions) || [];
+      for (const x of ps) {
+        const n = normPos(x, acct);
+        if (n) out.push(n);
+      }
+      offset += ps.length;
+      if (ps.length < HIST_PAGE || (r.total > 0 && offset >= r.total)) break;
+      if (out.length && Math.min(...out.map((o) => o.closedAt)) < since) break; // newest first: far enough back
+    }
+    return out.filter((o) => o.closedAt >= since);
+  }
+  // Positions → trades: the same trade copied across accounts is one entry, with every account in it.
+  function groupTrades(ps) {
+    const groups = [];
+    for (const p of [...ps].sort((a, b) => a.openedAt - b.openedAt)) {
+      const g = groups.find(
+        (g) =>
+          g.symbol === p.symbol &&
+          g.side === p.side &&
+          !g.accts.has(p.acct) &&
+          Math.abs(g.openedAt - p.openedAt) <= GROUP_OPEN_MS &&
+          Math.abs(g.closedAt - p.closedAt) <= GROUP_CLOSE_MS,
+      );
+      if (g) {
+        g.items.push(p);
+        g.accts.add(p.acct);
+        g.pnl += p.pnl;
+        g.closedAt = Math.max(g.closedAt, p.closedAt);
+      } else
+        groups.push({
+          key: p.acct + ':' + p.id,
+          symbol: p.symbol,
+          side: p.side,
+          openedAt: p.openedAt,
+          closedAt: p.closedAt,
+          pnl: p.pnl,
+          items: [p],
+          accts: new Set([p.acct]),
+        });
+    }
+    for (const g of groups) {
+      // the lead: the master when it's in the trade, else the first account in it
+      g.lead = g.items.find((p) => p.acct === S.master) || g.items[0];
+      g.copied = g.items.length > 1;
+    }
+    return groups.sort((a, b) => b.closedAt - a.closedAt);
+  }
+  // Every account the user has: the active ones and the finished ones (newest first, up to HIST_ACCTS)
+  async function historyAccounts() {
+    const list = Object.values(S.byId).map((r) => ({ id: r.id, label: r.label, active: true }));
+    const seen = new Set(list.map((a) => a.id));
+    let cursor = null;
+    try {
+      for (let page = 0; page < 5 && list.length < HIST_ACCTS + seen.size; page++) {
+        const r = await api(
+          `/v3/capital/accounts/history?limit=20${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`,
+        );
+        for (const a of (r && r.accounts) || []) {
+          const id = a.id || a.account_id;
+          if (!id || seen.has(id)) continue;
+          seen.add(id);
+          list.push({ id, label: label(a), active: false });
+        }
+        cursor = r && r.next;
+        if (!cursor) break;
+      }
+    } catch {
+      /* finished accounts unreadable: the active ones still count */
+    }
+    return list;
+  }
+  const histLabels = {}; // account id → its label, for finished accounts too
+  function loadHistory(force = false) {
+    if (_histBusy) return _histBusy;
+    if (!force && S.hist && !S.hist.error && Date.now() - S.hist.at < HIST_TTL_MS) return Promise.resolve(S.hist);
+    _histBusy = (async () => {
+      try {
+        const accts = await historyAccounts();
+        accts.forEach((a) => (histLabels[a.id] = a.label));
+        const since = Date.now() - HIST_DAYS * 86400000,
+          all = [];
+        let failed = 0;
+        // a few accounts at a time (each is one or more reads)
+        const queue = [...accts];
+        await Promise.all(
+          Array.from({ length: 4 }, async () => {
+            for (let a = queue.shift(); a; a = queue.shift())
+              try {
+                all.push(...(await accountPositions(a.id, since)));
+              } catch {
+                failed++;
+              }
+          }),
+        );
+        S.hist = { at: Date.now(), trades: groupTrades(all), accounts: accts.length, failed };
+        diag('history', {
+          accounts: accts.length,
+          finished: accts.filter((a) => !a.active).length,
+          positions: all.length,
+          trades: S.hist.trades.length,
+          failed,
+        });
+      } catch (e) {
+        S.hist = { at: Date.now(), trades: [], error: e.message };
+        diag('history', { outcome: 'error', error: e.message });
+      } finally {
+        _histBusy = null;
+      }
+      if (S.shareOpen) render();
+      return S.hist;
+    })();
+    return _histBusy;
+  }
+  const acctName = (id) => (S.byId[id] && S.byId[id].label) || histLabels[id] || 'An account';
+  // A trade's own story, from Vest's position details (its orders and the stop / target history): the entry and adds,
+  // each exit with its price and why (TP1, TP2, stop, breakeven, closed), and the stop moves. Cached per position.
+  const _details = {};
+  async function tradeDetails(g) {
+    const p = g.lead,
+      key = p.acct + ':' + p.id;
+    if (_details[key]) return _details[key];
+    const { token } = await mintAccountToken(p.acct);
+    const r = await api(`/v3/positions/${encodeURIComponent(p.id)}/details`, token);
+    const pos = (r && (r.position || r)) || {};
+    const tick = (SYMBOLS[p.symbol] || {}).tick || 0.25,
+      dir = p.side === 'long' ? 1 : -1;
+    const orders = (pos.orders || [])
+      .map((o) => ({
+        buy: o.isBuy ?? String(o.side || '').toLowerCase() === 'buy',
+        qty: num(o.executedQuantity ?? o.executed_quantity),
+        price: num(o.executionPrice ?? o.execution_price) || num(o.price),
+        at: msOf(o.executionTime ?? o.execution_time ?? o.updatedAt ?? o.updated_at),
+        reason: o.closeReason ?? o.close_reason ?? null,
+        reduce: !!(o.reduceOnly ?? o.reduce_only),
+      }))
+      .filter((o) => o.qty > 0 && o.price > 0 && o.at)
+      .sort((a, b) => a.at - b.at);
+    const entries = orders.filter((o) => !o.reduce && o.buy === (p.side === 'long'));
+    const exits = orders.filter((o) => o.reduce || o.buy !== (p.side === 'long'));
+    const entry =
+      p.open ||
+      (entries.length ? entries.reduce((a, o) => a + o.price * o.qty, 0) / entries.reduce((a, o) => a + o.qty, 0) : 0);
+    let tpN = 0;
+    const exitRows = exits.map((o) => {
+      const pts = dir * (o.price - entry);
+      const kind = /take/i.test(o.reason || '')
+        ? `TP${++tpN}`
+        : /stop/i.test(o.reason || '')
+          ? Math.abs(pts) <= 2 * tick
+            ? 'BE'
+            : 'SL'
+          : /liquid/i.test(o.reason || '')
+            ? pts > 0
+              ? 'VEST' // Vest closed it in profit: an evaluation reaching its target, not a liquidation
+              : 'LIQ'
+            : 'Close';
+      return { kind, qty: o.qty, price: o.price, pts, usd: pts * o.qty, at: o.at };
+    });
+    // the stop's moves: each new trigger price in the stop-loss history (not its first placement)
+    const slHist = (pos.stopLossHistory || pos.stop_loss_history || [])
+      .map((x) => ({
+        px: num(x.triggerPrice ?? x.trigger_price),
+        at: msOf(x.updatedAt ?? x.updated_at ?? x.createdAt),
+      }))
+      .filter((x) => x.px > 0 && x.at)
+      .sort((a, b) => a.at - b.at);
+    const moves = slHist.filter((x, i) => i > 0 && x.px !== slHist[i - 1].px);
+    const events = [];
+    const n = g.items.length;
+    entries.forEach((o, i) =>
+      events.push({
+        at: o.at,
+        text:
+          i === 0
+            ? `${p.side === 'long' ? 'Bought' : 'Sold'} ${fmtQty(o.qty, p.symbol)}${n > 1 ? `, copied to ${n - 1}` : ''}`
+            : `Added ${fmtQty(o.qty, p.symbol)}`,
+        hot: false,
+      }),
+    );
+    moves.forEach((m) =>
+      events.push({
+        at: m.at,
+        text: Math.abs(m.px - entry) <= 2 * tick ? 'Stop to breakeven' : `Stop to ${fmtPx(m.px, tick)}`,
+        hot: false,
+      }),
+    );
+    exitRows.forEach((x, i) =>
+      events.push({
+        at: x.at,
+        text: x.kind.startsWith('TP')
+          ? `${x.kind} filled`
+          : x.kind === 'BE'
+            ? i === exitRows.length - 1 && exitRows.length > 1
+              ? 'Rest out at breakeven'
+              : 'Out at breakeven'
+            : x.kind === 'SL'
+              ? 'Stopped out'
+              : x.kind === 'LIQ'
+                ? 'Liquidated'
+                : x.kind === 'VEST'
+                  ? 'Profit target hit'
+                  : 'Closed',
+        hot: x.kind.startsWith('TP') || x.kind === 'VEST',
+      }),
+    );
+    events.sort((a, b) => a.at - b.at);
+    return (_details[key] = { entry, exits: exitRows, events });
+  }
+
+  // ── Share: today's P&L as a picture to paste anywhere (X, Discord, a group chat). Drawn on a canvas in the page, copied
+  // to the clipboard as a PNG (or saved). Shows account numbers and P&L only: never balances, ids, emails or logins.
+  // Amounts hidden: % change on the day's starting equity, no $ anywhere. The only network use is the three fonts, from
+  // jsDelivr, loaded the first time Share opens (the card still draws with system fonts without them).
+  const SHARE_NAME_KEY = 'vc-share-name',
+    SHARE_OPTS_KEY = 'vc-share-opts'; // { hide, nums, code }: the Share sheet's switches, remembered
+  const CARD_W = 1200,
+    CARD_H = 675,
+    CARD_SCALE = 2;
+  const CARD_FONTS = [
+    [
+      'STRATUH Card Display',
+      'instrument-sans@5.2.8/files/instrument-sans-latin-standard-normal.woff2',
+      { stretch: '75% 100%', weight: '400 700' },
+    ],
+    ['STRATUH Card Sans', 'geist@5.2.8/files/geist-latin-wght-normal.woff2', { weight: '100 900' }],
+    ['STRATUH Card Mono', 'jetbrains-mono@5.2.8/files/jetbrains-mono-latin-wght-normal.woff2', { weight: '100 800' }],
+  ];
+  let _cardFonts = null; // a promise: resolves once loaded (or failed)
+  function loadCardFonts() {
+    if (_cardFonts) return _cardFonts;
+    _cardFonts = Promise.all(
+      CARD_FONTS.map(([family, file, desc]) =>
+        new FontFace(family, `url(https://cdn.jsdelivr.net/npm/@fontsource-variable/${file})`, desc)
+          .load()
+          .then((f) => document.fonts.add(f))
+          .catch(() => null),
+      ),
+    ).then(() => document.fonts.ready);
+    return _cardFonts;
+  }
+  const CF = {
+    display: "'STRATUH Card Display', 'Arial Narrow', sans-serif",
+    sans: "'STRATUH Card Sans', 'Inter', 'Segoe UI', system-ui, sans-serif",
+    mono: "'STRATUH Card Mono', ui-monospace, Consolas, monospace",
+  };
+  // Everything the card shows, from what the panel already knows. Missing parts are left off, never guessed.
+  function cardData() {
+    const d = dayTotals(),
+      hasDay = d.known > 0;
+    const rows = Object.values(S.byId).filter((r) => !isNaN(todayOf(r)) || !hasDay);
+    const startEq = hasDay ? rows.reduce((a, r) => a + (S.day.startEq[r.id] || 0), 0) : 0;
+    const st = dayStats();
+    const start = vestDayStart();
+    const fills = S.diag.filter(
+      (x) => ['open', 'append', 'close'].includes(x.type) && x.slipPts != null && Date.parse(x.t) >= start,
+    );
+    const slip = fills.length ? fills.reduce((a, x) => a + Math.abs(+x.slipPts || 0), 0) / fills.length : null;
+    const order = (r) => (r.id === S.master ? -1 : S.followers.has(r.id) ? 0 : 1);
+    const accts = [...rows].sort((a, b) => order(a) - order(b) || a.order - b.order);
+    const name = String(store.get(SHARE_NAME_KEY, '') || '')
+      .replace(/[^\p{L}\p{N}@._ -]/gu, '')
+      .slice(0, 24);
+    // the curve: Vest's series for the day, ending at the equity now
+    let curve = null;
+    if (hasDay && S.day.curve.length) {
+      const now = S.day.ids.reduce(
+        (a, id) => a + (S.byId[id] && !isNaN(S.byId[id].equity) ? S.byId[id].equity : NaN),
+        0,
+      );
+      curve = [...S.day.curve];
+      if (Number.isFinite(now) && Date.now() > curve[curve.length - 1][0]) curve.push([Date.now(), now]);
+      if (curve.length < 2) curve = null;
+    }
+    return {
+      hasDay,
+      chips: dayChips(),
+      followers: accts.filter((r) => r.id !== S.master).length,
+      total: hasDay
+        ? d.today
+        : Object.values(S.byId).reduce((a, r) => a + (isNaN(r.equity) ? 0 : r.equity - r.size), 0),
+      pct: hasDay && startEq > 0 ? d.today / startEq : null,
+      accounts: accts.map((r) => ({ n: acctNum(r.label), master: r.id === S.master })),
+      copies: st.copies,
+      missed: st.missed,
+      complete: st.complete,
+      slip,
+      curve,
+      name,
+      code: S.share ? S.share.code : true,
+      nums: !(S.share && S.share.nums), // false: the tiles carry no account numbers
+      at: Date.now(),
+    };
+  }
+  // The day's trades as chips: closed ones on the active accounts since the day began (a copied trade is one chip, its P&L
+  // summed), and the position open now. More than three: the three most profitable. Three or fewer: all of them.
+  function dayChips() {
+    const start = vestDayStart(),
+      active = (id) => !!S.byId[id];
+    const out = [];
+    for (const g of (S.hist && S.hist.trades) || []) {
+      const items = g.items.filter((p) => active(p.acct) && p.closedAt >= start);
+      if (!items.length) continue;
+      const lead = items.find((p) => p.acct === S.master) || items[0];
+      out.push({
+        side: g.side,
+        qty: lead.qty,
+        symbol: g.symbol,
+        pnl: items.reduce((a, p) => a + p.pnl, 0),
+        open: false,
+        at: g.closedAt,
+      });
+    }
+    // open now: the master's position (and the followers in it)
+    const st = S.master && S.acctState[S.master];
+    for (const h of (stateFresh(st) && st.positions) || []) {
+      let pnl = 0;
+      for (const id of [S.master, ...S.followers]) {
+        const r = S.byId[id];
+        if (r && inTrade(id)) pnl += r.upnl || 0;
+      }
+      out.push({ side: h.side, qty: h.qty, symbol: h.symbol, pnl, open: true, at: Date.now() });
+    }
+    const list = out.length > 3 ? [...out].sort((a, b) => b.pnl - a.pnl).slice(0, 3) : out;
+    return list.sort((a, b) => a.at - b.at);
+  }
+  // The day's date and time in ET, as on the card: "SAT 10 OCT 2026 · 20:41 ET"
+  function etStamp(t) {
+    const p = {};
+    for (const x of new Intl.DateTimeFormat('en-GB', {
+      timeZone: ET_TZ,
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    }).formatToParts(new Date(t)))
+      p[x.type] = x.value;
+    return `${p.weekday} ${p.day} ${p.month} ${p.year} · ${p.hour}:${p.minute} ET`.toUpperCase();
+  }
+  // The STRATUH mark and wordmark on the canvas, from the same geometry as the panel's logo. `h` = the mark's height.
+  function drawLockup(ctx, x, y, h) {
+    const u = h / 24; // one mark unit
+    ctx.save();
+    ctx.translate(x + 2.8 * u, y);
+    MARK_BARS.forEach(([w, fill, echo], i) => {
+      const by = (1 + i * 4.65) * u,
+        bh = 3.4 * u;
+      ctx.fillStyle = echo;
+      ctx.fillRect(-1.8 * u, by, 3.8 * u, bh);
+      const sh = ctx.createLinearGradient(-0.7 * u, 0, 1 * u, 0);
+      sh.addColorStop(0, 'rgba(0,0,0,0)');
+      sh.addColorStop(0.55, 'rgba(0,0,0,0.073)');
+      sh.addColorStop(1, 'rgba(0,0,0,0.22)');
+      ctx.fillStyle = sh;
+      ctx.fillRect(-0.7 * u, by, 1.7 * u, bh);
+      if (fill === 'poc') {
+        const g = ctx.createLinearGradient(1 * u, 0, (1 + w) * u, 0);
+        g.addColorStop(0, '#9fe02f');
+        g.addColorStop(1, '#e4ff7a');
+        ctx.fillStyle = g;
+      } else ctx.fillStyle = fill;
+      ctx.fillRect(1 * u, by, w * u, bh);
+    });
+    ctx.restore();
+    // the wordmark: caps 1 / 1.2 of the bars (22 units), centred on them, half a cap height after the point of control
+    const cap = (22 * u) / 1.2,
+      s = cap / 720,
+      wx = x + 22.4 * u + cap / 2,
+      base = y + 12 * u + cap / 2;
+    ctx.save();
+    ctx.translate(wx, base);
+    ctx.scale(s, s);
+    ctx.fillStyle = '#f0f0f1';
+    ctx.fill(new Path2D(WORDMARK_D));
+    ctx.restore();
+    return wx + 3159 * s; // where the wordmark ends
+  }
+  // A seeded ASCII texture, the strata on stratuh.com (same generator as the mockups).
+  function drawAscii(ctx, x, y, cols, rows) {
+    const chars = ' .:-=+*#%@';
+    let seed = 7;
+    const rnd = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
+    ctx.save();
+    ctx.font = `400 10px ${CF.mono}`;
+    ctx.fillStyle = 'rgba(200, 245, 66, 0.06)';
+    ctx.textBaseline = 'top';
+    for (let r = 0; r < rows; r++) {
+      const band = Math.sin(r * 0.55) * 0.5 + 0.5;
+      let line = '';
+      for (let c = 0; c < cols; c++)
+        line += chars[Math.min(9, Math.floor(rnd() * 10 * band * (0.6 + 0.4 * Math.sin(c * 0.07 + r))))] || ' ';
+      ctx.fillText(line, x, y + r * 12);
+    }
+    ctx.restore();
+  }
+  // Text in runs of colours: [[text, colour, font?], …] from x on one baseline; returns the end x.
+  function runs(ctx, x, y, parts) {
+    for (const [t, color, font] of parts) {
+      if (font) ctx.font = font;
+      ctx.fillStyle = color;
+      ctx.fillText(t, x, y);
+      x += ctx.measureText(t).width;
+    }
+    return x;
+  }
+  function drawCard(cv, d, hide) {
+    const ctx = cv.getContext('2d');
+    cv.width = CARD_W * CARD_SCALE;
+    cv.height = CARD_H * CARD_SCALE;
+    ctx.setTransform(CARD_SCALE, 0, 0, CARD_SCALE, 0, 0);
+    const T = {
+      bg: '#0c0c0d',
+      text: '#f0f0f1',
+      muted: '#a1a1a8',
+      dim: '#6b6b73',
+      lime: '#c8f542',
+      red: '#ff5a4f',
+      ink: '#0c0c0d',
+    };
+    ctx.fillStyle = T.bg;
+    ctx.fillRect(0, 0, CARD_W, CARD_H);
+    const glow = ctx.createRadialGradient(180, 300, 0, 180, 300, 320);
+    glow.addColorStop(0, 'rgba(200, 245, 66, 0.09)');
+    glow.addColorStop(1, 'rgba(200, 245, 66, 0)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 0, CARD_W, CARD_H);
+    drawAscii(ctx, 650, -6, 56, 27);
+    const L = 52,
+      R = CARD_W - 52;
+    // the day's curve (combined equity from the day's start), bottom right
+    if (d.curve) {
+      const pts = d.curve.map(([t, v]) => [t, v - d.curve[0][1]]);
+      const t0 = pts[0][0],
+        t1 = pts[pts.length - 1][0] || t0 + 1;
+      const vals = pts.map((p) => p[1]),
+        lo = Math.min(0, ...vals),
+        hi = Math.max(0, ...vals) || 1;
+      const x0 = 720,
+        x1 = R,
+        top = 378,
+        bot = 538;
+      const X = (t) => x0 + ((t - t0) / (t1 - t0 || 1)) * (x1 - x0),
+        Y = (v) => top + (1 - (v - lo) / (hi - lo || 1)) * (bot - top);
+      const up = vals[vals.length - 1] >= 0,
+        col = up ? T.lime : T.red;
+      ctx.save();
+      ctx.setLineDash([3, 5]);
+      ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+      ctx.beginPath();
+      ctx.moveTo(x0, Y(0));
+      ctx.lineTo(x1, Y(0));
+      ctx.stroke();
+      ctx.restore();
+      const path = new Path2D();
+      pts.forEach(([t, v], i) => (i ? path.lineTo(X(t), Y(v)) : path.moveTo(X(t), Y(v))));
+      if (!hide) {
+        const area = new Path2D(path);
+        area.lineTo(x1, bot);
+        area.lineTo(x0, bot);
+        area.closePath();
+        const fade = ctx.createLinearGradient(0, top, 0, bot);
+        fade.addColorStop(0, up ? 'rgba(200,245,66,0.18)' : 'rgba(255,90,79,0.16)');
+        fade.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = fade;
+        ctx.fill(area);
+      }
+      ctx.save();
+      ctx.strokeStyle = col;
+      ctx.lineWidth = 2.5;
+      ctx.lineJoin = 'round';
+      ctx.shadowColor = up ? 'rgba(200,245,66,0.5)' : 'rgba(255,90,79,0.45)';
+      ctx.shadowBlur = 8;
+      ctx.stroke(path);
+      ctx.restore();
+      ctx.fillStyle = col;
+      ctx.beginPath();
+      ctx.arc(X(t1), Y(vals[vals.length - 1]), 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.font = `400 12px ${CF.mono}`;
+      ctx.fillStyle = T.dim;
+      ctx.textAlign = 'left';
+      ctx.fillText(etStamp(t0 < 1e12 ? t0 * 1000 : t0).slice(-8, -3), x0, bot + 18);
+      ctx.textAlign = 'right';
+      ctx.fillText(etStamp(d.at).slice(-8, -3), x1, bot + 18);
+      ctx.textAlign = 'left';
+    }
+    // top: the lockup, then the date and source on the right
+    ctx.textBaseline = 'alphabetic';
+    const wEnd = drawLockup(ctx, L, 40, 28);
+    ctx.fillStyle = 'rgba(255,255,255,0.16)';
+    ctx.fillRect(wEnd + 14, 44, 1, 20);
+    ctx.font = `500 13px ${CF.mono}`;
+    ctx.fillStyle = T.dim;
+    ctx.letterSpacing = '2.3px';
+    ctx.fillText('COPIER', wEnd + 28, 59);
+    ctx.letterSpacing = '0px';
+    ctx.textAlign = 'right';
+    ctx.font = `500 14px ${CF.mono}`;
+    ctx.fillStyle = T.muted;
+    ctx.fillText(etStamp(d.at), R, 52);
+    ctx.fillText('from Vest', R, 71);
+    const fw = ctx.measureText('from Vest').width;
+    ctx.fillStyle = T.lime;
+    ctx.fillText('✓', R - fw - 8, 71);
+    ctx.textAlign = 'left';
+    // the tag, the number and the line under it
+    const tag = d.hasDay ? (hide ? '[Today · amounts hidden' : "[Today's P&L") : '[Total P&L';
+    ctx.font = `500 16px ${CF.mono}`;
+    ctx.fillStyle = T.lime;
+    ctx.fillText(`${tag}${d.name ? ' · @' + d.name.replace(/^@/, '') : ''}]`, L, 146);
+    const neg = hide ? d.pct < 0 : d.total < 0;
+    const big = hide
+      ? d.pct == null
+        ? '—'
+        : `${d.pct < 0 ? '−' : '+'}${Math.abs(d.pct * 100).toFixed(2)}%`
+      : sp(d.total);
+    const zero = hide ? !d.pct : Math.abs(d.total) < 0.005;
+    ctx.fillStyle = zero ? T.text : neg ? T.red : T.lime;
+    let size = 168;
+    const bigFont = () => `500 condensed ${size}px ${CF.display}`; // Instrument Sans at width 75, as the wordmark
+    ctx.font = bigFont();
+    while (ctx.measureText(big).width > 640 && size > 90) {
+      size -= 6;
+      ctx.font = bigFont();
+    }
+    ctx.fillText(big, L - 4, 146 + 16 + size * 0.92);
+    const n = d.accounts.length;
+    const sans = (w) => `${w} 22px ${CF.sans}`;
+    const parts = [
+      ['across ', T.muted, sans(400)],
+      [`${n} account${n === 1 ? '' : 's'}`, T.text, sans(500)],
+    ];
+    if (d.copies || d.missed) {
+      parts.push(
+        [' · ', T.muted, sans(400)],
+        [`${d.copies}${d.complete ? '' : '+'} copies, ${d.missed} missed`, T.muted, sans(400)],
+      );
+    }
+    if (d.slip != null) {
+      parts.push(
+        [' · fills ', T.muted, sans(400)],
+        [`avg ${d.slip.toFixed(2)} pts`, T.text, sans(500)],
+        [' from the master', T.muted, sans(400)],
+      );
+    }
+    runs(ctx, L, 146 + 16 + size * 0.92 + 44, parts);
+    // bottom left: the day's trades as chips; with none, the accounts as tiles (the master in lime), unless numbers are
+    // hidden. Bottom right: the code and the site.
+    if (d.chips.length) {
+      let x = L;
+      const y = CARD_H - 40 - 66,
+        h = 66;
+      for (const c of d.chips) {
+        const side = c.side === 'long' ? 'LONG' : 'SHORT',
+          size = c.qty > 0 ? `${fmtQty(c.qty, c.symbol)} ${symLabel(c.symbol)}` : symLabel(c.symbol),
+          val = hide ? '' : sp(c.pnl);
+        ctx.font = `700 11px ${CF.mono}`;
+        const sw = ctx.measureText(side).width + 14;
+        ctx.font = `400 16px ${CF.sans}`;
+        const zw = ctx.measureText(size).width;
+        ctx.font = `500 15px ${CF.mono}`;
+        const vw = val ? ctx.measureText(val).width : 0,
+          ow = c.open ? ctx.measureText(' open').width : 0;
+        const w = 14 + sw + 10 + zw + (val ? 12 + vw : 0) + ow + 14;
+        if (x + w > 920) break; // room for the code box
+        ctx.fillStyle = 'rgba(255,255,255,0.05)';
+        ctx.fillRect(x, y, w, h);
+        ctx.strokeStyle = 'rgba(255,255,255,0.07)';
+        ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+        let cx = x + 14;
+        ctx.fillStyle = c.side === 'long' ? T.lime : T.text;
+        ctx.fillRect(cx, y + h / 2 - 11, sw, 22);
+        ctx.font = `700 11px ${CF.mono}`;
+        ctx.fillStyle = T.ink;
+        ctx.fillText(side, cx + 7, y + h / 2 + 4);
+        cx += sw + 10;
+        ctx.font = `400 16px ${CF.sans}`;
+        ctx.fillStyle = T.text;
+        ctx.fillText(size, cx, y + h / 2 + 6);
+        cx += zw + 12;
+        if (val) {
+          ctx.font = `500 15px ${CF.mono}`;
+          ctx.fillStyle = Math.abs(c.pnl) < 0.005 ? T.text : c.pnl > 0 ? T.lime : T.red;
+          ctx.fillText(val, cx, y + h / 2 + 5);
+          cx += vw;
+        }
+        if (c.open) {
+          ctx.fillStyle = T.dim;
+          ctx.fillText(' open', cx, y + h / 2 + 5);
+        }
+        x += w + 12;
+      }
+    } else if (d.nums) {
+      const tilesY = CARD_H - 40 - 50;
+      ctx.font = `500 13px ${CF.mono}`;
+      ctx.fillStyle = T.dim;
+      ctx.letterSpacing = '1.8px';
+      const n = d.accounts.length;
+      ctx.fillText(
+        d.followers > 0 && d.accounts.some((a) => a.master)
+          ? `MASTER + ${d.followers} FOLLOWER${d.followers === 1 ? '' : 'S'}`
+          : `${n} ACCOUNT${n === 1 ? '' : 'S'}`,
+        L,
+        tilesY - 14,
+      );
+      ctx.letterSpacing = '0px';
+      d.accounts.slice(0, 10).forEach((a, i) => {
+        const x = L + i * 72;
+        ctx.fillStyle = a.master ? T.lime : 'rgba(255,255,255,0.06)';
+        ctx.fillRect(x, tilesY, 64, 50);
+        if (!a.master) {
+          ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+          ctx.strokeRect(x + 0.5, tilesY + 0.5, 63, 49);
+        }
+        ctx.font = `600 15px ${CF.mono}`;
+        ctx.fillStyle = a.master ? T.ink : T.muted;
+        ctx.textAlign = 'center';
+        ctx.fillText(a.n, x + 32, tilesY + 31);
+        ctx.textAlign = 'left';
+      });
+    }
+    ctx.textAlign = 'right';
+    ctx.font = `500 14px ${CF.mono}`;
+    ctx.fillStyle = T.dim;
+    ctx.fillText('Free copier · stratuh.com', R, CARD_H - 40);
+    if (d.code) {
+      ctx.font = `700 15px ${CF.mono}`;
+      ctx.letterSpacing = '2.4px';
+      const cw = ctx.measureText(SUPPORT_CODE).width + 28;
+      ctx.font = `500 12px ${CF.mono}`;
+      ctx.letterSpacing = '1px';
+      const lw = ctx.measureText('VEST CODE').width + 24;
+      const bx = R - cw - lw,
+        by = CARD_H - 40 - 22 - 34;
+      ctx.strokeStyle = 'rgba(200,245,66,0.45)';
+      ctx.strokeRect(bx + 0.5, by + 0.5, cw + lw - 1, 33);
+      ctx.fillStyle = T.lime;
+      ctx.fillRect(bx + lw, by, cw, 34);
+      ctx.textAlign = 'left';
+      ctx.fillStyle = T.dim;
+      ctx.fillText('VEST CODE', bx + 12, by + 22);
+      ctx.font = `700 15px ${CF.mono}`;
+      ctx.letterSpacing = '2.4px';
+      ctx.fillStyle = T.ink;
+      ctx.fillText(SUPPORT_CODE, bx + lw + 14, by + 23);
+      ctx.letterSpacing = '0px';
+    }
+    ctx.textAlign = 'left';
+  }
+  // ── The One trade card (1080 × 1080, drawn at 2×): side, size and entry; the total and how many accounts were in it;
+  // each exit with its price and points; the trade's timeline. Amounts hidden: points instead of dollars.
+  const TRADE_W = 1080;
+  function drawTradeCard(cv, g, det, o) {
+    const ctx = cv.getContext('2d');
+    cv.width = cv.height = TRADE_W * CARD_SCALE;
+    ctx.setTransform(CARD_SCALE, 0, 0, CARD_SCALE, 0, 0);
+    const T = {
+      bg: '#0c0c0d',
+      text: '#f0f0f1',
+      muted: '#a1a1a8',
+      dim: '#6b6b73',
+      lime: '#c8f542',
+      red: '#ff5a4f',
+      ink: '#0c0c0d',
+    };
+    const W = TRADE_W,
+      L = 60,
+      R = W - 60,
+      p = g.lead,
+      tick = (SYMBOLS[p.symbol] || {}).tick || 0.25,
+      n = g.items.length;
+    ctx.fillStyle = T.bg;
+    ctx.fillRect(0, 0, W, W);
+    const glow = ctx.createRadialGradient(W - 160, 300, 0, W - 160, 300, 420);
+    glow.addColorStop(0, 'rgba(200, 245, 66, 0.07)');
+    glow.addColorStop(1, 'rgba(200, 245, 66, 0)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 0, W, W);
+    drawAscii(ctx, -10, 760, 110, 26);
+    ctx.textBaseline = 'alphabetic';
+    // top: the lockup; the date, the trade's open and close times, and the source
+    const wEnd = drawLockup(ctx, L, 58, 28);
+    ctx.fillStyle = 'rgba(255,255,255,0.16)';
+    ctx.fillRect(wEnd + 14, 62, 1, 20);
+    ctx.font = `500 13px ${CF.mono}`;
+    ctx.fillStyle = T.dim;
+    ctx.letterSpacing = '2.3px';
+    ctx.fillText('COPIER', wEnd + 28, 77);
+    ctx.letterSpacing = '0px';
+    const day = etStamp(g.openedAt).replace(/ · .*$/, ''),
+      t0 = etStamp(g.openedAt).slice(-8, -3),
+      t1 = etStamp(g.closedAt).slice(-8, -3);
+    ctx.textAlign = 'right';
+    ctx.font = `500 14px ${CF.mono}`;
+    ctx.fillStyle = T.muted;
+    ctx.fillText(`${day} · ${t0}${t1 !== t0 ? ' – ' + t1 : ''} ET`, R, 70);
+    ctx.fillText('from Vest', R, 90);
+    const fw = ctx.measureText('from Vest').width;
+    ctx.fillStyle = T.lime;
+    ctx.fillText('✓', R - fw - 8, 90);
+    ctx.textAlign = 'left';
+    // the tag, the side, size and entry
+    ctx.font = `500 16px ${CF.mono}`;
+    ctx.fillStyle = T.lime;
+    ctx.fillText(`[One trade${o.name ? ' · @' + o.name.replace(/^@/, '') : ''}]`, L, 172);
+    const side = p.side === 'long' ? 'LONG' : 'SHORT';
+    ctx.font = `700 19px ${CF.mono}`;
+    ctx.letterSpacing = '1.5px';
+    const pw = ctx.measureText(side).width + 30;
+    ctx.fillStyle = p.side === 'long' ? T.lime : T.text;
+    ctx.fillRect(L, 198, pw, 40);
+    ctx.fillStyle = T.ink;
+    ctx.fillText(side, L + 15, 225);
+    ctx.letterSpacing = '0px';
+    const entry = (det && det.entry) || p.open;
+    ctx.font = `400 30px ${CF.mono}`;
+    ctx.fillStyle = T.text;
+    ctx.fillText(
+      `${p.qty > 0 ? fmtQty(p.qty, p.symbol) + ' ' : ''}${symLabel(p.symbol)}${entry > 0 ? ' @ ' + fmtPx(entry, tick) : ''}`,
+      L + pw + 18,
+      229,
+    );
+    // the total and how many accounts; amounts hidden: the points instead
+    const dir = p.side === 'long' ? 1 : -1;
+    const pts = p.close > 0 && entry > 0 ? dir * (p.close - entry) : null;
+    const big = o.hide
+      ? pts == null
+        ? '—'
+        : `${pts < 0 ? '−' : '+'}${fmtNum(Math.abs(pts), decimalsOf(tick))} pts`
+      : sp(g.pnl);
+    const val = o.hide ? pts || 0 : g.pnl;
+    let size = 132;
+    const font = () => `500 condensed ${size}px ${CF.display}`;
+    ctx.font = font();
+    while (ctx.measureText(big).width > R - L && size > 70) {
+      size -= 6;
+      ctx.font = font();
+    }
+    ctx.fillStyle = Math.abs(val) < 0.005 ? T.text : val > 0 ? T.lime : T.red;
+    ctx.fillText(big, L - 4, 250 + size * 0.95);
+    ctx.font = `500 condensed 120px ${CF.display}`;
+    ctx.fillStyle = T.text;
+    ctx.fillText(`on ${n} account${n === 1 ? '' : 's'}.`, L - 4, 250 + size * 0.95 + 112);
+    // the line under it: what each account made (when they match), and the copy
+    const base = 250 + size * 0.95 + 112 + 62;
+    const pnls = g.items.map((x) => x.pnl),
+      lo = Math.min(...pnls),
+      hi = Math.max(...pnls);
+    const parts = [];
+    if (!o.hide && n > 1)
+      parts.push(
+        hi - lo <= Math.max(1, Math.abs(hi) * 0.01)
+          ? [
+              [sp(p.pnl), T.text, 500],
+              [' each', T.muted, 400],
+            ]
+          : [
+              [`${sp(lo)} to ${sp(hi)}`, T.text, 500],
+              [' per account', T.muted, 400],
+            ],
+      );
+    if (n > 1) parts.push([[`copied to ${n - 1} follower${n - 1 === 1 ? '' : 's'}`, T.muted, 400]]);
+    let lx = L;
+    parts.forEach((pp, i) => {
+      if (i) lx = runs(ctx, lx, base, [[' · ', T.muted, `400 22px ${CF.sans}`]]);
+      lx = runs(
+        ctx,
+        lx,
+        base,
+        pp.map(([t, c, w]) => [t, c, `${w} 22px ${CF.sans}`]),
+      );
+    });
+    // the exits: each with its price, points (a bar) and what one account made
+    const exits = ((det && det.exits) || []).slice(0, 4);
+    let y = base + 60;
+    if (exits.length) {
+      ctx.font = `500 12px ${CF.mono}`;
+      ctx.fillStyle = T.dim;
+      ctx.letterSpacing = '1.8px';
+      ctx.fillText('EXIT', L, y);
+      ctx.fillText('PRICE', L + 170, y);
+      ctx.fillText('POINTS', L + 355, y);
+      ctx.textAlign = 'right';
+      if (!o.hide) ctx.fillText(n > 1 && hi - lo > Math.max(1, Math.abs(hi) * 0.01) ? 'MASTER' : 'EACH', R, y);
+      ctx.textAlign = 'left';
+      ctx.letterSpacing = '0px';
+      const maxPts = Math.max(...exits.map((x) => Math.abs(x.pts)), tick);
+      y += 40;
+      for (const x of exits) {
+        const col =
+          x.kind.startsWith('TP') || x.kind === 'VEST' ? T.lime : x.kind === 'SL' || x.kind === 'LIQ' ? T.red : T.muted;
+        ctx.font = `600 16px ${CF.mono}`;
+        ctx.fillStyle = col;
+        ctx.fillText(`${x.kind === 'VEST' ? 'TARGET' : x.kind} · ${fmtQty(x.qty, p.symbol)}`, L, y);
+        ctx.font = `400 18px ${CF.mono}`;
+        ctx.fillStyle = T.muted;
+        ctx.fillText(fmtPx(x.price, tick), L + 170, y);
+        const bx = L + 355,
+          bw = o.hide ? R - 120 - bx : R - 260 - bx;
+        ctx.fillStyle = 'rgba(255,255,255,0.06)';
+        ctx.fillRect(bx, y - 12, bw, 10);
+        ctx.fillStyle = x.pts >= 0 ? T.lime : T.red;
+        ctx.fillRect(bx, y - 12, Math.max(0, (Math.abs(x.pts) / maxPts) * bw), 10);
+        ctx.textAlign = 'right';
+        ctx.font = `500 18px ${CF.mono}`;
+        ctx.fillStyle = T.text;
+        ctx.fillText(
+          `${x.pts > 0 ? '+' : x.pts < 0 ? '−' : ''}${fmtNum(Math.abs(x.pts), decimalsOf(tick))}`,
+          o.hide ? R : R - 140,
+          y,
+        );
+        if (!o.hide) {
+          ctx.fillStyle = Math.abs(x.usd) < 0.005 ? T.text : x.usd > 0 ? T.lime : T.red;
+          ctx.fillText(Math.abs(x.usd) < 0.005 ? '$0' : sp(x.usd), R, y);
+        }
+        ctx.textAlign = 'left';
+        ctx.fillStyle = 'rgba(255,255,255,0.06)';
+        ctx.fillRect(L, y + 18, R - L, 1);
+        y += 50;
+      }
+    }
+    // the timeline: up to five moments, first and last always
+    let ev = (det && det.events) || [];
+    if (ev.length > 5)
+      ev = [
+        ev[0],
+        ...ev
+          .slice(1, -1)
+          .filter((e) => e.hot)
+          .slice(0, 3),
+        ev[ev.length - 1],
+      ].slice(0, 5);
+    if (ev.length > 1) {
+      const ty = Math.max(y + 30, 840),
+        step = (R - L - 120) / (ev.length - 1);
+      ctx.fillStyle = 'rgba(255,255,255,0.12)';
+      ctx.fillRect(L + 8, ty, step * (ev.length - 1), 2);
+      ev.forEach((e, i) => {
+        const x = L + 8 + i * step;
+        ctx.beginPath();
+        ctx.arc(x, ty + 1, 8, 0, Math.PI * 2);
+        ctx.fillStyle = T.bg;
+        ctx.fill();
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = e.hot ? T.lime : T.muted;
+        ctx.stroke();
+        ctx.font = `600 16px ${CF.mono}`;
+        ctx.fillStyle = T.text;
+        ctx.fillText(new Date(e.at).toLocaleTimeString('en-GB', { timeZone: ET_TZ, hour12: false }), x - 8, ty + 38);
+        ctx.font = `400 16px ${CF.sans}`;
+        ctx.fillStyle = T.muted;
+        // short lines, kept inside the card
+        const words = e.text.split(' '),
+          maxW = Math.min(step - 12, ev.length <= 3 ? 320 : 170, R - (x - 8));
+        let line = '',
+          ly = ty + 62;
+        for (const w of words) {
+          const tryLine = line ? line + ' ' + w : w;
+          if (ctx.measureText(tryLine).width > maxW && line) {
+            ctx.fillText(line, x - 8, ly);
+            line = w;
+            ly += 20;
+          } else line = tryLine;
+        }
+        if (line) ctx.fillText(line, x - 8, ly);
+      });
+    }
+    // bottom: the site and the code
+    ctx.font = `500 15px ${CF.mono}`;
+    ctx.fillStyle = T.dim;
+    ctx.fillText(g.copied ? 'Copied on Vest · free at stratuh.com' : 'Traded on Vest · stratuh.com', L, W - 56);
+    if (o.code) {
+      ctx.font = `700 15px ${CF.mono}`;
+      ctx.letterSpacing = '2.4px';
+      const cw = ctx.measureText(SUPPORT_CODE).width + 28;
+      ctx.font = `500 12px ${CF.mono}`;
+      ctx.letterSpacing = '1px';
+      const lw = ctx.measureText('VEST CODE').width + 24;
+      const bx = R - cw - lw,
+        by = W - 56 - 22;
+      ctx.strokeStyle = 'rgba(200,245,66,0.45)';
+      ctx.strokeRect(bx + 0.5, by + 0.5, cw + lw - 1, 33);
+      ctx.fillStyle = T.lime;
+      ctx.fillRect(bx + lw, by, cw, 34);
+      ctx.fillStyle = T.dim;
+      ctx.fillText('VEST CODE', bx + 12, by + 22);
+      ctx.font = `700 15px ${CF.mono}`;
+      ctx.letterSpacing = '2.4px';
+      ctx.fillStyle = T.ink;
+      ctx.fillText(SUPPORT_CODE, bx + lw + 14, by + 23);
+      ctx.letterSpacing = '0px';
+    }
+  }
+  const ymd = (t) => new Date(t).toISOString().slice(0, 10);
+  const cardFile = () => {
+    const g = S.share && S.share.kind === 'trade' && shareTrade();
+    return g
+      ? `stratuh-trade-${ymd(g.closedAt)}-${new Date(g.closedAt).toTimeString().slice(0, 5).replace(':', '')}.png`
+      : `stratuh-today-${ymd(Date.now())}.png`;
+  };
+  function saveCard(cv) {
+    const name = cardFile();
+    cv.toBlob((blob) => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob),
+        a = document.createElement('a');
+      a.href = url;
+      a.download = name;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }, 'image/png');
+  }
+  // The trades the One trade list offers: profitable ones, newest first (a copied trade once, its P&L summed)
+  // (Latest: newest first; Most profitable: the biggest total first)
+  const shareTrades = () => {
+    const list = ((S.hist && S.hist.trades) || []).filter((g) => g.pnl > 0);
+    return S.share && S.share.sort === 'best'
+      ? [...list].sort((a, b) => b.pnl - a.pnl || b.closedAt - a.closedAt)
+      : list;
+  };
+  const shareTrade = () => {
+    const list = shareTrades();
+    return list.find((g) => g.key === S.share.trade) || list[0] || null;
+  };
+  // The Share sheet: Today or One trade, the picture as it will be copied, its options, Copy image and Save PNG. Built
+  // once (the name being typed survives the panel's refreshes); the picture is redrawn when its data or an option
+  // changes. One trade lists the profitable trades of the last 30 days from Vest's position history.
+  function renderShare(body) {
+    if (!S.share) {
+      const o = store.get(SHARE_OPTS_KEY, {}) || {};
+      S.share = {
+        hide: o.hide === true,
+        nums: o.nums === true,
+        code: o.code !== false,
+        sort: o.sort === 'best' ? 'best' : 'latest',
+        kind: 'day',
+        trade: null,
+      };
+    }
+    ensureDay();
+    loadHistory(); // the day's trades (chips) and the One trade list
+    if (!(body.dataset.view === 'share' && body.querySelector('.share'))) {
+      body.dataset.view = 'share';
+      const opt = (key, name, short, on) =>
+        `<div class="opt" data-shopt="${key}"><div class="opt-txt"><div class="opt-name">${name}</div><div class="opt-short">${short}</div></div>
+          <button class="switch ${on ? 'on' : ''}" data-sh="${key}" role="switch" aria-checked="${on}" aria-label="${name}"><span class="knob"></span></button></div>`;
+      body.innerHTML = `
+        <div class="share">
+          <div class="tabseg" role="tablist"><button class="tab" role="tab" data-kind="day">Today</button><button class="tab" role="tab" data-kind="trade">One trade</button></div>
+          <div class="tabseg" id="sh-sort" role="tablist" aria-label="Order" hidden><button class="tab" role="tab" data-sort="latest">Latest</button><button class="tab" role="tab" data-sort="best">Most profitable</button></div>
+          <div class="sh-list" id="sh-list" hidden></div>
+          <div class="prev"><canvas id="sh-cv" width="${CARD_W}" height="${CARD_H}" aria-label="The picture to share"></canvas></div>
+          <div>
+            ${opt('hide', 'Hide amounts', 'Shows % gain (or points) instead of dollars.', S.share.hide)}
+            ${opt('nums', 'Hide account numbers', 'Leaves the account tiles off.', S.share.nums)}
+            <div class="opt"><div class="opt-txt"><div class="opt-name">Name on the card</div><div class="opt-short">Optional. Leave it empty to post without one.</div></div>
+              <input class="tr-in sh-name" id="sh-name" maxlength="24" placeholder="@name" aria-label="Name on the card"></div>
+            ${opt('code', `Add code ${SUPPORT_CODE}`, '5% off Vest for whoever sees it.', S.share.code)}
+          </div>
+          <div class="sh-btns"><button class="armbtn" id="sh-copy">${ICON.copy}<span>Copy image</span></button><button class="ghostbtn" id="sh-save">${ICON.save} Save PNG</button></div>
+          <div class="hint">Shows P&amp;L, sizes and prices only. Never balances, account ids or logins.</div>
+        </div>`;
+      const nm = body.querySelector('#sh-name');
+      nm.value = store.get(SHARE_NAME_KEY, '') || '';
+      ['keydown', 'keyup', 'keypress'].forEach((ev) => nm.addEventListener(ev, (e) => e.stopPropagation()));
+      nm.addEventListener('input', () => {
+        store.set(SHARE_NAME_KEY, nm.value.trim());
+        drawShare(body, true);
+      });
+      body.querySelectorAll('[data-sh]').forEach(
+        (b) =>
+          (b.onclick = () => {
+            S.share[b.dataset.sh] = !S.share[b.dataset.sh];
+            saveShareOpts();
+            b.classList.toggle('on', S.share[b.dataset.sh]);
+            b.setAttribute('aria-checked', String(S.share[b.dataset.sh]));
+            drawShare(body, true);
+          }),
+      );
+      body.querySelectorAll('[data-sort]').forEach(
+        (b) =>
+          (b.onclick = () => {
+            if (!S.share.trade) S.share.trade = (shareTrade() || {}).key || null; // the picked trade stays picked
+            S.share.sort = b.dataset.sort;
+            saveShareOpts();
+            renderShare(body);
+          }),
+      );
+      body.querySelectorAll('[data-kind]').forEach(
+        (b) =>
+          (b.onclick = () => {
+            S.share.kind = b.dataset.kind;
+            if (S.share.kind === 'trade') loadHistory();
+            renderShare(body);
+          }),
+      );
+      const cv = body.querySelector('#sh-cv');
+      body.querySelector('#sh-save').onclick = () => saveCard(cv);
+      body.querySelector('#sh-copy').onclick = () => copyCard(body, cv);
+      loadCardFonts().then(() => drawShare(body, true));
+    }
+    const trade = S.share.kind === 'trade';
+    body.querySelectorAll('[data-kind]').forEach((b) => {
+      b.classList.toggle('on', b.dataset.kind === S.share.kind);
+      b.setAttribute('aria-selected', String(b.dataset.kind === S.share.kind));
+    });
+    body.querySelector('[data-shopt="nums"]').hidden = trade; // the trade card names no accounts
+    body.querySelector('#sh-sort').hidden = !trade;
+    body.querySelectorAll('[data-sort]').forEach((b) => {
+      b.classList.toggle('on', b.dataset.sort === S.share.sort);
+      b.setAttribute('aria-selected', String(b.dataset.sort === S.share.sort));
+    });
+    renderShareList(body);
+    drawShare(body, false);
+  }
+  // One trade: the list to pick from (the chosen one lifted). Rewritten only when it changes, so a click isn't lost.
+  function renderShareList(body) {
+    const box = body.querySelector('#sh-list'),
+      trade = S.share.kind === 'trade';
+    box.hidden = !trade;
+    if (!trade) return;
+    const list = shareTrades(),
+      cur = shareTrade();
+    const html = !S.hist
+      ? '<div class="hint">Reading your trade history from Vest…</div>'
+      : S.hist.error
+        ? `<div class="hint">Couldn't read your trade history (${esc(S.hist.error)}).</div>`
+        : !list.length
+          ? `<div class="hint">No profitable trades in the last ${HIST_DAYS} days.</div>`
+          : list
+              .slice(0, 100)
+              .map((g) => {
+                const p = g.lead,
+                  when = new Date(g.closedAt);
+                // ET, like the cards
+                const date = when.toLocaleDateString('en-US', { timeZone: ET_TZ, month: 'short', day: 'numeric' }),
+                  time = when.toLocaleTimeString('en-GB', {
+                    timeZone: ET_TZ,
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false,
+                  });
+                return `<button class="sh-tr${cur && g.key === cur.key ? ' on' : ''}" data-trade="${esc(g.key)}">
+                  <span class="sh-side ${g.side}">${g.side === 'long' ? 'LONG' : 'SHORT'}</span>
+                  <span class="sh-what">${p.qty > 0 ? esc(fmtQty(p.qty, p.symbol)) + ' ' : ''}${esc(symLabel(g.symbol))}${g.copied ? `<small>× ${g.items.length}</small>` : ''}</span>
+                  <span class="sh-when">${esc(date)} ${esc(time)}</span><span class="sh-pnl">${esc(sp(g.pnl))}</span></button>`;
+              })
+              .join('');
+    if (box.dataset.html === html) return;
+    box.dataset.html = html;
+    box.innerHTML = html;
+    box.querySelectorAll('[data-trade]').forEach(
+      (b) =>
+        (b.onclick = () => {
+          S.share.trade = b.dataset.trade;
+          renderShareList(body);
+          drawShare(body, true);
+        }),
+    );
+  }
+  function drawShare(body, force) {
+    const cv = body.querySelector('#sh-cv');
+    if (!cv) return;
+    if (S.share.kind === 'trade') {
+      const g = shareTrade();
+      if (!g) {
+        cv.dataset.key = '';
+        cv.width = cv.height = 0;
+        return;
+      }
+      const det = _details[g.lead.acct + ':' + g.lead.id] || null;
+      const o = { hide: S.share.hide, code: S.share.code, name: shareName() };
+      const key = JSON.stringify({ k: g.key, det: !!det, ...o });
+      if (!force && cv.dataset.key === key) return;
+      cv.dataset.key = key;
+      drawTradeCard(cv, g, det, o);
+      if (!det)
+        tradeDetails(g)
+          .then(() => S.shareOpen && S.share.kind === 'trade' && shareTrade() === g && drawShare(body, true))
+          .catch(() => null); // without the details the card still shows the trade and its total
+      return;
+    }
+    const d = cardData();
+    const key = JSON.stringify({ ...d, at: Math.floor(d.at / 60000), hide: S.share.hide });
+    if (!force && cv.dataset.key === key) return;
+    cv.dataset.key = key;
+    drawCard(cv, d, S.share.hide);
+  }
+  if (window.__VC_TEST__) window.__vcShare = { dayChips, groupTrades, details: () => _details };
+  const saveShareOpts = () =>
+    store.set(SHARE_OPTS_KEY, { hide: S.share.hide, nums: S.share.nums, code: S.share.code, sort: S.share.sort });
+  const shareName = () =>
+    String(store.get(SHARE_NAME_KEY, '') || '')
+      .replace(/[^\p{L}\p{N}@._ -]/gu, '')
+      .slice(0, 24);
+  // Copy needs the click's user gesture: the PNG goes to the clipboard as a promise, so the gesture still counts.
+  // Where the browser refuses, the PNG is saved instead.
+  function copyCard(body, cv) {
+    const btn = body.querySelector('#sh-copy');
+    const blob = new Promise((res, rej) => cv.toBlob((b) => (b ? res(b) : rej(new Error('no image'))), 'image/png'));
+    let p;
+    try {
+      p = navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+    } catch (e) {
+      p = Promise.reject(e);
+    }
+    p.then(() => {
+      btn.classList.add('done');
+      btn.querySelector('span').textContent = 'Copied';
+      toast('Image copied. Paste it into X, Discord or a group chat.');
+      diag('share', { outcome: 'copied', kind: S.share.kind, hidden: !!S.share.hide });
+      setTimeout(() => {
+        btn.classList.remove('done');
+        btn.querySelector('span').textContent = 'Copy image';
+      }, 2000);
+    }).catch(() => {
+      const name = cardFile();
+      saveCard(cv);
+      toast(`The browser blocked the clipboard, so the picture was saved to Downloads as ${name}.`);
+      diag('share', { outcome: 'saved', kind: S.share.kind, hidden: !!S.share.hide });
+    });
   }
 
   // ───────────────────────── claim profit ─────────────────────────
@@ -10109,9 +12594,9 @@
   async function claimPreview() {
     if (claimBusy()) return;
     if (S.flattening || S.placing || S.adjusting || S.arming)
-      return toast('Wait for the current order, Flatten All or arming to finish.');
+      return toast('Wait for the current order, Flatten all or starting to finish.');
     // a trade copied mid-claim would change what each account can claim
-    if (S.armed) return toast('Disarm the copier before claiming profit.');
+    if (S.armed) return toast('Stop copying before claiming profit.');
     if (healthState().changed)
       return toast(
         siteGate() === 'failed'
@@ -10159,7 +12644,7 @@
     const todo = c.items.filter((i) => i.claimable > 0);
     if (!todo.length) return;
     if (S.armed || S.arming || S.placing || S.adjusting || S.flattening)
-      return toast('Disarm and let orders finish before claiming profit.');
+      return toast('Stop copying and let orders finish before claiming profit.');
     c.phase = 'running';
     c.stop = false;
     const total = todo.reduce((a, i) => a + i.claimable, 0);
@@ -10259,7 +12744,7 @@
     const c = S.claim;
     if (!c && S.armed)
       return `<div class="claim"><button class="ghostbtn claim-go" data-claim="preview" disabled>Claim all profit…</button>
-        <div class="sum-note">Disarm the copier to claim profit: a trade copied mid-claim would change what each account
+        <div class="sum-note">Stop copying to claim profit: a trade copied mid-claim would change what each account
         can claim.</div></div>`;
     if (!c)
       return `<div class="claim"><button class="ghostbtn claim-go" data-claim="preview">Claim all profit…</button>
@@ -10322,7 +12807,85 @@
     );
   }
 
+  // ── Today: each account's equity at the start of Vest's trading day (20:00 ET) and the day's combined equity curve, from
+  // Vest's own performance series (what its portfolio chart draws), so it's right even for hours the panel was closed.
+  // Read when the P&L tab or Share is open, at most once a minute. Today = equity now − equity at the day's start.
+  const DAY_REFRESH_MS = 60000,
+    DAY_POINTS = 200;
+  S.day = null; // { start, at, startEq: {id: equity}, startUpnl: {id: upnl}, curve: [[ts, combined equity]] }
+  let _dayBusy = false;
+  async function ensureDay(force = false) {
+    const start = vestDayStart();
+    if (_dayBusy || !userTokenOk()) return;
+    if (!force && S.day && S.day.start === start && Date.now() - S.day.at < DAY_REFRESH_MS) return;
+    _dayBusy = true;
+    try {
+      const r = await api(`/v3/trading-performance/series?from=${start}&to=${Date.now()}&points=${DAY_POINTS}`);
+      const byAcct = {};
+      for (const it of (r && r.items) || []) {
+        const v = num(it.equity_value);
+        if (!it.account_id || !Number.isFinite(v)) continue;
+        (byAcct[it.account_id] = byAcct[it.account_id] || []).push({
+          ts: msOf(it.ts) || 0,
+          eq: v,
+          upnl: num(it.total_unrealized_pnl) || 0,
+        });
+      }
+      const startEq = {},
+        startUpnl = {};
+      for (const [id, pts] of Object.entries(byAcct)) {
+        pts.sort((x, y) => x.ts - y.ts);
+        startEq[id] = pts[0].eq;
+        startUpnl[id] = pts[0].upnl;
+      }
+      // the combined curve: every account's last known equity at each point in time (no guesses before its first)
+      const ids = Object.keys(byAcct).filter((id) => S.byId[id]);
+      const times = [...new Set(ids.flatMap((id) => byAcct[id].map((p) => p.ts)))].sort((x, y) => x - y);
+      const last = {},
+        idx = {};
+      const curve = [];
+      for (const t of times) {
+        for (const id of ids) {
+          const pts = byAcct[id];
+          let i = idx[id] || 0;
+          while (i < pts.length && pts[i].ts <= t) last[id] = pts[i++].eq;
+          idx[id] = i;
+        }
+        // a point from before the day began (Vest buckets the series) counts as the day's opening value
+        if (ids.every((id) => last[id] != null))
+          curve.push([Math.max(t, start), ids.reduce((a, id) => a + last[id], 0)]);
+      }
+      const dedup = curve.filter((c, i) => i === curve.length - 1 || curve[i + 1][0] !== c[0]);
+      S.day = { start, at: Date.now(), startEq, startUpnl, curve: dedup, ids };
+    } catch {
+      S.day = S.day && S.day.start === start ? { ...S.day, at: Date.now() } : null; // try again in a minute
+    } finally {
+      _dayBusy = false;
+    }
+    if (S.summaryOpen || S.shareOpen) render();
+  }
+  // Today's P&L for an account (NaN until the day's start is known or while its balance is unread).
+  const todayOf = (r) =>
+    S.day && S.day.startEq[r.id] != null && !isNaN(r.equity) ? r.equity - S.day.startEq[r.id] : NaN;
+  const sp = (n) =>
+    isNaN(n)
+      ? '—'
+      : (n >= 0 ? '+' : '−') +
+        '$' +
+        Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  function dayTotals() {
+    const rows = Object.values(S.byId);
+    const known = rows.filter((r) => !isNaN(todayOf(r)));
+    const today = known.reduce((a, r) => a + todayOf(r), 0);
+    const open = known.reduce((a, r) => a + (r.upnl || 0), 0);
+    const openAtStart = known.reduce((a, r) => a + ((S.day && S.day.startUpnl[r.id]) || 0), 0);
+    return { known: known.length, rows: rows.length, today, open, openAtStart, closed: today - (open - openAtStart) };
+  }
+
+  // P&L: today on top (with Share), what you keep after splits, then each account: today, and its equity and total
+  // since it started. Claim profit underneath.
   function renderSummary(body) {
+    ensureDay();
     const rows = Object.values(S.byId).sort((a, b) => a.size - b.size || a.order - b.order);
     if (!rows.length) {
       body.innerHTML = `<div class="empty">No accounts loaded.</div>`;
@@ -10334,10 +12897,6 @@
     const totalEq = sum(known.map((r) => r.equity)),
       totalInit = sum(known.map((r) => r.size)),
       totalPnl = totalEq - totalInit;
-    const sp = (n) =>
-      (n >= 0 ? '+' : '−') +
-      '$' +
-      Math.abs(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const pnlOf = (r) => r.equity - r.size; // NaN while the balance is unknown
     // What you'd take home if every funded account's profit were claimed now, after each account's own split
     const funded = rows.filter(isFunded);
@@ -10349,54 +12908,76 @@
       evalsUp && "evaluations (their profit doesn't pay out)",
       fundedDown && 'accounts in a loss (claims are per account, so they pay $0 and take nothing from the others)',
     ].filter(Boolean);
+    const d = dayTotals(),
+      hasDay = d.known > 0;
+    const hero = hasDay ? d.today : totalPnl;
+    const daySub = hasDay
+      ? `Today on ${d.known} account${d.known === 1 ? '' : 's'}${
+          Math.abs(d.openAtStart) < 0.005 && (d.open || d.closed)
+            ? `<br>Closed <span class="mono">${sp(d.closed)}</span> · open <span class="mono">${sp(d.open)}</span>`
+            : ''
+        }`
+      : S.day === null
+        ? 'Since start · today loads in a moment'
+        : 'Since start';
     const keepHtml = funded.length
       ? `<div class="sum-keep" title="Each funded account's profit × its profit split, added up. Accounts in a loss count as $0.">
-          <div class="sum-keep-v">${money(keep)}</div>
-          <div class="sum-keep-l">you keep after splits${openTrades ? ', if closed now' : ''}</div></div>`
+          <span class="sum-keep-v">${money(keep)}</span> <span class="sum-keep-l">you keep after splits${openTrades ? ', if closed now' : ''}</span></div>`
       : '';
     body.innerHTML = `
       <div class="summary">
-        <div class="sum-top"><div class="sum-total ${totalPnl >= 0 ? 'pos' : 'neg'}">${sp(totalPnl)}</div>${keepHtml}</div>
-        <div class="sum-sub">total P&amp;L · ${rows.length} account${rows.length > 1 ? 's' : ''} · equity ${money(totalEq)} / start ${money(totalInit)}</div>
+        <div class="sum-hero">
+          <button class="ghostbtn sum-share" data-act="share" title="A picture of today's P&amp;L to paste anywhere">${ICON.share} Share</button>
+          <div class="sum-total ${hero >= 0 ? 'pos' : 'neg'}" title="${hasDay ? "Since Vest's trading day began (20:00 ET)" : 'Equity − starting balance, all accounts'}">${sp(hero)}</div>
+          <div class="sum-day">${daySub}</div>
+        </div>
+        <div class="sum-sub">${hasDay ? `Since start <span class="mono">${sp(totalPnl)}</span> · ` : ''}equity <span class="mono">${money(totalEq)}</span> of <span class="mono">${money(totalInit)}</span></div>
+        ${keepHtml}
         <div class="sum-list">
           ${rows
             .map((r) => {
-              const n = (r.label.match(/(\d+)\s*$/) || ['', '--'])[1];
               const pnl = pnlOf(r),
-                k = keepOf(r);
-              const keepLine =
-                k > 0 ? `<span class="sum-k">keeps ${money(k)} · ${Math.round(r.split * 100)}%</span>` : '';
-              return `<div class="sum-row"><span class="badge sm">${n}</span>
-              <span class="sum-left"><span class="sum-name">${esc(r.label)} <span class="chip">${esc(r.chip)}</span></span>${keepLine}</span>
-              <span class="sum-eq">${money(r.equity)}</span>
-              <span class="sum-pnl ${isNaN(pnl) ? '' : pnl >= 0 ? 'pos' : 'neg'}">${isNaN(pnl) ? '—' : sp(pnl)}</span></div>`;
+                k = keepOf(r),
+                td = todayOf(r);
+              const side =
+                k > 0
+                  ? `keeps ${money(k)}`
+                  : r.target && !isNaN(r.equity) && r.equity < r.target
+                    ? `${money(r.target - r.equity)} to pass`
+                    : '';
+              return `<div class="sum-row${r.id === S.master ? ' m' : ''}"><span class="tile${r.id === S.master ? ' m' : ''}">${esc(acctNum(r.label))}</span>
+              <span class="sum-left"><span class="sum-name">${esc(r.label)}</span><span class="sum-k" title="${k > 0 ? `Keeps ${money(k)} after its ${Math.round(r.split * 100)}% split` : ''}">${esc(r.chip)}${side ? ' · ' + side : ''}</span></span>
+              <span class="sum-right"><span class="sum-td ${isNaN(td) ? '' : td >= 0 ? 'pos' : 'neg'}" title="Today">${hasDay ? sp(td) : ''}</span>
+                <span class="sum-tot"><span class="sum-eq">${money(r.equity)}</span> <span class="sum-pnl ${isNaN(pnl) ? '' : pnl >= 0 ? 'pos' : 'neg'}" title="Since start">${isNaN(pnl) ? '—' : sp(pnl)}</span></span></span></div>`;
             })
             .join('')}
         </div>
         ${notCounted.length ? `<div class="sum-note">Not counted in what you keep: ${notCounted.join('; ')}.</div>` : ''}
         ${funded.length ? claimHtml() : ''}
       </div>`;
+    body.querySelector('[data-act="share"]').onclick = () => setView('share');
     wireClaim(body);
   }
 
+  // A warning that something went wrong (not a routine notice): the footer offers Get help next to it.
+  const PROBLEM_RE =
+    /fail|refus|reject|couldn't|could not|didn't|not filled|not copied|error|lost|wrong|missing|garbled/i;
   function renderLog() {
     if (!_root) return;
     const el = _root.querySelector('.log');
     if (!el) return;
-    const confirmBar = (text, goId, goLabel, noId, noLabel) =>
-      `<div class="orphan">${text}<button class="obtn" id="${goId}">${goLabel}</button><button class="obtn keep" id="${noId}">${noLabel}</button></div>`;
-    const n = S.orphan ? S.orphan.list.length : 0;
-    const orphanHtml = n
-      ? confirmBar(
-          `${n} follower position${n !== 1 ? 's' : ''} without the master.`,
-          'vc-flatten',
-          'Flatten',
-          'vc-keep',
-          'Keep',
-        )
-      : '';
+    // Followers in a trade without the master: name them and why, then Flatten / Keep (and help).
+    const ol = S.orphan ? S.orphan.list : [];
+    let orphanHtml = '';
+    if (ol.length) {
+      const names = [...new Set(ol.map((o) => accLabel(o.accountId)))];
+      const syms = [...new Set(ol.map((o) => symLabel(o.symbol)))].join(', ');
+      const why = ol[ol.length - 1].why;
+      orphanHtml = `<div class="orphan"><div><b>${esc(names.length === 1 ? names[0] + ' is' : names.join(', ') + ' are')} still in ${esc(syms)}</b>, but the master isn't${why ? `: ${esc(why)}` : ''}.</div>
+          <div class="obtns"><button class="obtn" id="vc-flatten">Flatten ${esc(names.length === 1 ? names[0] : names.length + ' followers')}</button><button class="obtn keep" id="vc-keep">Keep it</button><button class="lnk" data-act="help">Get help</button></div></div>`;
+    }
     const toastHtml = _toast ? `<div class="toast">${esc(_toast)}</div>` : '';
-    // armed, and Vest's own screen is on another of the user's accounts: orders placed on Vest's ticket there aren't copied
+    // copying, and Vest's own screen is on another of the user's accounts: orders placed on Vest's ticket there aren't copied
     const screenHtml =
       S.armed && S.master && S.screen && S.screen !== S.master && S.byId[S.screen]
         ? `<div class="toast" data-warn="screen">Vest is showing ${esc(accLabel(S.screen))}, not your master ${esc(accLabel(S.master))}: orders placed there aren't copied.</div>`
@@ -10404,22 +12985,36 @@
     // The orphan prompt and notices sit above the log, so they show even while it's folded.
     const alerts = _root.querySelector('.alerts');
     const html = orphanHtml + screenHtml + toastHtml;
-    if (alerts.dataset.html !== html) alerts.innerHTML = alerts.dataset.html = html; // a redraw would eat a click
+    if (alerts.dataset.html !== html) {
+      alerts.innerHTML = alerts.dataset.html = html; // a redraw would eat a click
+      const fb = alerts.querySelector('#vc-flatten'),
+        kb = alerts.querySelector('#vc-keep'),
+        hb = alerts.querySelector('[data-act="help"]');
+      if (fb) fb.onclick = () => flattenOrphans();
+      if (kb) kb.onclick = () => keepOrphans();
+      if (hb) hb.onclick = () => openReport();
+    }
     el.innerHTML = S.log
       .map(
         (e) =>
           `<div class="le ${e.level}"><span class="ts">${e.t.toLocaleTimeString([], { hour12: false })}</span><span>${esc(e.msg)}</span></div>`,
       )
       .join('');
-    const last = _root.querySelector('.loglast');
-    last.textContent = S.log.length ? S.log[0].msg : '';
-    last.className = 'loglast ' + (S.log.length ? S.log[0].level : '');
-    if (S.orphan) {
-      const fb = alerts.querySelector('#vc-flatten'),
-        kb = alerts.querySelector('#vc-keep');
-      if (fb) fb.onclick = () => flattenOrphans();
-      if (kb) kb.onclick = () => keepOrphans();
+    // folded, the footer is the latest line; a warning there offers help
+    const last = _root.querySelector('.loglast'),
+      e0 = S.log[0];
+    const trouble = e0 && e0.level === 'warn' && PROBLEM_RE.test(e0.msg);
+    const lastHtml = e0
+      ? `<span class="ts">${e0.t.toLocaleTimeString([], { hour12: false })}</span><span class="lm">${esc(e0.msg)}</span>${
+          trouble ? '<button class="lnk" data-act="loghelp">Get help</button>' : ''
+        }`
+      : '';
+    if (last.dataset.html !== lastHtml) {
+      last.innerHTML = last.dataset.html = lastHtml;
+      const lh = last.querySelector('[data-act="loghelp"]');
+      if (lh) lh.onclick = () => openReport();
     }
+    last.className = 'loglast ' + (e0 ? e0.level : '');
   }
 
   async function refresh() {
@@ -10482,6 +13077,26 @@
     diag('encoding', { probeLength: ENCODING_PROBE.length });
   }
 
+  // The userscript manager, for the diagnostics (Tampermonkey's GM_info, available even with @grant none). No secrets in it.
+  function scriptManager() {
+    try {
+      // eslint-disable-next-line no-undef
+      const g = typeof GM_info !== 'undefined' ? GM_info : null;
+      if (!g) return null;
+      return {
+        name: g.scriptHandler || null,
+        version: g.version || null,
+        injectInto: g.injectInto || null,
+        sandbox: g.sandboxMode || null,
+        incognito: !!g.isIncognito,
+        updateURL: (g.script && g.script.updateURL) || null,
+        downloadURL: (g.script && g.script.downloadURL) || null,
+      };
+    } catch {
+      return null;
+    }
+  }
+
   // ───────────────────────── boot ─────────────────────────
   const boot = () => {
     loadLog();
@@ -10506,6 +13121,9 @@
       },
       termsAccepted: S.ack,
       openPlans: Object.keys(store.get('vc-plans', {}) || {}).length,
+      start: BOOT_STATE,
+      vestSizeUnit: vestSizeUnit(),
+      manager: scriptManager(),
     });
     // The copier's own crashes (not Vest's): Tampermonkey runs it from a "userscript" source.
     const ours = (stack) => /userscript|vest-copier/i.test(String(stack || ''));

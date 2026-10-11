@@ -1,6 +1,30 @@
 # STRATUH Copier (formerly Vest Copier) — What's New
 
-Newest first. To update, click **Install** on the green bar that appears in the panel whenever there's a newer version.
+Newest first. To update, click **Install** on the update row that appears in the panel whenever there's a newer version.
+
+## v0.38.0
+A new, calmer layout, the new STRATUH logo, a Today P&L you can share, and minis and micros. Copying works exactly as before.
+
+- **One sentence on top:** "Copying Account 11 to 4 followers", with what last happened under it. **Start copying** and **Stop copying** replace Arm and Disarm, Stop is no longer a big red button, and **Flatten all** stays one click on every view. Start works from any tab.
+- **Three tabs: Copier, Trade and P&L.** Settings, Help and Report a problem are in the **⋯** menu, along with Docked on chart / Float anywhere and Reload accounts. The Rules and Support tabs are now Help.
+- **Copier tab:** one line per account: room to the floor with a small meter, and a dot (in a trade, flat, not copied). Accounts that aren't copied sit under **Left out** with the reason. A follower with less than 30% of its drawdown left is flagged in amber; it still copies. Change the master, followers and sizing (1:1 or Cap-to-fit) in **Edit**, while not copying.
+- **Trade tab:**
+  - **Market / Limit** switch above one **Buy** and one **Sell** (Limit still picks the price on the chart).
+  - The ladder shows **one side at a time**: point at Buy or Sell and it shows that side's prices and fail price.
+  - The target split and auto breakeven fold to one line each.
+  - In a trade, the position card draws your **stop, entry, price and targets on one bar**. Add or reduce folds away until you need it.
+- **Minis and micros** for NQ, ES and RTY: size in units, micros or minis (it follows your choice on Vest's own order form). Sizes stay whole micros or minis; one NQ micro is 2 units, an ES or RTY micro is 5. Copying is unchanged: followers get the same units.
+- **P&L shows Today** (since Vest's trading day began at 20:00 ET, from Vest's own figures, even for hours the panel was closed), then each account's equity and total since start.
+- **Share:** turn your P&L into a picture and paste it into X, Discord or a group chat (or save it).
+  - **Today:** the day's total, its equity curve and your trades as chips (all of them if you made three or fewer, otherwise your three best).
+  - **One trade:** pick any profitable trade from the last 30 days, on any of your accounts, including ones that are finished. A trade copied across accounts shows once, "on 5 accounts", with each exit (TP1, TP2, stop, breakeven) and its timeline.
+  - Hide the amounts (% or points instead), hide the account numbers, and add your name if you like. Never balances or logins.
+- **The footer** is the latest activity line (click it for the log); when something goes wrong, a **Get help** link takes you straight to Report a problem. Under it the bottom bar shows your version and the API budget, with a dot you click for Vest's build and the site check.
+- **Minimised,** the pill shows the state, the open P&L and one button: Flatten while copying, Start when ready, Open when something needs you.
+- **Settings** show one line each; the **?** opens the full explanation.
+- **Update row** shows only when there's a new version.
+- **Breakeven wording** follows Vest's new rule (stops now trigger on the mid price).
+- Minor improvements.
 
 ## v0.37.0
 When Vest updates its site, the copier now checks itself. No more finding the site check and pressing Accept.

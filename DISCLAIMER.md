@@ -6,7 +6,7 @@ accept these terms before it can be used.
 ## It trades for you
 
 STRATUH Copier places **real orders on live trading accounts**, automatically, using your logged-in Vest session.
-Once armed, an order you place on your master account is sent to every follower account you selected.
+While copying, an order you place on your master account is sent to every follower account you selected.
 
 ## Things can go wrong
 
