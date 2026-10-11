@@ -9,12 +9,11 @@ Trade one Vest account and your other accounts take the same trade, live. It's a
 inside the [Vest Markets](https://next.vestmarkets.com) page, part of STRATUH, my trading tools. It used to be called
 Vest Copier: same script, same install link, new look.
 
-[![Watch the 6-minute setup video](docs/tutorial/img/banner.jpg)](https://youtu.be/EMpVqls6D8o)
+[![Watch the 10-minute tutorial video](docs/tutorial/img/tutorial-video.jpg)](https://youtu.be/mFJGsJ0IInY)
 
 [![Install vest-copier.user.js](https://img.shields.io/badge/install-vest--copier.user.js-c8f542?style=for-the-badge&labelColor=0c0c0d)](https://github.com/xAmped/Vest-Copier/releases/latest/download/vest-copier.user.js)
 
-New here? Start with the [6-minute setup video](https://youtu.be/EMpVqls6D8o) (recorded before the new look, same
-steps), the [tutorial](https://xamped.github.io/Vest-Copier/tutorial/) or the
+New here? Start with the [10-minute tutorial video](https://youtu.be/mFJGsJ0IInY), the [tutorial](https://xamped.github.io/Vest-Copier/tutorial/) or the
 [one-page quick start](docs/Vest-Copier-Quick-Start.pdf). Every button is in the [user guide](docs/USER-GUIDE.md).
 
 <table>
@@ -79,7 +78,7 @@ minutes:
    **Stop copying** stops; positions stay as they are.
 
 > [!TIP]
-> Stuck? Watch the [setup video](https://youtu.be/EMpVqls6D8o) or ask in the [Discord](https://discord.gg/Aa69y9KnM3).
+> Stuck? Watch the [tutorial video](https://youtu.be/mFJGsJ0IInY) or ask in the [Discord](https://discord.gg/Aa69y9KnM3).
 
 ## The panel
 

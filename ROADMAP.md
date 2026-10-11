@@ -13,6 +13,8 @@ What I'm working on for the copier. No dates, and plans can change. Once somethi
 ## Later
 
 - **Appearance settings.** Pick your own buy and sell colors, theme colors and text size, all in one place.
+- **Stop entries (testing).** Vest only has market and limit entries. The idea: mark a price on the chart and the
+  copier buys or sells at market when price gets there, like a buy stop or sell stop. Testing first.
 
 ## Have an idea?
 
