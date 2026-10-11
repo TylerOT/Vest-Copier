@@ -37,6 +37,23 @@ trades a size scaled to its own account.
 > These are live orders on real accounts. While it's copying, whatever you do on the master happens on every
 > follower, mistakes included. Try it with the minimum size before anything else.
 
+## Share your day
+
+Good session? **P&L → Share** turns it into a picture you can paste straight into X, Discord or a group chat: today's
+total across your accounts with your best trades, or one trade with every exit and when it happened (any trade from the
+last 30 days that made money). You can show percentages instead of dollars, leave the account numbers off and put
+your @name on it.
+
+<table>
+  <tr>
+    <th>Today</th><th>One trade</th>
+  </tr>
+  <tr valign="top">
+    <td><img src="docs/tutorial/img/share-today.jpg" alt="Today card: the day's P&L across three accounts, its trades and the equity line" width="480"><br><sub>The day, from Vest's own numbers.</sub></td>
+    <td><img src="docs/tutorial/img/share-trade.jpg" alt="One-trade card: a short copied to two followers, each exit and its timeline" width="270"><br><sub>Every exit, to the second.</sub></td>
+  </tr>
+</table>
+
 ## Getting it running
 
 **Use Chrome on a computer.** It's the recommended browser: every release is tested on Chrome before it ships. Edge
