@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Vest Copier
 // @namespace    vestcopier
-// @version      0.39.2
+// @version      0.39.3
 // @description  Copies a master Vest account's trades to your other Vest accounts, live, and adds a points-based order panel.
 // @author       xAmped
 // @license      STRATUH Copier License — free to use, no selling; see LICENSE
@@ -36,7 +36,7 @@
     })(),
   };
 
-  const VERSION = '0.39.2';
+  const VERSION = '0.39.3';
   const API = 'https://api-gateway.hz.vestmarkets.com';
   const _fetch = window.fetch.bind(window);
   // Console echo of the activity log, for troubleshooting: localStorage.setItem('vc-debug', '1') and reload.
@@ -1449,6 +1449,8 @@
   // didn't fill, its trade is forgotten and any follower that did fill is raised as an orphan. When Vest's history
   // can't be read, nothing is changed: the trader is told the fills couldn't be confirmed.
   const NO_FILL_WHY = 'Vest accepted the order but did not execute it (usually not enough margin for that size)';
+  const NO_FILL_LIMIT = "its limit price wasn't there (fill now or not at all), so nothing opened";
+  const _missNoted = new Set(); // master order ids the Trade tab already reported as not filled (a capped stop entry)
   async function confirmFills(symbol, master, placed, entry, kind = 'entry') {
     if (!placed.length && !master.orderId) return;
     if (!feedLive()) await sleep(FILL_FIRST_LOOK_MS); // with the feed, each check waits on it instead
@@ -1466,8 +1468,14 @@
     const m = master.orderId ? await tryFill(master.accountId, master.orderId) : {};
     const mp = m.fill || null;
     const masterMissed = !!m.missing;
+    // the Trade tab already said its capped stop entry filled nothing: no second account of the same miss
+    const quiet = masterMissed && _missNoted.delete(master.orderId);
     if (masterMissed) {
-      logEvent('warn', `MASTER ${accLabel(master.accountId)} did NOT fill — ${NO_FILL_WHY}.`);
+      if (!quiet)
+        logEvent(
+          'warn',
+          `MASTER ${accLabel(master.accountId)} did NOT fill — ${master.ioc ? NO_FILL_LIMIT : NO_FILL_WHY}.`,
+        );
       diag('master_no_fill', { ...who(master.accountId), symbol, kind, orderId: master.orderId, qty: master.qty });
       if (master.undo) master.undo();
       if (kind === 'entry' && entry) {
@@ -1500,7 +1508,7 @@
               : kind === 'add'
                 ? `${p.label} did NOT fill the add — its original position is unchanged.`
                 : `${p.label} did NOT fill — not in this trade.`;
-          logEvent('warn', msg);
+          if (!quiet) logEvent('warn', msg);
           if (p.undo) {
             p.undo();
             undone = true;
@@ -1579,7 +1587,8 @@
       );
     if (!placed.length) return;
     const n = placed.length - unknown.length;
-    if (noFill.length) logEvent('warn', `Fills ${filled}/${n} — not filled: ${noFill.join(', ')}.`);
+    if (quiet && !filled) logEvent('info', "↳ the followers' copies didn't fill either: nothing is open.");
+    else if (noFill.length) logEvent('warn', `Fills ${filled}/${n} — not filled: ${noFill.join(', ')}.`);
     else if (slipN)
       logEvent(
         'ok',
@@ -2036,7 +2045,13 @@
       if (e.resting) watchMasterResting(e);
       if (isImmediate(req)) {
         Promise.all(jobs).then((placed) =>
-          confirmFills(sym, { accountId: S.master, orderId: res.orderId, qty }, placed.filter(Boolean), e, 'entry'),
+          confirmFills(
+            sym,
+            { accountId: S.master, orderId: res.orderId, qty, ioc: req.orderType === 'limit' },
+            placed.filter(Boolean),
+            e,
+            'entry',
+          ),
         );
       }
     } else if (action === 'append') {
@@ -2463,7 +2478,7 @@
       Promise.all(pending.jobs).then(() =>
         confirmFills(
           pending.sym,
-          { accountId: S.master, orderId: res.orderId, qty: pending.qty },
+          { accountId: S.master, orderId: res.orderId, qty: pending.qty, ioc: pending.req.orderType === 'limit' },
           pending.placed,
           e,
           'entry',
@@ -2560,7 +2575,9 @@
       api('/v3/positions/opened', token),
       api('/v3/positions/opened-orders', token),
     ]);
-    const positions = (posR && posR.positions) || [],
+    // a resting limit's size-0 position holds only its pending stop and targets: cancelling the order clears it, and a
+    // close would only be refused (Vest 10009) while the log said "closed"
+    const positions = ((posR && posR.positions) || []).filter((p) => p.quantity == null || num(p.quantity) > 0),
       orders = (ordR && ordR.orders) || [];
     for (const o of orders) {
       // resting orders first
@@ -3987,11 +4004,14 @@
     let next = S.paused;
     try {
       const r = await _fetch(STATUS_URL + '?t=' + Date.now(), { cache: 'no-store' });
-      if (r.status === 404) next = null;
-      else if (r.ok) {
+      if (r.status === 404) {
+        next = null;
+        setNotice(null);
+      } else if (r.ok) {
         const j = await r.json();
         next = statusPause(j);
         _pauseForVersion = !!next && j.trading !== false; // a version lock: the banner offers Install
+        setNotice(noticeOf(j));
       }
     } catch {
       /* best effort: keep the last answer */
@@ -4004,6 +4024,48 @@
       cancelStopEntries('the copier is paused.');
     } else logEvent('ok', 'Pause lifted: new trades are copied again.');
     render();
+  }
+  // The owner's notice (status.json `notice`: { id, text, level: 'info' | 'warn', until? }): a banner shown until
+  // dismissed; the dismissed id is remembered, so a new id shows again. Text only, escaped.
+  const NOTICE_KEY = 'vc-notice';
+  S.notice = null;
+  function noticeOf(j) {
+    const n = j && j.notice;
+    if (!n || typeof n !== 'object' || typeof n.id !== 'string' || typeof n.text !== 'string') return null;
+    const text = n.text.trim().slice(0, 280);
+    if (!n.id.trim() || !text) return null;
+    if (n.until && Date.parse(n.until) < Date.now()) return null;
+    return { id: n.id.trim().slice(0, 80), text, level: n.level === 'warn' ? 'warn' : 'info' };
+  }
+  function setNotice(n) {
+    const was = S.notice;
+    S.notice = n && (store.get(NOTICE_KEY, {}) || {}).dismissed !== n.id ? n : null;
+    if (S.notice && (!was || was.id !== S.notice.id || was.text !== S.notice.text)) {
+      logEvent(S.notice.level === 'warn' ? 'warn' : 'info', `Notice: ${S.notice.text}`);
+      diag('notice', { id: S.notice.id });
+    }
+    if (was !== S.notice) renderNotice();
+  }
+  function dismissNotice() {
+    if (!S.notice) return;
+    store.set(NOTICE_KEY, { dismissed: S.notice.id });
+    S.notice = null;
+    renderNotice();
+  }
+  function renderNotice() {
+    const bar = _root && _root.querySelector('.noticebar');
+    if (!bar) return;
+    const n = S.notice;
+    const html = n
+      ? `<span class="ntext">${esc(n.text)}</span><button class="nx" data-act="notice-x" aria-label="Dismiss this notice" title="Dismiss">×</button>`
+      : '';
+    bar.hidden = !html;
+    bar.classList.toggle('warn', !!n && n.level === 'warn');
+    if (bar.dataset.html === html) return;
+    bar.dataset.html = html;
+    bar.innerHTML = html;
+    const x = bar.querySelector('[data-act="notice-x"]');
+    if (x) x.onclick = dismissNotice;
   }
   function startStatusChecks() {
     checkStatus();
@@ -4519,7 +4581,15 @@
       const m = missing(o, keys);
       return m.length ? ['fail', 'Missing fields: ' + m.join(', ')] : ['pass', ok];
     };
-    const sym = S.trade.symbol || 'NDX-USD-PERP';
+    // the market on Vest's screen (the Trade tab's follows it only while open, so a closed tab named an old market)
+    let sym = S.trade.symbol || 'NDX-USD-PERP';
+    try {
+      const name = vestMarketName(),
+        map = name && (await loadDisplayMap());
+      if (map && map[name]) sym = map[name];
+    } catch {
+      /* best effort: the Trade tab's market */
+    }
     const codeP = readVestCode();
 
     const required = (async () => {
@@ -5184,6 +5254,46 @@
     .pausebar[hidden] {
       display: none;
     }
+    .noticebar {
+      flex: none;
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 8px 8px 8px 14px;
+      background: var(--s1);
+      border-bottom: 1px solid var(--hair);
+      box-shadow: inset 2px 0 0 var(--accent);
+      color: var(--text);
+      font-size: 12.5px;
+      line-height: 1.45;
+    }
+    .noticebar.warn {
+      box-shadow: inset 2px 0 0 var(--warn);
+    }
+    .noticebar[hidden] {
+      display: none;
+    }
+    .noticebar .ntext {
+      flex: 1;
+      padding-top: 1px;
+    }
+    .noticebar .nx {
+      flex: none;
+      display: grid;
+      place-items: center;
+      width: 22px;
+      height: 22px;
+      background: none;
+      border: none;
+      color: var(--dim);
+      font-size: 17px;
+      line-height: 1;
+      cursor: pointer;
+    }
+    .noticebar .nx:hover {
+      color: var(--text);
+    }
+
     .update.muted {
       color: var(--faint);
       font-size: 11.5px;
@@ -6293,6 +6403,51 @@
     .seg button.on {
       background: var(--s3);
       color: var(--text);
+    }
+    /* the chart bracket's switch, at the end of the Order row */
+    .tr-lines {
+      margin-left: auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 5px 8px 5px 9px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--dim);
+      background: var(--s1);
+      border: 1px solid var(--hair);
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .tr-lines:hover,
+    .tr-lines.on {
+      color: var(--text);
+    }
+    .tr-lines[hidden] {
+      display: none;
+    }
+    .tr-lines .knob {
+      width: 24px;
+      height: 13px;
+      background: var(--s3);
+      position: relative;
+      flex: none;
+    }
+    .tr-lines .knob i {
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 9px;
+      height: 9px;
+      background: var(--faint);
+      transition: left 0.12s;
+    }
+    .tr-lines.on .knob {
+      background: rgba(200, 245, 66, 0.35);
+    }
+    .tr-lines.on .knob i {
+      left: 13px;
+      background: var(--accent);
     }
     .tr-lh .seg button {
       padding: 2px 7px;
@@ -7791,6 +7946,7 @@
     .collapsed .tabs,
     .collapsed .status,
     .collapsed .pausebar,
+    .collapsed .noticebar,
     .collapsed .alertzone,
     .collapsed .logwrap,
     .collapsed .reportbar,
@@ -8063,6 +8219,7 @@
           <button class="mi" role="menuitem" data-act="report">${ICON.alert}<span class="mt">Report a problem</span></button>
         </div>
         <div class="pausebar" role="status" hidden></div>
+        <div class="noticebar" role="status" hidden></div>
         <div class="status">
           <div class="say" id="st-say">Loading your accounts…</div>
           <div class="ssub" id="st-sub"></div>
@@ -8279,6 +8436,7 @@
     renderHealthSum();
     renderUpdate();
     renderPause();
+    renderNotice();
     renderThemeIntro();
   }
   // The bottom bar's right side: this version · the API budget, or what Vest's update means for copying.
@@ -9779,7 +9937,8 @@
             ['market', 'Market'],
             ['limit', 'Limit'],
             ['stop', 'Stop'],
-          ])}</div></div>
+          ])}<button class="tr-lines" id="tr-lines" role="switch" aria-checked="false"
+            title="Show or hide your entry, stop and targets on Vest's chart (same as Appearance → Bracket on the chart)"><span>Lines</span><span class="knob"><i></i></span></button></div></div>
           <div class="tr-f" id="tr-sliprow" hidden title="The most a stop order may fill past its price. Blank: a market order, which always fills, wherever the price is.">
             <span class="tr-k">Slip</span><div class="tr-row"><input class="tr-in sm" id="tr-slip" inputmode="decimal"
               aria-label="Max slip, in points" placeholder="—" value="${esc(t.slipPts)}"><span class="tr-sliptxt" id="tr-sliptxt"></span></div></div>
@@ -9899,6 +10058,7 @@
     };
     body.querySelector('#tr-stopx').onclick = () => stopOn(false);
     body.querySelector('#tr-stopon').onclick = () => stopOn(true);
+    body.querySelector('#tr-lines').onclick = () => toggleOption('bracket');
     num(body.querySelector('#tr-betrig'), 'beTrigger');
     num(body.querySelector('#tr-beoff'), 'beOffset');
     body.querySelectorAll('[data-seg]').forEach((g) =>
@@ -10281,6 +10441,8 @@
             if (pos && parseFloat(pos.quantity) > 0) f = { price: parseFloat(pos.openPrice) };
           }
           if (f) return reanchorOn ? doReanchor() : undefined;
+          _missNoted.add(res.orderId);
+          setTimeout(() => _missNoted.delete(res.orderId), 60000);
           logEvent(
             'warn',
             `${stopName(opt.stopEntry)}: nothing filled — the price was past ${body.price} (your max slip). No trade.`,
@@ -12025,6 +12187,11 @@
     $('tr-pick').hidden = !pk;
     // Slip (stop orders): the most past the level a fill may be; blank = a market order
     $('tr-sliprow').hidden = c.t.orderType !== 'stop' || !!h;
+    // the chart bracket's switch: only with Market (Limit and Stop draw it only while picking a price)
+    const lines = $('tr-lines');
+    lines.hidden = c.t.orderType !== 'market';
+    lines.classList.toggle('on', !!S.chartBracket);
+    lines.setAttribute('aria-checked', String(!!S.chartBracket));
     if (c.t.orderType === 'stop') {
       const slip = +c.t.slipPts > 0 ? +c.t.slipPts : 0;
       set('tr-sliptxt', slip ? `pts · within ${slip} or not at all` : 'pts · blank = market');

@@ -43,6 +43,9 @@ copying their exits, stop and target moves, and Flatten all works. The panel che
 minutes (this check stays on even with update checks off), and the pause lifts on its own. If GitHub can't be
 reached, the copier keeps working as it was.
 
+**Notices:** now and then a short note may show under the panel's header (planned Vest maintenance, a heads-up before
+big news). Click × to dismiss it; it won't come back, but a new notice will.
+
 **Sharing with a friend:** the userscript contains **no personal information** — no tokens, keys,
 emails, or account ids. It's safe to send. It only ever uses the session of whoever installs it in
 their own browser.
@@ -203,7 +206,8 @@ every order like any other master order.
   stop off (it reads *None*; **+ stop** puts it back with the same points), and **×** on a target removes it, every one
   if you like. Without a stop, Auto BE is off and a warning names the price where the account fails, since nothing
   closes the trade for you. Followers copy the trade the same way.
-- **Bracket on the chart** (on by default; Appearance turns it off): your entry, stop, targets and fail price are
+- **Bracket on the chart** (on by default; the **Lines** switch at the end of the Order row, shown with Market, or
+  Appearance turns it off): your entry, stop, targets and fail price are
   drawn on Vest's chart as dashed lines for the side you point at, and follow the price and your points. Drag the stop
   or a target line to set its points. In Limit or Stop mode they appear once you've clicked Buy or Sell and follow the
   pointer, so you see where everything lands before you click. They're a preview: nothing is sent, and they go away

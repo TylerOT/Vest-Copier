@@ -2,6 +2,15 @@
 
 Newest first. To update, click **Install** on the update row that appears in the panel whenever there's a newer version.
 
+## v0.39.3
+A one-click switch for the chart bracket, notices, and a cleaner Flatten all.
+
+- **Lines switch** at the end of the Order row (with Market): one click hides or shows your bracket on Vest's chart. It's the same setting as Appearance → Bracket on the chart.
+- **Notices:** a short note can show under the panel's header (Vest maintenance, a heads-up before news). × dismisses it.
+- **Flatten all with a waiting limit** no longer tries to close the limit's empty position after cancelling it (Vest refused that, and the log said "closed").
+- **A stop order with a max slip that fills nothing** while copying: the log says it once, without the misleading "not enough margin" and per-follower lines.
+- **Site check** names the market on Vest's screen for Live prices, not the Trade tab's last market.
+
 ## v0.39.2
 Partial targets close their share again, plus safety fixes for limits and stop orders.
 
