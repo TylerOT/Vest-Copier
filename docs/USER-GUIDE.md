@@ -36,6 +36,13 @@ itself (while copying it shows **Reload now** instead, since reloading stops cop
 **Settings → Updates** has **Check now** and a switch to turn the check off. Installed from the link,
 Tampermonkey also updates the script on its own schedule. Your settings and logs are kept.
 
+**Paused for a fix:** if a problem turns up, I can pause the copier while the fix ships. The panel then shows
+**Paused** with a short note, often asking you to install the newest version. While paused, nothing new is placed or
+copied (Start copying, Trade-tab orders, stop orders, the master's new trades and adds), but trades already open keep
+copying their exits, stop and target moves, and Flatten all works. The panel checks for a pause on load and every few
+minutes (this check stays on even with update checks off), and the pause lifts on its own. If GitHub can't be
+reached, the copier keeps working as it was.
+
 **Sharing with a friend:** the userscript contains **no personal information** — no tokens, keys,
 emails, or account ids. It's safe to send. It only ever uses the session of whoever installs it in
 their own browser.
@@ -236,7 +243,8 @@ every order like any other master order.
   - **Both sides at once:** a buy stop and a sell stop can wait together on a market; the first to trigger cancels
     the other (handy around news).
   - **Slip** (a row under Order while Stop is picked; optional, in points): instead of a market order, it sends a limit that fills at the level plus the
-    slip or better, right away, or not at all. Blank: a market order, which always fills, wherever the price is.
+    slip or better, right away, or not at all. Blank: a market order, which always fills, wherever the price is. With a slip, the stop
+    is measured from the level and the targets from the level plus the slip, so neither ends up closer than you set.
   - The size, stop and targets are the ones set when you placed it (a % size is worked out when it fires).
   - **It lives in this Vest tab.** It only fires while the tab is open; a reload or closing the tab cancels it (the log
     says so). If the price passes the level while the live price feed is down, it's cancelled rather than sent late.

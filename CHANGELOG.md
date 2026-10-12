@@ -2,6 +2,21 @@
 
 Newest first. To update, click **Install** on the update row that appears in the panel whenever there's a newer version.
 
+## v0.39.2
+Partial targets close their share again, plus safety fixes for limits and stop orders.
+
+- **Partial targets work again.** With two or more targets on a market or stop order, the first target closed the whole trade instead of its share. When the copier moved the targets to exact points from the fill, the move dropped each target's size and Vest made it a full exit, on followers too. Each target now keeps its size.
+- **A master limit that Vest refuses, cancels or expires elsewhere** (Vest's app, another tab) now cancels the followers' copies too, instead of leaving them waiting on their own. A copy that already filled shows up in the orphan prompt.
+- **Moving a limit twice quickly** cancels every follower's old copy before the new one goes out, including a copy that was still on its way.
+- **Stop orders with a max slip:** the stop is measured from the level and the targets from the level plus the slip, so neither ends up closer than you set. The fill check also waits for Vest's answer before saying nothing filled.
+- **Minimising the panel** ends a Limit or Stop pick, so a later click on the chart can't place an order.
+- **Dragging a waiting limit's stop or target** follows the same rules as every other order (terms, Flatten all, the site check), keeps a sized target's size, and is refused once part of the limit has filled.
+- **Flatten all** stops a stop order that is firing at that moment.
+- **Stop order size** uses the minis / micros pick it was set with and follows a stop you drag in Risk $ mode.
+- **Switching size modes keeps your size:** picking Stop starts % at the size you had, and removing the stop in Risk $ keeps the same quantity.
+- **Today after a payout** counts from the time the payout was requested, and the Share card leaves out trades from before it.
+- **Pause notice.** If a problem turns up, I can pause new trades from GitHub while a fix ships. The panel shows **Paused** with a short note (often: install the newest version). Trades already open keep copying their exits, and Flatten all always works. If GitHub can't be reached, nothing changes.
+
 ## v0.39.1
 Moving limits is reliable on every account, and waiting orders show their whole bracket on the chart.
 

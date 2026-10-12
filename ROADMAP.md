@@ -5,6 +5,8 @@ What I'm working on for the copier. No dates, and plans can change. Once somethi
 
 ## Next
 
+- **Put a stop or target back on an open trade** from the Trade tab, after it was removed.
+- **A one-click bracket preview button** next to the order type, to show or hide the lines on the chart.
 - **Share a trade when it closes.** A quick prompt to post it.
 
 ## Later
