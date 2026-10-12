@@ -5,7 +5,7 @@ What I'm working on for the copier. No dates, and plans can change. Once somethi
 
 ## Next
 
-- **Put a stop or target back on an open trade** from the Trade tab, after it was removed.
+- **More from the chart's right-click menu:** place a limit or a stop order at the price you clicked.
 - **Share a trade when it closes.** A quick prompt to post it.
 
 ## Later

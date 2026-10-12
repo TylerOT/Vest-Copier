@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Vest Copier
 // @namespace    vestcopier
-// @version      0.39.3
+// @version      0.40.0
 // @description  Copies a master Vest account's trades to your other Vest accounts, live, and adds a points-based order panel.
 // @author       xAmped
 // @license      STRATUH Copier License — free to use, no selling; see LICENSE
@@ -36,7 +36,7 @@
     })(),
   };
 
-  const VERSION = '0.39.3';
+  const VERSION = '0.40.0';
   const API = 'https://api-gateway.hz.vestmarkets.com';
   const _fetch = window.fetch.bind(window);
   // Console echo of the activity log, for troubleshooting: localStorage.setItem('vc-debug', '1') and reload.
@@ -1799,9 +1799,15 @@
                 else delete body.quantity;
               }
               await acctPut(f, path, body);
+              const resized = body.quantity != null && Math.abs(fl.price - parseFloat(req.triggerPrice)) < PRICE_EPS;
               fl.price = parseFloat(req.triggerPrice);
               if (body.quantity != null) fl.qty = body.quantity;
-              logEvent('ok', `↳ moved ${KIND} → ${req.triggerPrice} on ${accLabel(f)} (${lat()})`);
+              logEvent(
+                'ok',
+                resized
+                  ? `↳ resized ${KIND} ${req.triggerPrice} → ${body.quantity} on ${accLabel(f)} (${lat()})`
+                  : `↳ moved ${KIND} → ${req.triggerPrice} on ${accLabel(f)} (${lat()})`,
+              );
             } else {
               await acctDelete(f, path, body);
               fp.legs = fp.legs.filter((l) => l !== fl);
@@ -2282,13 +2288,23 @@
       const kind = action === 'stop-loss' ? 'sl' : 'tp',
         KIND = kind === 'sl' ? 'SL' : 'TP';
       const op = method === 'POST' ? 'add' : method === 'DELETE' ? 'remove' : 'move';
+      // a PUT that keeps the price and sends a size is a resize (e.g. targets split again when one is added)
+      const legId = req.stopLossId || req.takeProfitId || req.orderId || req.id,
+        was = entry && (entry.legs || []).find((l) => l.id === legId),
+        resize =
+          op === 'move' &&
+          req.quantity != null &&
+          !!was &&
+          Math.abs(was.price - parseFloat(req.triggerPrice)) < PRICE_EPS;
       logEvent(
         'info',
         op === 'add'
           ? `MASTER added ${KIND} ${req.triggerPrice}${req.quantity != null ? ' × ' + req.quantity : ''} on ${accLabel(S.master)}`
           : op === 'remove'
             ? `MASTER removed a ${KIND} on ${accLabel(S.master)}`
-            : `MASTER moved ${KIND} → ${req.triggerPrice} on ${accLabel(S.master)}`,
+            : resize
+              ? `MASTER resized ${KIND} ${req.triggerPrice} → ${req.quantity} on ${accLabel(S.master)}`
+              : `MASTER moved ${KIND} → ${req.triggerPrice} on ${accLabel(S.master)}`,
       );
       if (!entry) return untracked(`${KIND} change`);
       enqueue(entry, () => mirrorLeg(op, kind, req, entry, followers, lat, t0));
@@ -7121,6 +7137,41 @@
       transition: 0.12s;
       white-space: nowrap;
     }
+    .tr-legs {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+    .tr-legbtn {
+      flex: 1;
+      padding: 7px 8px;
+      font-size: 12.5px;
+      font-weight: 500;
+      border: 1px solid var(--line2);
+      background: none;
+      color: var(--dim);
+      cursor: pointer;
+    }
+    .tr-legbtn:hover:not(:disabled) {
+      color: var(--text);
+      border-color: var(--dim);
+    }
+    .tr-legbtn.warn {
+      color: var(--warn);
+      border-color: var(--warn);
+    }
+    .tr-legbtn.on {
+      color: var(--ink);
+      background: var(--text);
+      border-color: var(--text);
+    }
+    .tr-legbtn[hidden] {
+      display: none;
+    }
+    .tr-legbtn:disabled {
+      opacity: 0.45;
+      cursor: default;
+    }
     .tr-bebtn {
       border: 1px solid var(--line2);
       background: var(--s2);
@@ -9084,6 +9135,7 @@
     hideSessionShading(chartFrame());
     themeChart(chartFrame());
     themeOrderLines(chartFrame());
+    hookChartMenu(chartFrame());
     const f = chartFrame(),
       r = f && f.getBoundingClientRect();
     const key = r ? [r.left, r.top, r.width, r.height].map(Math.round).join() : 'none';
@@ -9916,6 +9968,7 @@
             <div class="tr-pn"><span>Risk</span><span id="tr-prisk"></span></div><div class="tr-track"><i id="tr-prnow"></i></div></div>
         </div>
         <div class="tr-pacts" id="tr-pacts" hidden>
+          <div class="tr-legs" id="tr-legs"><button class="tr-legbtn" id="tr-addsl" title="Add a stop to this trade: click the chart where it goes, or press Enter for your saved stop points">+ Add stop</button><button class="tr-legbtn" id="tr-addtp" title="Add a target: click the chart where it goes, or press Enter for your saved points. The targets split the position evenly">+ Add target</button></div>
           <div class="tr-go"><button class="tr-bebtn" id="tr-be">Breakeven</button><button class="tr-close" id="tr-close">Close</button></div>
           <button class="tr-disc" id="tr-addfold" aria-expanded="false"><span>Add or reduce</span>${ICON.right}</button>
           <div class="tr-addbox" id="tr-addbox" hidden>
@@ -10131,6 +10184,8 @@
     body.querySelector('#tr-buy').onclick = () => go('long');
     body.querySelector('#tr-sell').onclick = () => go('short');
     body.querySelector('#tr-be').onclick = () => breakevenNow();
+    body.querySelector('#tr-addsl').onclick = () => startLegPick('sl');
+    body.querySelector('#tr-addtp').onclick = () => startLegPick('tp');
     body.querySelector('#tr-lbuy').onclick = () => startPick('long');
     body.querySelector('#tr-lsell').onclick = () => startPick('short');
     body.querySelector('#tr-place').onclick = () => placePick();
@@ -10799,6 +10854,7 @@
     }
   }
   function stopPick(quiet) {
+    if (S.legPick) stopLegPick(); // every place a pick has to end (minimise, another tab or market) ends this one too
     if (_pickOff) _pickOff();
     _pickOff = null;
     if (_pickLine)
@@ -11596,6 +11652,314 @@
     }
   }
 
+  // ── Adding a stop or a target to the open trade (v0.40): from the buttons above Breakeven / Close (then one click on
+  // the chart, or Enter for the saved points) or from the chart's right-click menu (at the price clicked). A target
+  // added to targets already there splits the position evenly across all of them: those are resized first (each PUT
+  // carries its size, else Vest makes the leg full-position), then the new one is added. Everything goes through the
+  // hooked fetch, so an armed copier copies each step to the followers, sized to their own positions.
+  const MAX_TRADE_TARGETS = 5;
+  // the market on Vest's chart (the Trade tab's follows it only while open)
+  const chartSymbol = () => {
+    const n = vestMarketName();
+    return (n && _displayMap && _displayMap[n]) || S.trade.symbol;
+  };
+  // the master's open trade on a market as the feed / last read has it (a waiting limit's size-0 position doesn't count)
+  function heldOn(master, sym) {
+    const st = master && S.acctState[master];
+    return (stateFresh(st) && st.positions.find((p) => p.symbol === sym && p.qty > 0)) || null;
+  }
+  // under the price is a long's stop and a short's target
+  const legKindAt = (side, price, px) => (price < px === (side === 'long') ? 'sl' : 'tp');
+  // why adding that leg has to wait, or null (a stop only takes risk off, so a pause doesn't hold it back)
+  function legBlocks(kind) {
+    if (S.placing || S.adjusting || S.flattening || S.arming || claimBusy()) return 'Wait for the order going through.';
+    const held = siteBlocks() || (kind === 'tp' ? pauseBlocks() : null);
+    if (held) return held;
+    if (!S.ack) return 'Read and accept the terms first.';
+    return null;
+  }
+  async function addLeg(kind, price, sym) {
+    const name = kind === 'sl' ? 'stop' : 'target';
+    const blocked = legBlocks(kind);
+    if (blocked) return void toast(blocked);
+    const master = S.master,
+      meta = SYMBOLS[sym];
+    if (!master || !meta) return;
+    const tick = meta.tick,
+      fmt = (n) => fmtNum(n, decimalsOf(tick));
+    S.placing = true;
+    updateTrade();
+    try {
+      // read the position fresh: its side, size and the legs Vest has on it now
+      const r = await api('/v3/positions/opened', (await mintAccountToken(master)).token);
+      const pos = ((r && r.positions) || []).find((x) => x.symbol === sym && parseFloat(x.quantity) > 0);
+      if (!pos) throw new Error(`${accLabel(master)} has no open ${meta.label} position`);
+      const long = pos.side === 'long',
+        px = priceOf(sym),
+        entry = parseFloat(pos.openPrice),
+        pid = posIdOf(pos),
+        p = roundTick(price, tick);
+      if (!(px > 0)) throw new Error('no live price yet');
+      if (!nearMarket(p, px, NEAR_MARKET_LOOSE)) throw new Error(`${fmt(p)} is too far from the price (${fmt(px)})`);
+      // Vest's rule: a long's stop under the price and its target over it (a short's the other way), a tick clear
+      const under = (kind === 'sl') === long;
+      if (under ? !(p <= px - tick) : !(p >= px + tick))
+        throw new Error(
+          `a ${long ? 'long' : 'short'}'s ${name} goes ${under ? 'below' : 'above'} the price (${fmt(px)})`,
+        );
+      const sls = pos.stopLosses || [],
+        tps = pos.takeProfits || [];
+      const pts = fmtNum(Math.abs(p - entry), decimalsOf(tick));
+      if (kind === 'sl') {
+        if (sls.length) throw new Error('the trade already has a stop: drag it on the chart to move it');
+        await send('POST', '/v3/positions/stop-loss', master, {
+          positionId: pid,
+          executionType: 'market',
+          triggerPrice: fmt(p),
+        });
+        logEvent(
+          'ok',
+          `Stop added at ${fmt(p)} (${pts} pts from the entry)${S.armed ? ' — the copier adds it on the followers' : ''}.`,
+        );
+        diag('trade_panel', { outcome: 'leg-added', kind, price: p, positionId: pid });
+        return;
+      }
+      if (tps.length >= MAX_TRADE_TARGETS) throw new Error(`${MAX_TRADE_TARGETS} targets is the most`);
+      if (tps.some((l) => Math.abs(parseFloat(l.triggerPrice) - p) < tick / 2))
+        throw new Error(`there's already a target at ${fmt(p)}`);
+      // the targets nearest the entry first; an even split, the odd size steps going to the first ones
+      const total = parseFloat(pos.quantity),
+        n = tps.length + 1,
+        order = [...tps.map((l) => ({ l, price: parseFloat(l.triggerPrice) })), { l: null, price: p }].sort((a, b) =>
+          long ? a.price - b.price : b.price - a.price,
+        );
+      if (n > 1) {
+        const sp = splitQty(total, n, 'even', meta.step);
+        if (sp.error) throw new Error(`${fmtQty(total, sym)} ${meta.label} is too small for ${n} targets`);
+        if (sp.qtys.some((q) => q * p < MIN_LEG_USD))
+          throw new Error(
+            `${fmtQty(total, sym)} ${meta.label} is too small for ${n} targets (Vest's $1 minimum per target)`,
+          );
+        order.forEach((o, i) => (o.qty = fmtQty(sp.qtys[i], sym)));
+      }
+      // shrink the targets already there first, so the sizes never add up past the position
+      for (const o of order) {
+        if (!o.l) continue;
+        const sized = o.l.sizeMode !== 'full_position' && o.l.quantity != null;
+        if (sized && +o.l.quantity === +o.qty) continue;
+        await send('PUT', '/v3/positions/take-profit', master, {
+          positionId: pid,
+          executionType: 'market',
+          triggerPrice: fmt(o.price),
+          takeProfitId: o.l.id,
+          quantity: o.qty,
+        });
+      }
+      const mine = order.find((o) => !o.l);
+      await send('POST', '/v3/positions/take-profit', master, {
+        positionId: pid,
+        executionType: 'market',
+        triggerPrice: fmt(p),
+        ...(n > 1 ? { quantity: mine.qty } : {}),
+      });
+      logEvent(
+        'ok',
+        `Target added at ${fmt(p)} (${pts} pts from the entry)${n > 1 ? `; ${n} targets of ${order.map((o) => o.qty).join(' / ')}` : ', the whole position'}${
+          S.armed ? ' — the copier does the same on the followers' : ''
+        }.`,
+      );
+      diag('trade_panel', {
+        outcome: 'leg-added',
+        kind,
+        price: p,
+        positionId: pid,
+        qtys: order.map((o) => o.qty || null),
+      });
+    } catch (e) {
+      logEvent('warn', `Add ${name}: not placed — ${e.message}.`);
+      diag('trade_panel', { outcome: 'leg-add-failed', kind, price, error: e.message, errorCode: errCode(e) });
+    } finally {
+      S.placing = false;
+      updateTrade();
+      refreshTradeState();
+    }
+  }
+  if (window.__VC_TEST__) window.__vcAddLeg = addLeg;
+  // The chart's right-click menu in a trade: "Add stop loss @ price" or "Add take profit @ price" for where the click was
+  // (under the price: a long's stop, a short's target). TradingView's onContextMenu; Vest adds no items of its own, and
+  // the standard ones stay below ours. Registered once per chart; nothing is added outside a trade.
+  let _menuApi = null;
+  function hookChartMenu(f) {
+    try {
+      const api = f && f.contentWindow.tradingViewApi;
+      if (!api || api === _menuApi || typeof api.onContextMenu !== 'function') return;
+      _menuApi = api;
+      api.onContextMenu((unixTime, price) => {
+        try {
+          return chartMenuItems(price);
+        } catch {
+          return [];
+        }
+      });
+    } catch {
+      /* best effort: the buttons do the same */
+    }
+  }
+  function chartMenuItems(price) {
+    const master = S.master,
+      sym = chartSymbol(),
+      meta = SYMBOLS[sym];
+    if (!master || !meta || !(price > 0)) return [];
+    const h = heldOn(master, sym),
+      px = priceOf(sym);
+    if (!h || !(px > 0)) return [];
+    const p = roundTick(price, meta.tick);
+    if (Math.abs(p - px) < meta.tick) return [];
+    const kind = legKindAt(h.side, p, px),
+      legs = h.triggers || [];
+    if (kind === 'sl' && legs.some((l) => l.kind === 'sl')) return [];
+    if (kind === 'tp' && legs.filter((l) => l.kind === 'tp').length >= MAX_TRADE_TARGETS) return [];
+    if (legBlocks(kind)) return [];
+    return [
+      {
+        position: 'top',
+        text: `${kind === 'sl' ? 'Add stop loss' : 'Add take profit'} @ ${fmtPx(p, meta.tick)}`,
+        click: () => addLeg(kind, p, sym),
+      },
+      { position: 'top', text: '-' },
+    ];
+  }
+  if (window.__VC_TEST__) window.__vcMenu = chartMenuItems;
+  // The buttons' pick: the stop or target hangs off the pointer on Vest's chart as a dashed line; one click on the chart
+  // places it there, Enter (or the button again) at the saved points from the average entry, Esc cancels. Without a
+  // chart the button places it at the saved points at once.
+  S.legPick = null; // { kind, sym, hover } while picking
+  let _legPickOff = null,
+    _legLine = null,
+    _legLineKey = '';
+  // the saved points for the next stop or target, from the average entry (the setup's stop, or the target for its slot)
+  function legDefault(kind, h) {
+    const t = S.trade,
+      tps = (h.triggers || []).filter((l) => l.kind === 'tp').length,
+      pts = kind === 'sl' ? +t.stopPts || 0 : +t.targets[tps] || +t.targets[t.targets.length - 1] || DEFAULT_TARGET_PTS,
+      dir = h.side === 'long' ? 1 : -1;
+    return pts > 0 ? h.openPrice + (kind === 'sl' ? -dir : dir) * pts : null;
+  }
+  function placeLegDefault(kind) {
+    const sym = S.trade.symbol,
+      h = heldOn(S.master, sym),
+      p = h && legDefault(kind, h);
+    stopLegPick();
+    if (!p) return toast(`Set the ${kind === 'sl' ? 'stop' : 'target'} points first, or click the chart.`);
+    addLeg(kind, p, sym);
+  }
+  const onLegKey = (e) => {
+    if (!S.legPick) return;
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      stopLegPick();
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      placeLegDefault(S.legPick.kind);
+    }
+  };
+  function startLegPick(kind) {
+    if (S.legPick && S.legPick.kind === kind) return placeLegDefault(kind); // the button again: the saved points
+    const blocked = legBlocks(kind);
+    if (blocked) return toast(blocked);
+    const sym = S.trade.symbol;
+    if (!heldOn(S.master, sym)) return;
+    stopPick(true);
+    const tv = chartApi();
+    if (!tv) return placeLegDefault(kind);
+    S.legPick = { kind, sym, hover: null };
+    window.addEventListener('keydown', onLegKey, true);
+    try {
+      const chart = tv.api.activeChart();
+      let last = null,
+        down = null;
+      const move = (d) => {
+        last = d && Number.isFinite(d.price) && d.price > 0 ? d.price : null;
+        if (!S.legPick) return;
+        S.legPick.hover = last ? roundTick(last, SYMBOLS[sym].tick) : null;
+        drawLegLine(chart);
+      };
+      const dn = (d) => (down = d ? { x: d.clientX, y: d.clientY } : null);
+      const up = (d) => {
+        const click =
+          down && d && Math.abs(d.clientX - down.x) <= PICK_CLICK_PX && Math.abs(d.clientY - down.y) <= PICK_CLICK_PX;
+        down = null;
+        if (!click || last === null || !S.legPick) return;
+        const k = S.legPick.kind;
+        stopLegPick();
+        addLeg(k, roundTick(last, SYMBOLS[sym].tick), sym);
+      };
+      chart.crossHairMoved().subscribe(null, move);
+      tv.api.subscribe('mouse_down', dn);
+      tv.api.subscribe('mouse_up', up);
+      tv.win.addEventListener('keydown', onLegKey, true);
+      _legPickOff = () => {
+        try {
+          chart.crossHairMoved().unsubscribe(null, move);
+          tv.api.unsubscribe('mouse_down', dn);
+          tv.api.unsubscribe('mouse_up', up);
+          tv.win.removeEventListener('keydown', onLegKey, true);
+        } catch {
+          /* best effort: nothing to do if this fails */
+        }
+      };
+    } catch {
+      stopLegPick();
+      return placeLegDefault(kind);
+    }
+    diag('trade_panel', { outcome: 'leg-pick-start', kind });
+    updateTrade();
+  }
+  function drawLegLine(chart) {
+    const lp = S.legPick,
+      key = lp && lp.hover ? `${lp.kind}|${lp.hover}` : '';
+    if (key === _legLineKey) return;
+    _legLineKey = key;
+    try {
+      if (!key) {
+        if (_legLine) _legLine.remove();
+        _legLine = null;
+        return;
+      }
+      const col = lp.kind === 'sl' ? LINE_DOWN : LINE_UP;
+      if (!_legLine) _legLine = chart.createOrderLine();
+      _legLine
+        .setPrice(lp.hover)
+        .setText(`${lp.kind === 'sl' ? 'Stop' : 'Target'} · click to place`)
+        .setQuantity('')
+        .setLineColor(col)
+        .setBodyBorderColor(col)
+        .setBodyTextColor(col)
+        .setBodyBackgroundColor(LINE_INK)
+        .setLineStyle(2);
+      if (typeof _legLine.setLineLength === 'function') _legLine.setLineLength(LINE_LEN, 'percentage');
+      if (typeof _legLine.setExtendLeft === 'function') _legLine.setExtendLeft(false);
+    } catch {
+      // the line is a convenience: the click still places it
+    }
+  }
+  function stopLegPick() {
+    if (_legPickOff) _legPickOff();
+    _legPickOff = null;
+    if (_legLine)
+      try {
+        _legLine.remove();
+      } catch {
+        /* best effort: nothing to do if this fails */
+      }
+    _legLine = null;
+    _legLineKey = '';
+    window.removeEventListener('keydown', onLegKey, true);
+    if (!S.legPick) return;
+    S.legPick = null;
+    updateTrade();
+  }
+
   // Scale out: take the picked share (25 or 50%) off the master's position at market, with Vest's own reduce order (the
   // body its close window sends). 100% is a close. The stop and targets stay where they are. It goes through the hooked
   // fetch, so an armed copier reduces each follower by the same share of its own position.
@@ -12180,6 +12544,7 @@
     $('tr-pos').hidden = !h;
     // limits: a new trade only, so the limit row shows when flat; while picking, the pick replaces both rows
     if (h && S.pick) stopPick(true);
+    if (!h && S.legPick) stopLegPick();
     const pk = S.pick;
     $('tr-mgo').hidden = !!pk || !!h; // in a trade, ADD and REDUCE sit under the Scale chips
     $('tr-lgo').hidden = true; // Limit is the Order switch now; these stay for the chart pick's own code
@@ -12243,6 +12608,20 @@
       const legs = (h.triggers || []).slice().sort((a, b) => dir * (a.price - b.price));
       const sls = legs.filter((l) => l.kind === 'sl'),
         tps = legs.filter((l) => l.kind === 'tp');
+      // + Add stop (only without one, amber: nothing closes the trade on a loss) and + Add target
+      const legBusy = !!(S.placing || S.adjusting || S.flattening);
+      for (const [b, k] of [
+        [$('tr-addsl'), 'sl'],
+        [$('tr-addtp'), 'tp'],
+      ]) {
+        const on = !!S.legPick && S.legPick.kind === k,
+          txt = on ? 'Click the chart…' : k === 'sl' ? '+ Add stop' : '+ Add target';
+        if (b.textContent !== txt) b.textContent = txt;
+        b.classList.toggle('on', on);
+        b.disabled = legBusy || (k === 'tp' && tps.length >= MAX_TRADE_TARGETS);
+      }
+      $('tr-addsl').hidden = sls.length > 0;
+      $('tr-addsl').classList.toggle('warn', !sls.length && !(S.legPick && S.legPick.kind === 'sl'));
       const lvHtml =
         sls
           .map((l) => {

@@ -2,6 +2,15 @@
 
 Newest first. To update, click **Install** on the update row that appears in the panel whenever there's a newer version.
 
+## v0.40.0
+Put a stop or a target on an open trade, from the panel or the chart's right-click menu.
+
+- **+ Add stop** and **+ Add target** above Breakeven and Close. **+ Add stop** shows (in amber) when the trade has no stop. Click one, then click the chart where it goes, or press Enter for your saved points; Esc cancels.
+- **Right-click the chart** in a trade: **Add stop loss @ price** or **Add take profit @ price**, placed at the price you clicked.
+- **Targets split evenly:** adding one resizes the others first (two targets are halves, three are thirds). Up to five.
+- Followers get the same stop or targets while copying, sized to their own positions.
+- The log says **resized** when a target's size changes and its price doesn't.
+
 ## v0.39.3
 A one-click switch for the chart bracket, notices, and a cleaner Flatten all.
 

@@ -12,8 +12,8 @@ body:
     id: version
     attributes:
       label: Copier version
-      description: Shown in the panel's bottom bar, e.g. v0.39.3.
-      placeholder: "0.39.3"
+      description: Shown in the panel's bottom bar, e.g. v0.40.0.
+      placeholder: "0.40.0"
     validations:
       required: true
   - type: dropdown

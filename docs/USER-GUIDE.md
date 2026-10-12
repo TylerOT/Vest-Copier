@@ -279,6 +279,17 @@ in it (and their total in 1:1), a **bar drawn to scale** with your stop, entry, 
 sit on Vest, and a risk bar for what's left before your floor. The setup for a new trade (size, stop, targets, Auto BE)
 is put away until you're flat again.
 
+- **+ Add stop** and **+ Add target** (above Breakeven and Close): **+ Add stop** shows only when the trade has no
+  stop, in amber. Click one, then click Vest's chart where it goes (a dashed line follows the pointer), or press
+  **Enter** (or the button again) for your saved points from the average entry; **Esc** cancels. Up to 5 targets.
+  Adding a target splits the position evenly across all of them: the ones already there are resized first (2 targets
+  = halves, 3 = thirds). Removing one doesn't resize the rest; add another to cover the whole position again. A stop
+  goes under the price for a long and over it for a short, a target the other way; the wrong side is refused. Adding a
+  stop works while the copier is paused; adding a target doesn't. While copying, the followers get the same, sized to
+  their own positions.
+- **Right-click on Vest's chart** in a trade does the same at the price you clicked: **Add stop loss @ price** on the
+  stop side, **Add take profit @ price** on the other. With no trade on that market (or a stop already there for the
+  stop side), the menu is Vest's usual one.
 - **Breakeven** moves the stop to your **average entry** (an average between ticks rounds toward profit to the nearest
   tick, so it never locks a loss). It's offered once price is clear of the entry, since Vest refuses a stop the price
   has already passed (Vest triggers stops on the mid; the panel checks the bid or ask, a little stricter, so Vest always
