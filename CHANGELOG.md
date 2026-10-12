@@ -2,6 +2,9 @@
 
 Newest first. To update, click **Install** on the update row that appears in the panel whenever there's a newer version.
 
+## v0.40.1
+- **Placing a stop or target by clicking the chart** no longer floods the browser console with chart errors when the mouse stays still after the click. The guide line that follows the pointer no longer gets in the way of the click. The same goes for a limit placed with one click.
+
 ## v0.40.0
 Put a stop or a target on an open trade, from the panel or the chart's right-click menu.
 

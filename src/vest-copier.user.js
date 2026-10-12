@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Vest Copier
 // @namespace    vestcopier
-// @version      0.40.0
+// @version      0.40.1
 // @description  Copies a master Vest account's trades to your other Vest accounts, live, and adds a points-based order panel.
 // @author       xAmped
 // @license      STRATUH Copier License — free to use, no selling; see LICENSE
@@ -36,7 +36,7 @@
     })(),
   };
 
-  const VERSION = '0.40.0';
+  const VERSION = '0.40.1';
   const API = 'https://api-gateway.hz.vestmarkets.com';
   const _fetch = window.fetch.bind(window);
   // Console echo of the activity log, for troubleshooting: localStorage.setItem('vc-debug', '1') and reload.
@@ -10847,22 +10847,35 @@
         .setQuantityBackgroundColor(col)
         .setQuantityTextColor(LINE_INK)
         .setLineStyle(2);
+      if (typeof _pickLine.setEditable === 'function') _pickLine.setEditable(false); // a guide, not grabbable
+      if (typeof _pickLine.setCancellable === 'function') _pickLine.setCancellable(false);
       if (typeof _pickLine.setLineLength === 'function') _pickLine.setLineLength(ENTRY_LEN, 'percentage');
       if (typeof _pickLine.setExtendLeft === 'function') _pickLine.setExtendLeft(false);
     } catch {
       // the line is a convenience: the panel shows the price either way
     }
   }
+  // A line removed while TradingView is still handling the click on it stays "under the cursor" in its painter, which
+  // then fails on every repaint until the mouse moves: hide it now, remove it once the click is done.
+  function removeLineLater(l) {
+    try {
+      if (typeof l.setLineColor === 'function') l.setLineColor('rgba(0,0,0,0)');
+    } catch {
+      /* best effort */
+    }
+    setTimeout(() => {
+      try {
+        l.remove();
+      } catch {
+        /* best effort: nothing to do if this fails */
+      }
+    }, 50);
+  }
   function stopPick(quiet) {
     if (S.legPick) stopLegPick(); // every place a pick has to end (minimise, another tab or market) ends this one too
     if (_pickOff) _pickOff();
     _pickOff = null;
-    if (_pickLine)
-      try {
-        _pickLine.remove();
-      } catch {
-        /* best effort: nothing to do if this fails */
-      }
+    if (_pickLine) removeLineLater(_pickLine);
     _pickLine = null;
     _pickLineKey = '';
     window.removeEventListener('keydown', onPickKey, true);
@@ -11937,6 +11950,10 @@
         .setBodyTextColor(col)
         .setBodyBackgroundColor(LINE_INK)
         .setLineStyle(2);
+      // a guide only: not grabbable, so the click that places it lands on the chart, not on this line (TradingView kept
+      // painting a removed line it was tracking under the cursor: thousands of errors until the mouse moved)
+      if (typeof _legLine.setEditable === 'function') _legLine.setEditable(false);
+      if (typeof _legLine.setCancellable === 'function') _legLine.setCancellable(false);
       if (typeof _legLine.setLineLength === 'function') _legLine.setLineLength(LINE_LEN, 'percentage');
       if (typeof _legLine.setExtendLeft === 'function') _legLine.setExtendLeft(false);
     } catch {
@@ -11946,12 +11963,7 @@
   function stopLegPick() {
     if (_legPickOff) _legPickOff();
     _legPickOff = null;
-    if (_legLine)
-      try {
-        _legLine.remove();
-      } catch {
-        /* best effort: nothing to do if this fails */
-      }
+    if (_legLine) removeLineLater(_legLine);
     _legLine = null;
     _legLineKey = '';
     window.removeEventListener('keydown', onLegKey, true);

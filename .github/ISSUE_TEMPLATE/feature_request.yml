@@ -19,4 +19,4 @@ body:
     id: version
     attributes:
       label: Copier version
-      description: Shown in the panel's bottom bar, e.g. v0.40.0.
+      description: Shown in the panel's bottom bar, e.g. v0.40.1.
