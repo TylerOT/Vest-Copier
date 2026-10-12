@@ -22,7 +22,7 @@ New here? Start with the [10-minute tutorial video](https://youtu.be/mFJGsJ0IInY
   </tr>
   <tr valign="top">
     <td><img src="docs/tutorial/img/accounts.png" alt="Copier tab: copying the master to two followers, one line each" width="250"><br><sub>Who copies whom, in one sentence.</sub></td>
-    <td><img src="docs/tutorial/img/trade.png" alt="Trade tab: Market or Limit, size, and a one-sided price ladder" width="250"><br><sub>Points in, prices out.</sub></td>
+    <td><img src="docs/tutorial/img/trade.png" alt="Trade tab: Market, Limit or Stop, size, and a one-sided price ladder" width="250"><br><sub>Points in, prices out.</sub></td>
     <td><img src="docs/tutorial/img/trade-in.png" alt="In a trade: the bracket drawn to scale, Breakeven and Close" width="250"><br><sub>Your bracket on one bar.</sub></td>
   </tr>
 </table>
@@ -100,7 +100,8 @@ guides), **Report a problem**, docking and reload.
 - **Margin and risk bars:** how much of Vest's buying power you're using, and what your stop would cost against the
   room to your floor, before you click.
 - **One price ladder:** targets, entry, stop and fail price in a single table, for the side you point at (Buy or Sell).
-  The same bracket is drawn on Vest's chart as you set it; drag a line to change it. The stop and targets are optional.
+  The same bracket is drawn on Vest's chart as you set it; drag a line to change it, and **Lines** (next to Market)
+  hides or shows it. The stop and targets are optional.
 - **Sizing:** contracts, dollars at risk, a % of the max, or the max the account allows. On NQ, ES and RTY, in units,
   **micros** or **minis**, like Vest's own order form.
 - **Market, Limit or Stop:** with Limit or Stop, one click on Vest's chart places it. Stop orders (a buy stop over the
@@ -144,8 +145,13 @@ your version and the API budget (click it for Vest's build and the site check).
 ## Updates
 
 New versions show up as a row above the activity line. Click **Install**, confirm in Tampermonkey, switch back to Vest and
-the page reloads with the new version. The [changelog](CHANGELOG.md) lists what each one changed, and the
+the page reloads with the new version (while copying, it asks first: **Reload now**). The [changelog](CHANGELOG.md) lists what each one changed, and the
 [roadmap](ROADMAP.md) what's coming next.
+
+If a version turns out to have a problem, I can pause new trades from here while the fix ships. The panel shows
+**Paused** with a short note, usually asking you to install the newest version. Stop orders waiting in the tab are
+cancelled; trades already open keep copying their exits, and Flatten all always works. Now and then a short note
+(Vest maintenance, a heads-up before news) can show under the header too; × dismisses it.
 
 ## About the AMPED code
 
@@ -160,8 +166,10 @@ off.
 ## Privacy
 
 The script runs in your browser tab and uses the Vest session you're already logged into. Your orders go to Vest and
-nowhere else. The only outside requests are to this repository, to see if a newer version exists, and, only when you
-open Share, three fonts from jsDelivr to draw the picture. Nothing about you or your accounts goes with either.
+nowhere else. Outside Vest it only reads public files: this repository's latest release, to see if there's a newer
+version, and a small status file every few minutes (how I can pause new trades if a version has a problem). Only when
+you open Share, it also loads three fonts from jsDelivr to draw the picture. Nothing about you or your accounts goes
+with any of them.
 
 ## Terms
 

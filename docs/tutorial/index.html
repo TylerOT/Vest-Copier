@@ -149,7 +149,7 @@ dd { margin: 0; font-size: 15.5px; }
   <p class="lede">Trade one Vest account and have the same trade placed on your other accounts, live, from inside the Vest page. It also adds a Trade tab where you set your stop and targets in points. Formerly Vest Copier: same script, same link, new look.</p>
   <div class="video"><iframe src="https://www.youtube-nocookie.com/embed/mFJGsJ0IInY" title="STRATUH Copier tutorial video" loading="lazy" allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowfullscreen></iframe></div>
   <p class="video-link">Prefer YouTube? <a href="https://youtu.be/mFJGsJ0IInY">Watch the tutorial there</a> (10 minutes).</p>
-  <div class="meta"><span class="pill">v0.39.3</span><span class="pill">next.vestmarkets.com</span><span class="pill">10-minute setup</span><a class="pill" href="https://github.com/xAmped/Vest-Copier">github.com/xAmped/Vest-Copier</a></div>
+  <div class="meta"><span class="pill">v0.39.3</span><span class="pill">next.vestmarkets.com</span><span class="pill">5-minute setup</span><a class="pill" href="https://github.com/xAmped/Vest-Copier">github.com/xAmped/Vest-Copier</a></div>
 </header>
 
 <div class="wrap">
@@ -191,7 +191,7 @@ dd { margin: 0; font-size: 15.5px; }
             <li><div>The <b>Copier</b> tab opens on <b>Choose accounts</b>. Pick the account you'll trade with the round button: that's the <b>master</b>.</div></li>
             <li><div>Tick each account that should copy it. Those are the <b>followers</b>. Click <b>Done</b>.<span class="why">By default (Cap-to-fit) each follower is sized to its own equity, so sizes can differ. For identical contracts everywhere, pick 1:1 under Sizing (see Sizing). Change them later with <b>Edit</b>, while not copying.</span></div></li>
             <li><div>Set your leverage on Vest the way you'll trade, then click <b>Start copying</b>. On first use, read the risk terms, tick the box and click <b>Accept and continue</b>.<span class="why">Starting checks every account, then sets each follower's leverage to match the master. It works from any tab.</span></div></li>
-            <li><div>Trade the master as you normally would, from Vest's order ticket or from the Trade tab. The sentence on top says who copies to whom, and the line under it the last copy ("4 of 4 filled"). The activity line at the bottom shows each order, then one line per follower and a fill summary such as <code>Fills 3/3 confirmed · avg slip 0.25pt</code>. Click it for the full log.</div></li>
+            <li><div>Trade the master as you normally would, from Vest's order ticket or from the Trade tab. The sentence on top says who copies to whom, and the line under it the last copy ("4 of 4 filled"). The activity line at the bottom shows each order, then one line per follower and a fill summary such as <code>Fills 3/3 confirmed · avg slip 0.25 pt · max 0.50 pt</code>. Click it for the full log.</div></li>
             <li><div>Click <b>Stop copying</b> when you're finished. It does not close anything.</div></li>
           </ol>
         </div>
@@ -216,12 +216,12 @@ dd { margin: 0; font-size: 15.5px; }
               <tbody>
                 <tr><td>Margin bar</td><td>How much of Vest's buying power your position uses, and how many contracts are left. The striped part previews the order you're about to send.</td></tr>
                 <tr><td>Risk bar</td><td>What your stop would lose, fees included, against the room left before your floor. Amber near the limit, red past it. Both bars use the tightest account.</td></tr>
-                <tr><td>Order</td><td><b>Market</b>, <b>Limit</b> or <b>Stop</b>. With Limit or Stop, one click on the chart places it.</td></tr>
+                <tr><td>Order</td><td><b>Market</b>, <b>Limit</b> or <b>Stop</b>. With Limit or Stop, one click on the chart places it. With Market, <b>Lines</b> hides or shows your bracket on the chart.</td></tr>
                 <tr><td>Size</td><td><b>Qty</b>, <b>Risk $</b> (the panel sizes the order so hitting your stop loses that amount; $1 per point per contract) <b>%</b> (a share of the max: 25 is a quarter) or <b>Max</b>: the most the account can open, the same as Vest's 100%.</td></tr>
                 <tr><td>Minis, micros</td><td>On NQ, ES and RTY, size in <b>Units</b>, <b>Micros</b> or <b>Minis</b>, like Vest's own order form. An NQ micro is 2 units, an ES or RTY micro 5; a mini is 10 micros. Sizes stay whole.</td></tr>
                 <tr><td>Price ladder</td><td>Targets, entry, stop and the fail price in one table, for the side you're about to trade: point at <b>Buy</b> or <b>Sell</b> and it shows that side's prices. Type each level's points in the middle. The <b>×</b> on the stop or a target removes it: both are optional. The same bracket is drawn on Vest's chart as you set it; drag a line to change its points.</td></tr>
                 <tr><td>Split</td><td>One line under the ladder; <b>Change</b> picks <b>Start</b> (most on TP1), <b>Even</b> or <b>End</b> (most on the last target). <b>+ target</b> adds another.</td></tr>
-                <tr><td>Auto BE</td><td>The next line; <b>Change</b> picks <b>After TP1</b> or <b>At +pts</b>, which move the stop to your entry. <b>Lock</b> adds points of profit beyond it (0 = exact breakeven).</td></tr>
+                <tr><td>Auto BE</td><td>The next line; <b>Change</b> picks <b>After TP1</b> or <b>+pts</b>, which move the stop to your entry. <b>Lock</b> adds points of profit beyond it (0 = exact breakeven).</td></tr>
               </tbody>
             </table>
           </div>
@@ -232,7 +232,7 @@ dd { margin: 0; font-size: 15.5px; }
         </div>
         <div>
           <figure>
-            <div class="shot"><img src="img/trade.png" alt="The Trade tab: margin and risk bars, Market or Limit, Risk $300 sized to 15 contracts, the Buy side of the price ladder with three targets, entry, stop and fail price, and Buy and Sell." width="340"></div>
+            <div class="shot"><img src="img/trade.png" alt="The Trade tab: margin and risk bars, Market, Limit or Stop with the Lines switch, Risk $300 sized to 15 contracts, the Buy side of the price ladder with three targets, entry, stop and fail price, and Buy and Sell." width="340"></div>
             <figcaption>Risk $300 at a 20-pt stop, targets 20 / 40 / 60.</figcaption>
           </figure>
           <figure>
@@ -256,6 +256,7 @@ dd { margin: 0; font-size: 15.5px; }
       </div>
       <div class="formula">follower size = master size × (follower equity ÷ master equity)<br><span class="c">// only when scaling down: × 0.95 buffer, rounded down to the market's size step</span><br><span class="c">// within 0.5% of the master's equity: copied 1:1</span></div>
       <p>Example: a $25k master trading 1 NQ drives a $5k follower at about 0.19 NQ. Both lose the same share of their account if the stop is hit. An account too small to hold even the minimum size is skipped, with a line in the log saying so.</p>
+      <p><b>Fast mode</b> (Settings, on by default) sends the followers' entries the instant you send yours, instead of waiting for Vest to answer the master. <b>Auto-flatten</b> (off by default) closes followers left in a trade the master isn't in. Looks live under <b>⋯ → Appearance</b>: text size, the chart bracket, chart marks, session shading and the STRATUH theme.</p>
     </section>
 
     <section id="copies">
@@ -284,8 +285,9 @@ dd { margin: 0; font-size: 15.5px; }
       <h2><span class="n">06</span>Safety controls</h2>
       <div class="cols2">
         <div class="card"><h4>Stop copying</h4><p>Stops copying immediately. Open positions stay open.</p></div>
-        <div class="card"><h4>Flatten all</h4><p>Closes every position and cancels every order on <b>all</b> loaded accounts, instantly and with no confirmation. On every tab and on the minimised pill. Copying keeps running, so it's also a quick way out of a trade across every account.</p></div>
+        <div class="card"><h4>Flatten all</h4><p>Closes every position and cancels every order on <b>all</b> loaded accounts, instantly and with no confirmation. On every tab, and on the minimised pill while copying. Copying keeps running, so it's also a quick way out of a trade across every account.</p></div>
         <div class="card"><h4>Fill check</h4><p>After each entry, the copier confirms every account actually filled. One that didn't is named in the log and dropped from that trade.</p></div>
+        <div class="card"><h4>Paused</h4><p>If a version has a problem, I can pause new trades from GitHub while the fix ships. The panel says so at the top, often with an <b>Install</b> button. Trades already open keep copying their exits, and Flatten all works.</p></div>
         <div class="card"><h4>Site check</h4><p>When Vest updates its website, the copier checks itself: the panel shows the check for a few seconds (read-only), then says <b>All clear</b> and comes back. If something Vest changed breaks the copier, copying stays off until an update; use Vest's own panel meanwhile.</p></div>
       </div>
       <div class="callout warn"><p><b>After a Vest update,</b> do one small test before trading size: one follower, open with a stop, move the stop, close.</p></div>
