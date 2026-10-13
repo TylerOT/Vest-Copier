@@ -2,6 +2,14 @@
 
 Newest first. To update, click **Install** on the update row that appears in the panel whenever there's a newer version.
 
+## v0.40.3
+Share's Today card shows your whole day, losses included.
+
+- **Trades on the card:** a new choice in Share for how the Today card shows your trades. **Day summary** (the default) shows how many trades, won and lost, your best and worst, and a position still open. **Latest trades** shows the last three in order, **Last trade + day** the last trade and the day's count, and **None** just the number and the curve. Before, a day with more than three trades showed only the three best, so a red day could look green.
+- **Clearer trade sizes:** a line above the trades says the size is the master's and the P&L is added up across your accounts. A trade shows "on 3" when fewer accounts were in it.
+- **Hide amounts** shows the master's points on each trade. Day summary then shows only how many trades and won / lost.
+- **Points read right** when Vest's trade history carries a wrong entry price (it could show tens of thousands of points).
+
 ## v0.40.2
 Copying keeps up with Vest's newer order options, and % sizing follows a leverage change at once.
 

@@ -396,14 +396,17 @@ when they're on.
   a claim.
 - **Share** (top right of the P&L tab) — your P&L as a picture.
   - **Today:** the day's total, how many accounts, today's copies and how close the followers' fills were to the
-    master's, the day's equity curve and your trades as chips (all of them with three or fewer, else your three best;
-    an open position shows as "open").
+    master's, the day's equity curve and your trades. **Trades on the card** picks how the trades show: **Day summary**
+    (how many, won / lost, best and worst, and a position still open), **Latest trades** (the last three, oldest
+    first, with "+2 earlier" for the rest), **Last trade + day** (the last trade and the day's count) or **None**
+    (just the number and the curve). A trade's size is the master's and its P&L is added up across every account in
+    it; a line above the trades says so, and a trade shows "on 3" when fewer accounts were in it.
   - **One trade:** a list of your profitable trades from the last 30 days, sorted **Latest** or **Most profitable**, read from Vest's position history on every
     account you have, finished ones included (a passed evaluation, a closed or failed funded account). The same trade
     copied across accounts shows once ("× 5"); pick one and the card shows the side, size and entry, the total "on 5
     accounts", each exit (TP1, TP2, stop or breakeven) with its price and points, and the trade's timeline. **Copy image** puts it on
-  the clipboard to paste into X, Discord or a group chat; **Save PNG** saves it. **Hide amounts** shows the % change (points
-  on a trade) instead of dollars; **Hide account numbers** leaves the account tiles off; **Name on the card** is optional; **Add code AMPED** puts the code on it. It never shows balances,
+  the clipboard to paste into X, Discord or a group chat; **Save PNG** saves it. **Hide amounts** shows the % change instead of
+  dollars, with the master's points on each trade (Day summary then shows only how many trades and won / lost); **Hide account numbers** leaves the account tiles off; **Name on the card** is optional; **Add code AMPED** puts the code on it. It never shows balances,
   account ids or logins. If the browser blocks the clipboard, the picture is saved to Downloads instead.
 - **Claim all profit** (bottom of the P&L tab; stop copying first) — claims every funded account's available profit to your Primary
   Account, the same claim as the Claim Profit window Vest itself offers, for the full amount. First a **preview**: what each account

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Vest Copier
 // @namespace    vestcopier
-// @version      0.40.2
+// @version      0.40.3
 // @description  Copies a master Vest account's trades to your other Vest accounts, live, and adds a points-based order panel.
 // @author       xAmped
 // @license      STRATUH Copier License — free to use, no selling; see LICENSE
@@ -38,7 +38,7 @@
     })(),
   };
 
-  const VERSION = '0.40.2';
+  const VERSION = '0.40.3';
   // Where this script runs from, read off its own first stack frame (each script manager names it differently): the
   // diagnostics use it to tell the copier's own errors from Vest's. Null when the stack shows no address.
   const OWN_SRC = (() => {
@@ -8519,6 +8519,43 @@
       width: 116px;
       flex: none;
     }
+    /* Trades on the card: a dropdown drawn like the name box, its list the panel's own menu */
+    .opt[hidden] {
+      display: none;
+    }
+    .sh-dd {
+      position: relative;
+      flex: none;
+    }
+    .sh-ddb {
+      width: 148px;
+      height: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 0 8px 0 10px;
+      background: var(--sunk);
+      border: 1px solid var(--line2);
+      color: var(--text);
+      font-size: 12.5px;
+      cursor: pointer;
+    }
+    .sh-ddb svg {
+      color: var(--faint);
+      flex: none;
+    }
+    .sh-ddb[aria-expanded='true'] {
+      border-color: var(--accent);
+    }
+    .sh-ddb[aria-expanded='true'] svg {
+      transform: rotate(180deg);
+    }
+    .sh-ddm {
+      top: 34px;
+      right: 0;
+      width: 196px;
+    }
     .sh-btns {
       display: grid;
       grid-template-columns: 1fr auto;
@@ -14295,7 +14332,7 @@
   // Amounts hidden: % change on the day's starting equity, no $ anywhere. The only network use is the three fonts, from
   // jsDelivr, loaded the first time Share opens (the card still draws with system fonts without them).
   const SHARE_NAME_KEY = 'vc-share-name',
-    SHARE_OPTS_KEY = 'vc-share-opts'; // { hide, nums, code }: the Share sheet's switches, remembered
+    SHARE_OPTS_KEY = 'vc-share-opts'; // { hide, nums, code, sort, style }: the Share sheet's options, remembered
   const CARD_W = 1200,
     CARD_H = 675,
     CARD_SCALE = 2;
@@ -14357,7 +14394,8 @@
     }
     return {
       hasDay,
-      chips: dayChips(),
+      trades: dayTrades(),
+      style: S.share ? S.share.style : 'summary',
       followers: accts.filter((r) => r.id !== S.master).length,
       total: hasDay
         ? d.today
@@ -14375,9 +14413,19 @@
       at: Date.now(),
     };
   }
-  // The day's trades as chips: closed ones on the active accounts since the day began (a copied trade is one chip, its P&L
-  // summed), and the position open now. More than three: the three most profitable. Three or fewer: all of them.
-  function dayChips() {
+  // The day's trades, oldest first: closed ones on the active accounts since the day began (a copied trade is one entry,
+  // its P&L summed, `accts` = how many accounts were in it), and the position open now. `qty` and `pts` are the lead's
+  // (the master when it's in the trade): the card shows the master's size and, with amounts hidden, its points.
+  // A closed position's points: from its prices, unless they disagree with its P&L ÷ size (Vest's history can carry a
+  // wrong open price, seen 2026-10-13 as ±30,000 points on NQ), then from the P&L ($1 a point per unit).
+  function closedPts(p) {
+    const byPrice = p.open > 0 && p.close > 0 ? (p.side === 'long' ? 1 : -1) * (p.close - p.open) : NaN,
+      byPnl = p.qty > 0 ? p.pnl / p.qty : NaN;
+    if (Number.isFinite(byPrice) && Number.isFinite(byPnl))
+      return Math.abs(byPrice - byPnl) > Math.max(2, Math.abs(byPnl) * 0.25) ? byPnl : byPrice;
+    return Number.isFinite(byPrice) ? byPrice : Number.isFinite(byPnl) ? byPnl : null;
+  }
+  function dayTrades() {
     const start = vestDayStart(),
       active = (id) => !!S.byId[id];
     const out = [];
@@ -14393,6 +14441,8 @@
         qty: lead.qty,
         symbol: g.symbol,
         pnl: items.reduce((a, p) => a + p.pnl, 0),
+        pts: closedPts(lead),
+        accts: items.length,
         open: false,
         at: g.closedAt,
       });
@@ -14400,15 +14450,29 @@
     // open now: the master's position (and the followers in it)
     const st = S.master && S.acctState[S.master];
     for (const h of (stateFresh(st) && st.positions) || []) {
-      let pnl = 0;
+      let pnl = 0,
+        accts = 0;
       for (const id of [S.master, ...S.followers]) {
         const r = S.byId[id];
-        if (r && inTrade(id)) pnl += r.upnl || 0;
+        if (r && inTrade(id)) {
+          pnl += r.upnl || 0;
+          accts++;
+        }
       }
-      out.push({ side: h.side, qty: h.qty, symbol: h.symbol, pnl, open: true, at: Date.now() });
+      const px = priceOf(h.symbol),
+        entry = num(h.openPrice);
+      out.push({
+        side: h.side,
+        qty: h.qty,
+        symbol: h.symbol,
+        pnl,
+        pts: px > 0 && entry > 0 ? (h.side === 'long' ? 1 : -1) * (px - entry) : null,
+        accts: accts || 1,
+        open: true,
+        at: Date.now(),
+      });
     }
-    const list = out.length > 3 ? [...out].sort((a, b) => b.pnl - a.pnl).slice(0, 3) : out;
-    return list.sort((a, b) => a.at - b.at);
+    return out.sort((a, b) => a.at - b.at);
   }
   // The day's date and time in ET, as on the card: "SAT 10 OCT 2026 · 20:41 ET"
   function etStamp(t) {
@@ -14492,6 +14556,252 @@
     }
     return x;
   }
+  // ── The Today card's trade row (bottom left), in the style picked in Share (`SHARE_STYLES`, design in
+  // docs/redesign/share-styles/): Day summary (tiles: trades, won / lost, best, worst, the position open now), Latest
+  // trades (the newest three that fit, older ones as "+N earlier"), Last trade + day, or None. A caption above the row
+  // says the size is the master's and the P&L is summed across the accounts in each trade; a chip says "on 3" when fewer
+  // accounts were in that trade than on the card. Amounts hidden: the master's points instead of dollars.
+  const SHARE_STYLES = [
+    ['summary', 'Day summary', 'Trades, wins and losses, best and worst.'],
+    ['latest', 'Latest trades', 'The last three, oldest first.'],
+    ['mix', 'Last trade + day', "The last trade and the day's count."],
+    ['none', 'None', 'Just the number and the curve.'],
+  ];
+  const ROW_H = 66,
+    ROW_Y = CARD_H - 40 - ROW_H,
+    ROW_X1 = 920, // the code box is to the right
+    ROW_GAP = 12;
+  const signedPts = (n) =>
+    n == null || !Number.isFinite(n) ? '—' : `${n >= 0 ? '+' : '−'}${Math.abs(n).toFixed(2)} pts`;
+  const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+  function drawTradeRow(ctx, d, hide, L, T) {
+    const pnlCol = (n) => (n == null || Math.abs(n) < 0.005 ? T.text : n > 0 ? T.lime : T.red);
+    const valOf = (t) => (hide ? t.pts : t.pnl),
+      valText = (t) => (hide ? signedPts(t.pts) : sp(t.pnl));
+    const box = (x, w) => {
+      ctx.fillStyle = 'rgba(255,255,255,0.05)';
+      ctx.fillRect(x, ROW_Y, w, ROW_H);
+      ctx.strokeStyle = 'rgba(255,255,255,0.07)';
+      ctx.strokeRect(x + 0.5, ROW_Y + 0.5, w - 1, ROW_H - 1);
+    };
+    // the caption: [text, strong?], strong parts in muted, the rest dim (the account tiles' label style)
+    const caption = (parts) => {
+      let x = L;
+      ctx.font = `500 13px ${CF.mono}`;
+      ctx.letterSpacing = '1.8px';
+      for (const [t, strong] of parts) {
+        ctx.fillStyle = strong ? T.muted : T.dim;
+        ctx.fillText(t, x, ROW_Y - 14);
+        x += ctx.measureText(t).width;
+      }
+      ctx.letterSpacing = '0px';
+    };
+    const n = d.accounts.length,
+      SEP = [' · '],
+      sizeParts = hide
+        ? [
+            ['SIZE AND POINTS: ', false],
+            ['MASTER', true],
+          ]
+        : [['SIZE: ', false], ['MASTER', true], SEP, ['P&L: ', false], [plural(n, 'account').toUpperCase(), true]];
+    const sideOf = (t) => (t.side === 'long' ? 'LONG' : 'SHORT'),
+      sizeOf = (t) => (t.qty > 0 ? `${fmtQty(t.qty, t.symbol)} ${symLabel(t.symbol)}` : symLabel(t.symbol));
+    // a trade chip: side, size, P&L, "on 3" when fewer accounts were in it, "open"; measure = the width, nothing drawn
+    const chip = (x, t, measure) => {
+      const side = sideOf(t),
+        size = sizeOf(t),
+        val = valText(t),
+        fewer = !hide && t.accts < n ? ` on ${t.accts}` : '';
+      ctx.font = `700 11px ${CF.mono}`;
+      const sw = ctx.measureText(side).width + 14;
+      ctx.font = `400 16px ${CF.sans}`;
+      const zw = ctx.measureText(size).width;
+      ctx.font = `500 15px ${CF.mono}`;
+      const vw = ctx.measureText(val).width,
+        fw = fewer ? ctx.measureText(fewer).width : 0,
+        ow = t.open ? ctx.measureText(' open').width : 0;
+      const w = 14 + sw + 10 + zw + 12 + vw + fw + ow + 14;
+      if (measure) return w;
+      box(x, w);
+      const mid = ROW_Y + ROW_H / 2;
+      let cx = x + 14;
+      ctx.fillStyle = t.side === 'long' ? T.lime : T.text;
+      ctx.fillRect(cx, mid - 11, sw, 22);
+      ctx.font = `700 11px ${CF.mono}`;
+      ctx.fillStyle = T.ink;
+      ctx.fillText(side, cx + 7, mid + 4);
+      cx += sw + 10;
+      ctx.font = `400 16px ${CF.sans}`;
+      ctx.fillStyle = T.text;
+      ctx.fillText(size, cx, mid + 6);
+      cx += zw + 12;
+      ctx.font = `500 15px ${CF.mono}`;
+      ctx.fillStyle = pnlCol(valOf(t));
+      ctx.fillText(val, cx, mid + 5);
+      cx += vw;
+      ctx.fillStyle = T.dim;
+      if (fewer) {
+        ctx.fillText(fewer, cx, mid + 5);
+        cx += fw;
+      }
+      if (t.open) ctx.fillText(' open', cx, mid + 5);
+      return w;
+    };
+    // a chip of mono text: "+2 earlier", "5 trades · 3W 2L". parts: [text, colour]
+    const textChip = (x, parts, measure) => {
+      ctx.font = `500 15px ${CF.mono}`;
+      const w = 28 + parts.reduce((a, [t]) => a + ctx.measureText(t).width, 0);
+      if (measure) return w;
+      box(x, w);
+      let cx = x + 14;
+      for (const [t, col] of parts) {
+        ctx.fillStyle = col;
+        ctx.fillText(t, cx, ROW_Y + ROW_H / 2 + 5);
+        cx += ctx.measureText(t).width;
+      }
+      return w;
+    };
+    // a stat tile: a small label on top, the value under it. value: [[text, colour], …]
+    const tileLabel = (x, label) => {
+      ctx.font = `500 11px ${CF.mono}`;
+      ctx.letterSpacing = '1.5px';
+      ctx.fillStyle = T.dim;
+      ctx.fillText(label, x + 16, ROW_Y + 24);
+      const lw = ctx.measureText(label).width;
+      ctx.letterSpacing = '0px';
+      return lw;
+    };
+    const tile = (x, label, value, measure) => {
+      ctx.font = `500 11px ${CF.mono}`;
+      ctx.letterSpacing = '1.5px';
+      const lw = ctx.measureText(label).width;
+      ctx.letterSpacing = '0px';
+      ctx.font = `500 20px ${CF.mono}`;
+      const vw = value.reduce((a, [t]) => a + ctx.measureText(t).width, 0);
+      const w = Math.max(112, 32 + Math.max(lw, vw));
+      if (measure) return w;
+      box(x, w);
+      tileLabel(x, label);
+      let cx = x + 16;
+      ctx.font = `500 20px ${CF.mono}`;
+      for (const [t, col] of value) {
+        ctx.fillStyle = col;
+        ctx.fillText(t, cx, ROW_Y + 51);
+        cx += ctx.measureText(t).width;
+      }
+      return w;
+    };
+    // a tile holding one trade: the label, then side, size and P&L on one line
+    const tradeTile = (x, label, t, measure) => {
+      const side = sideOf(t),
+        size = sizeOf(t),
+        val = valText(t);
+      ctx.font = `700 11px ${CF.mono}`;
+      const sw = ctx.measureText(side).width + 14;
+      ctx.font = `400 16px ${CF.sans}`;
+      const zw = ctx.measureText(size).width;
+      ctx.font = `500 17px ${CF.mono}`;
+      const vw = ctx.measureText(val).width;
+      const w = 16 + sw + 10 + zw + 12 + vw + 16;
+      if (measure) return w;
+      box(x, w);
+      tileLabel(x, label);
+      let cx = x + 16;
+      ctx.fillStyle = t.side === 'long' ? T.lime : T.text;
+      ctx.fillRect(cx, ROW_Y + 36, sw, 20);
+      ctx.font = `700 11px ${CF.mono}`;
+      ctx.fillStyle = T.ink;
+      ctx.fillText(side, cx + 7, ROW_Y + 50);
+      cx += sw + 10;
+      ctx.font = `400 16px ${CF.sans}`;
+      ctx.fillStyle = T.text;
+      ctx.fillText(size, cx, ROW_Y + 51);
+      cx += zw + 12;
+      ctx.font = `500 17px ${CF.mono}`;
+      ctx.fillStyle = pnlCol(valOf(t));
+      ctx.fillText(val, cx, ROW_Y + 51);
+      return w;
+    };
+    // boxes in a row from L, each drawn only if it fits left of the code box
+    const row = (boxes) => {
+      let x = L;
+      for (const b of boxes) {
+        if (x + b(x, true) > ROW_X1) break;
+        x += b(x) + ROW_GAP;
+      }
+    };
+    const all = d.trades,
+      closed = all.filter((t) => !t.open),
+      open = all.filter((t) => t.open),
+      won = closed.filter((t) => t.pnl > 0).length,
+      lost = closed.filter((t) => t.pnl < 0).length;
+    const style = d.style || 'summary';
+    if (style === 'summary') {
+      // counts, won / lost and best / worst from closed trades only; one closed trade: the trade itself. Amounts hidden:
+      // the count and won / lost only (owner, 2026-10-13)
+      caption([
+        ['TODAY', true],
+        ...(hide ? [] : [SEP, ['P&L ACROSS ', false], [plural(n, 'account').toUpperCase(), true]]),
+      ]);
+      const boxes = [
+        (x, m) => tile(x, 'TRADES', [[String(closed.length), T.text]], m),
+        (x, m) =>
+          tile(
+            x,
+            'WON / LOST',
+            [
+              [`${won}W `, T.text],
+              [`${lost}L`, T.muted],
+            ],
+            m,
+          ),
+      ];
+      const ranked = hide ? [] : closed.filter((t) => Number.isFinite(t.pnl));
+      if (closed.length >= 2 && ranked.length) {
+        const best = ranked.reduce((a, t) => (valOf(t) > valOf(a) ? t : a)),
+          worst = ranked.reduce((a, t) => (valOf(t) < valOf(a) ? t : a));
+        boxes.push(
+          (x, m) => tile(x, 'BEST', [[valText(best), pnlCol(valOf(best))]], m),
+          (x, m) => tile(x, 'WORST', [[valText(worst), pnlCol(valOf(worst))]], m),
+        );
+      }
+      if (!hide) {
+        if (closed.length === 1) boxes.push((x, m) => tradeTile(x, 'THE TRADE', closed[0], m));
+        for (const t of open) boxes.push((x, m) => tradeTile(x, 'OPEN NOW', t, m));
+      }
+      row(boxes);
+    } else if (style === 'latest') {
+      // the newest that fit (three at most), oldest on the left; the ones left out as "+N earlier" before them
+      const widths = all.map((t) => chip(0, t, true));
+      const moreW = (m) => (m ? textChip(0, [[`+${m} earlier`, T.muted]], true) + ROW_GAP : 0);
+      const fits = (k) =>
+        moreW(all.length - k) + widths.slice(-k).reduce((a, w) => a + w + ROW_GAP, -ROW_GAP) <= ROW_X1 - L;
+      let k = Math.min(3, all.length);
+      while (k > 1 && !fits(k)) k--;
+      const more = all.length - k;
+      caption([
+        [more ? `LAST ${k} OF ${all.length}` : plural(all.length, 'trade').toUpperCase(), true],
+        SEP,
+        ...sizeParts,
+      ]);
+      let x = L;
+      if (more) x += textChip(x, [[`+${more} earlier`, T.muted]]) + ROW_GAP;
+      for (const t of all.slice(-k)) x += chip(x, t) + ROW_GAP;
+    } else if (style === 'mix') {
+      // the latest trade (the open one, if any), then the day in one chip
+      const last = all[all.length - 1];
+      caption([[last.open ? 'OPEN NOW' : 'LAST TRADE', true], SEP, ...sizeParts]);
+      const parts = [
+        [plural(closed.length, 'trade'), T.text],
+        [' · ', T.dim],
+        [`${won}W `, T.text],
+        [`${lost}L`, T.muted],
+      ];
+      if (open.length && !last.open) parts.push([' · ', T.dim], [`${open.length} open`, T.muted]);
+      row([(x, m) => chip(x, last, m), (x, m) => textChip(x, parts, m)]);
+    }
+    // None: nothing
+  }
   function drawCard(cv, d, hide) {
     const ctx = cv.getContext('2d');
     cv.width = CARD_W * CARD_SCALE;
@@ -14516,7 +14826,8 @@
     drawAscii(ctx, 650, -6, 56, 27);
     const L = 52,
       R = CARD_W - 52;
-    // the day's curve (combined equity from the day's start), bottom right
+    // the day's curve (combined equity from the day's start), bottom right; with no trade row (None), the full width
+    const wide = d.style === 'none';
     if (d.curve) {
       const pts = d.curve.map(([t, v]) => [t, v - d.curve[0][1]]);
       const t0 = pts[0][0],
@@ -14524,9 +14835,9 @@
       const vals = pts.map((p) => p[1]),
         lo = Math.min(0, ...vals),
         hi = Math.max(0, ...vals) || 1;
-      const x0 = 720,
+      const x0 = wide ? L : 720,
         x1 = R,
-        top = 378,
+        top = wide ? 400 : 378,
         bot = 538;
       const X = (t) => x0 + ((t - t0) / (t1 - t0 || 1)) * (x1 - x0),
         Y = (v) => top + (1 - (v - lo) / (hi - lo || 1)) * (bot - top);
@@ -14633,53 +14944,10 @@
       );
     }
     runs(ctx, L, 146 + 16 + size * 0.92 + 44, parts);
-    // bottom left: the day's trades as chips; with none, the accounts as tiles (the master in lime), unless numbers are
-    // hidden. Bottom right: the code and the site.
-    if (d.chips.length) {
-      let x = L;
-      const y = CARD_H - 40 - 66,
-        h = 66;
-      for (const c of d.chips) {
-        const side = c.side === 'long' ? 'LONG' : 'SHORT',
-          size = c.qty > 0 ? `${fmtQty(c.qty, c.symbol)} ${symLabel(c.symbol)}` : symLabel(c.symbol),
-          val = hide ? '' : sp(c.pnl);
-        ctx.font = `700 11px ${CF.mono}`;
-        const sw = ctx.measureText(side).width + 14;
-        ctx.font = `400 16px ${CF.sans}`;
-        const zw = ctx.measureText(size).width;
-        ctx.font = `500 15px ${CF.mono}`;
-        const vw = val ? ctx.measureText(val).width : 0,
-          ow = c.open ? ctx.measureText(' open').width : 0;
-        const w = 14 + sw + 10 + zw + (val ? 12 + vw : 0) + ow + 14;
-        if (x + w > 920) break; // room for the code box
-        ctx.fillStyle = 'rgba(255,255,255,0.05)';
-        ctx.fillRect(x, y, w, h);
-        ctx.strokeStyle = 'rgba(255,255,255,0.07)';
-        ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
-        let cx = x + 14;
-        ctx.fillStyle = c.side === 'long' ? T.lime : T.text;
-        ctx.fillRect(cx, y + h / 2 - 11, sw, 22);
-        ctx.font = `700 11px ${CF.mono}`;
-        ctx.fillStyle = T.ink;
-        ctx.fillText(side, cx + 7, y + h / 2 + 4);
-        cx += sw + 10;
-        ctx.font = `400 16px ${CF.sans}`;
-        ctx.fillStyle = T.text;
-        ctx.fillText(size, cx, y + h / 2 + 6);
-        cx += zw + 12;
-        if (val) {
-          ctx.font = `500 15px ${CF.mono}`;
-          ctx.fillStyle = Math.abs(c.pnl) < 0.005 ? T.text : c.pnl > 0 ? T.lime : T.red;
-          ctx.fillText(val, cx, y + h / 2 + 5);
-          cx += vw;
-        }
-        if (c.open) {
-          ctx.fillStyle = T.dim;
-          ctx.fillText(' open', cx, y + h / 2 + 5);
-        }
-        x += w + 12;
-      }
-    } else if (d.nums) {
+    // bottom left: the day's trades in the style picked in Share (`drawTradeRow`); with none yet, the accounts as tiles
+    // (the master in lime), unless numbers are hidden or the style is None. Bottom right: the code and the site.
+    if (d.trades.length) drawTradeRow(ctx, d, hide, L, T);
+    else if (d.nums && !wide) {
       const tilesY = CARD_H - 40 - 50;
       ctx.font = `500 13px ${CF.mono}`;
       ctx.fillStyle = T.dim;
@@ -15022,6 +15290,7 @@
         nums: o.nums === true,
         code: o.code !== false,
         sort: o.sort === 'best' ? 'best' : 'latest',
+        style: SHARE_STYLES.some(([k]) => k === o.style) ? o.style : 'summary',
         kind: 'day',
         trade: null,
       };
@@ -15040,6 +15309,12 @@
           <div class="sh-list" id="sh-list" hidden></div>
           <div class="prev"><canvas id="sh-cv" width="${CARD_W}" height="${CARD_H}" aria-label="The picture to share"></canvas></div>
           <div>
+            <div class="opt" data-shopt="style"><div class="opt-txt"><div class="opt-name">Trades on the card</div><div class="opt-short" id="sh-style-short"></div></div>
+              <div class="sh-dd"><button class="sh-ddb" id="sh-style" aria-haspopup="listbox" aria-expanded="false"><span></span>${ICON.down}</button>
+              <div class="menu sh-ddm" id="sh-style-menu" role="listbox" aria-label="Trades on the card" hidden>${SHARE_STYLES.map(
+                ([k, name]) =>
+                  `<button class="mi" role="option" data-style="${k}"><span class="mt">${name}</span><span class="mk">${ICON.check}</span></button>`,
+              ).join('')}</div></div></div>
             ${opt('hide', 'Hide amounts', 'Shows % gain (or points) instead of dollars.', S.share.hide)}
             ${opt('nums', 'Hide account numbers', 'Leaves the account tiles off.', S.share.nums)}
             <div class="opt"><div class="opt-txt"><div class="opt-name">Name on the card</div><div class="opt-short">Optional. Leave it empty to post without one.</div></div>
@@ -15083,6 +15358,28 @@
             renderShare(body);
           }),
       );
+      const ddb = body.querySelector('#sh-style'),
+        ddm = body.querySelector('#sh-style-menu');
+      const showMenu = (on) => {
+        ddm.hidden = !on;
+        ddb.setAttribute('aria-expanded', String(on));
+      };
+      ddb.onclick = (e) => {
+        e.stopPropagation();
+        showMenu(ddm.hidden);
+      };
+      body.querySelectorAll('[data-style]').forEach(
+        (b) =>
+          (b.onclick = (e) => {
+            e.stopPropagation();
+            S.share.style = b.dataset.style;
+            saveShareOpts();
+            showMenu(false);
+            renderShare(body);
+            drawShare(body, true);
+          }),
+      );
+      body.querySelector('.share').addEventListener('click', () => showMenu(false)); // a click anywhere else closes it
       const cv = body.querySelector('#sh-cv');
       body.querySelector('#sh-save').onclick = () => saveCard(cv);
       body.querySelector('#sh-copy').onclick = () => copyCard(body, cv);
@@ -15094,6 +15391,14 @@
       b.setAttribute('aria-selected', String(b.dataset.kind === S.share.kind));
     });
     body.querySelector('[data-shopt="nums"]').hidden = trade; // the trade card names no accounts
+    body.querySelector('[data-shopt="style"]').hidden = trade; // Today only
+    const style = SHARE_STYLES.find(([k]) => k === S.share.style) || SHARE_STYLES[0];
+    body.querySelector('#sh-style span').textContent = style[1];
+    body.querySelector('#sh-style-short').textContent = style[2];
+    body.querySelectorAll('[data-style]').forEach((b) => {
+      b.classList.toggle('on', b.dataset.style === style[0]);
+      b.setAttribute('aria-selected', String(b.dataset.style === style[0]));
+    });
     body.querySelector('#sh-sort').hidden = !trade;
     body.querySelectorAll('[data-sort]').forEach((b) => {
       b.classList.toggle('on', b.dataset.sort === S.share.sort);
@@ -15170,14 +15475,20 @@
       return;
     }
     const d = cardData();
-    const key = JSON.stringify({ ...d, at: Math.floor(d.at / 60000), hide: S.share.hide });
+    const key = JSON.stringify({ ...d, at: Math.floor(d.at / 60000), hide: S.share.hide }); // d carries the style
     if (!force && cv.dataset.key === key) return;
     cv.dataset.key = key;
     drawCard(cv, d, S.share.hide);
   }
-  if (window.__VC_TEST__) window.__vcShare = { dayChips, groupTrades, details: () => _details };
+  if (window.__VC_TEST__) window.__vcShare = { dayTrades, groupTrades, details: () => _details };
   const saveShareOpts = () =>
-    store.set(SHARE_OPTS_KEY, { hide: S.share.hide, nums: S.share.nums, code: S.share.code, sort: S.share.sort });
+    store.set(SHARE_OPTS_KEY, {
+      hide: S.share.hide,
+      nums: S.share.nums,
+      code: S.share.code,
+      sort: S.share.sort,
+      style: S.share.style,
+    });
   const shareName = () =>
     String(store.get(SHARE_NAME_KEY, '') || '')
       .replace(/[^\p{L}\p{N}@._ -]/gu, '')
