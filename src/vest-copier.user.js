@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Vest Copier
 // @namespace    vestcopier
-// @version      0.40.1
+// @version      0.40.2
 // @description  Copies a master Vest account's trades to your other Vest accounts, live, and adds a points-based order panel.
 // @author       xAmped
 // @license      STRATUH Copier License — free to use, no selling; see LICENSE
@@ -17,6 +17,8 @@
 
 // STRATUH Copier (formerly Vest Copier) — Copyright (c) 2026 xAmped. Free to use for your own trading and to share unmodified; not for sale.
 // Full terms: LICENSE (https://github.com/xAmped/Vest-Copier/blob/main/LICENSE). Not affiliated with Vest Markets.
+
+/* global GM_info */
 
 (() => {
   'use strict';
@@ -36,7 +38,17 @@
     })(),
   };
 
-  const VERSION = '0.40.1';
+  const VERSION = '0.40.2';
+  // Where this script runs from, read off its own first stack frame (each script manager names it differently): the
+  // diagnostics use it to tell the copier's own errors from Vest's. Null when the stack shows no address.
+  const OWN_SRC = (() => {
+    try {
+      const m = String(new Error().stack || '').match(/((?:[a-z-]+):\/\/[^\s()]+?):\d+:\d+/i);
+      return m ? m[1] : null;
+    } catch {
+      return null;
+    }
+  })();
   const API = 'https://api-gateway.hz.vestmarkets.com';
   const _fetch = window.fetch.bind(window);
   // Console echo of the activity log, for troubleshooting: localStorage.setItem('vc-debug', '1') and reload.
@@ -68,6 +80,7 @@
   const RESYNC_AFTER_REDUCE_MS = 2000; // re-read sizes after a reduce
   const EXIT_RETRY_MS = 400; // one retry of a follower close/reduce on 429/5xx
   const BALANCE_AFTER_TRADE_MS = 1500;
+  const LEV_TRUST_MS = 30000; // a leverage the page just saved beats Vest's reads this long (they can lag the change)
   const BALANCE_POLL_MS = 20000; // full re-read of every account while Vest's live feed is down
   const FEED_BACKSTOP_MS = 60000; // ...and while it is up: the feed carries every change, this catches anything missed
   const FEED_QUIET_MS = 75000; // Vest pings its feed every 30 s: this long without a message means it's down
@@ -196,13 +209,38 @@
     // add to an open position: Vest's ticket sends this, not /open, when you already hold the same direction
     append: {
       need: ['positionId', 'symbol', 'quantity', 'isBuy'],
-      known: ['symbol', 'positionId', 'orderType', 'quantity', 'leverage', 'isBuy', 'timeInForce', 'price'],
+      known: [
+        'symbol',
+        'positionId',
+        'orderType',
+        'quantity',
+        'leverage',
+        'isBuy',
+        'timeInForce',
+        'price',
+        'expirationTime',
+      ],
     },
     reduce: {
       need: ['positionId', 'quantity', 'symbol'],
-      known: ['positionId', 'orderType', 'leverage', 'quantity', 'timeInForce', 'reduceOnly', 'symbol'],
+      // price: a limit reduce (Vest's Close dialog, part of the position); expirationTime: its chart line dragged
+      known: [
+        'positionId',
+        'orderType',
+        'leverage',
+        'quantity',
+        'timeInForce',
+        'reduceOnly',
+        'symbol',
+        'price',
+        'expirationTime',
+      ],
     },
-    close: { need: ['positionId', 'symbol'], known: ['symbol', 'positionId', 'orderType', 'leverage'] },
+    // limitPrice: a limit close (Vest's Close dialog, Limit Close)
+    close: {
+      need: ['positionId', 'symbol'],
+      known: ['symbol', 'positionId', 'orderType', 'leverage', 'limitPrice', 'expirationTime'],
+    },
     'stop-loss': {
       need: ['positionId', 'triggerPrice', 'stopLossId'],
       known: ['positionId', 'executionType', 'triggerPrice', 'stopLossId', 'quantity', 'limitPrice'],
@@ -260,7 +298,8 @@
 
   // A completed request made by the page. Picks up the user's session token, and when armed, mirrors the master's
   // order requests. Requests Vest refused (non-2xx) are never copied.
-  const onRequest = (url, reqBody, resBody, auth, method, status) => {
+  // `via`: the hook that saw it, 'xhr' or 'fetch' (Vest sends its orders over XHR: axios), recorded in the diagnostics
+  const onRequest = (url, reqBody, resBody, auth, method, status, via) => {
     const action = orderAction(url);
     if (action && status >= 200 && status < 300) refreshSoon(); // any order on any account: balances catch up at once
     if (!S.armed || !action) return;
@@ -314,7 +353,7 @@
       return;
     }
     checkShape(action, req, method);
-    mirror(action, req, res, method);
+    mirror(action, req, res, method, via);
   };
 
   // fetch
@@ -328,19 +367,25 @@
     }
     const method = ((init && init.method) || (input && input.method) || 'GET').toUpperCase();
     const body = init && init.body;
-    let pending = null;
+    let pending = null,
+      levChange = null;
     try {
-      if (method === 'POST') pending = maybeFastOpen(url, body, auth);
+      if (method === 'POST') pending = maybeFastOpen(url, body, auth, 'fetch');
     } catch {
       /* best effort: nothing to do if this fails */
     }
     try {
       offerUser(auth);
-      if (method !== 'GET') notePageRequest(url, method, body);
+      if (method !== 'GET') levChange = notePageRequest(url, method, body);
     } catch {
       /* best effort: nothing to do if this fails */
     }
     const p = _fetch.apply(this, arguments);
+    if (levChange)
+      p.then(
+        (r) => pageLeverageDone(levChange, r.status),
+        () => pageLeverageDone(levChange, 0),
+      );
     // Only order requests are read back (never other responses, which may be long-lived streams).
     if (pending || (auth && orderAction(url))) {
       p.then(
@@ -349,7 +394,10 @@
             .clone()
             .text()
             .then(
-              (t) => (pending ? reconcileFast(pending, t, r.status) : onRequest(url, body, t, auth, method, r.status)),
+              (t) =>
+                pending
+                  ? reconcileFast(pending, t, r.status)
+                  : onRequest(url, body, t, auth, method, r.status, 'fetch'),
               () => pending && reconcileFast(pending, null, r.status, true),
             ),
         () => pending && reconcileFast(pending, null, 0), // network failure: Vest may or may not have the order
@@ -377,8 +425,8 @@
     if (vc) {
       let pending = null;
       try {
-        pending = vc.method === 'POST' ? maybeFastOpen(vc.url, b, vc.auth) : null;
-        if (vc.method !== 'GET') notePageRequest(vc.url, vc.method, b);
+        pending = vc.method === 'POST' ? maybeFastOpen(vc.url, b, vc.auth, 'xhr') : null;
+        if (vc.method !== 'GET') vc.lev = notePageRequest(vc.url, vc.method, b);
       } catch {
         /* best effort: nothing to do if this fails */
       }
@@ -392,8 +440,9 @@
           } catch {
             /* best effort: nothing to do if this fails */
           }
+          if (vc.lev) pageLeverageDone(vc.lev, this.status);
           if (pending) reconcileFast(pending, r, this.status);
-          else onRequest(vc.url, b, r, vc.auth, vc.method, this.status);
+          else onRequest(vc.url, b, r, vc.auth, vc.method, this.status, 'xhr');
         },
         { once: true },
       );
@@ -417,20 +466,70 @@
     });
 
   // What the page sends that the copier needs to know before Vest answers: a close or reduce (so the position closing on
-  // the live feed isn't mistaken for one Vest made), the account Vest's screen switches to, and a leverage change.
+  // the live feed isn't mistaken for one Vest made), the account Vest's screen switches to, and a leverage change
+  // (returned, so the hook can report Vest's answer to `pageLeverageDone`).
   const _exits = {}; // positionId -> when this tab last sent a close or reduce for it
   const noteExit = (positionId) => positionId && (_exits[positionId] = Date.now());
   const ourExit = (positionId) => Date.now() - (_exits[positionId] || 0) < OUR_EXIT_MS;
+  // A limit close or reduce rests until its price: noted when it fills, not now. A reduce also notes the position's size
+  // as it goes out (by Vest's answer an opposite order bigger than the position has already flipped it).
+  const _preSize = {}; // positionId -> { qty, side, at }
+  function notePreSize(positionId) {
+    for (const st of Object.values(S.acctState)) {
+      const p = stateFresh(st) && st.positions.find((x) => x.id === positionId);
+      if (p) return void (_preSize[positionId] = { qty: p.qty, side: p.side, at: Date.now() });
+    }
+  }
   function notePageRequest(url, method, body) {
     const action = orderAction(url);
     if (action === 'close' || action === 'reduce') {
       const req = parseJson(body, null);
-      if (req) noteExit(req.positionId);
+      if (req && action === 'reduce') notePreSize(req.positionId);
+      if (req && (req.orderType || 'market') === 'market') noteExit(req.positionId);
     } else if (method === 'PATCH' && /\/v3\/user-state\/preferences/.test(url)) {
       const req = parseJson(body, null);
       if (req && req.lastUsedAccountId) setScreen(req.lastUsedAccountId);
-    } else if (/\/v3\/user-state\/accounts\/[^/]+\/leverages\//.test(url))
+    } else if (/\/v3\/user-state\/accounts\/[^/]+\/leverages\//.test(url)) {
       setTimeout(() => S.tradeOpen && refreshTradeState(), BALANCE_AFTER_TRADE_MS);
+      return notePageLeverage(url, body);
+    }
+    return null;
+  }
+
+  // A leverage the page saves (Vest's ticket: PUT .../accounts/{id}/leverages/{symbol}, {"leverage":"20"}) is used at
+  // once: Vest's own reads can still answer the old one for a while, and the Trade tab sizes % and Max from it (a size
+  // one leverage change behind went out in a live test, 2026-10-12). Kept over every read for LEV_TRUST_MS, dropped if
+  // Vest refuses it.
+  const _levSet = {}; // "accountId|symbol" -> { key, id, sym, lev, at }
+  function notePageLeverage(url, body) {
+    const m = /\/v3\/user-state\/accounts\/([^/]+)\/leverages\/([^/?#]+)/.exec(url),
+      lev = +(parseJson(body, null) || {}).leverage;
+    if (!m || !(lev > 0)) return null;
+    const id = decodeURIComponent(m[1]),
+      sym = decodeURIComponent(m[2]);
+    const change = { key: id + '|' + sym, id, sym, lev, at: Date.now() };
+    _levSet[change.key] = change;
+    const set = (levs) => levs && (levs[id] = { ...levs[id], [sym]: lev });
+    set(S.levs);
+    S.stopEntries.forEach((e) => set(e.levs)); // waiting stop entries fire at the new one too
+    drawTradeSoon();
+    return change;
+  }
+  function pageLeverageDone(change, status) {
+    if (status >= 200 && status < 300) return;
+    if (_levSet[change.key] === change) delete _levSet[change.key];
+    if (S.tradeOpen) refreshTradeState(); // Vest's own leverage back on the panel
+    refreshStopLeverage();
+  }
+  // A read of every account's leverage with the page's recent changes laid over it.
+  function withPageLevs(levs) {
+    const now = Date.now();
+    for (const key in _levSet) {
+      const c = _levSet[key];
+      if (now - c.at > LEV_TRUST_MS) delete _levSet[key];
+      else levs[c.id] = { ...levs[c.id], [c.sym]: c.lev };
+    }
+    return levs;
   }
 
   // ───────────────────────── Vest's live account feed (read-only) ─────────────────────────
@@ -646,17 +745,22 @@
   // other than this tab. The trade's bookkeeping follows, the log says what happened, and when the master is out of a
   // copied trade, followers still in it after a moment are offered to flatten (they normally close on their own stops).
   S.failing = {}; // accountId -> when Vest reported it failed (its forced close follows)
+  const _limitExits = new Set(); // position ids (master and followers) with a copied limit close or reduce waiting
   function onFeedPositions(id, d, ch) {
     const legHit = {};
     for (const it of d.order_intents || [])
       if (/TRIGGERED|COMPLETED/.test(it.event || '') && it.position_id)
         legHit[it.position_id] = it.kind === 'stop_loss' ? 'sl' : 'tp';
     const cause = (pid) =>
-      ourExit(pid) ? 'ours' : legHit[pid] || (Date.now() - (S.failing[id] || 0) < 60000 ? 'breach' : 'vest');
+      ourExit(pid)
+        ? 'ours'
+        : legHit[pid] ||
+          (Date.now() - (S.failing[id] || 0) < 60000 ? 'breach' : _limitExits.has(pid) ? 'lclose' : 'vest');
     for (const p of [...ch.closed, ...ch.reduced]) {
       const pid = p.position_id,
         closed = ch.closed.includes(p),
         why = cause(pid);
+      if (closed) _limitExits.delete(pid);
       if (closed && S.plans[pid]) endPlan(S.plans[pid], 'Breakeven: trade closed — stopped watching.');
       if (why === 'ours') continue; // this tab sent it: the copier already copied it
       // closed at size 0: an order that never filled (a limit cancelled or expired, one Vest refused, an immediate-or-cancel
@@ -687,6 +791,8 @@
   }
   function masterClosedByVest(pid, entry, why) {
     delete S.posMap[pid];
+    _limitExits.delete(pid);
+    cancelWaitingCopies(entry, false);
     const followers = Object.entries(entry.followers);
     if (!followers.length) return;
     setTimeout(async () => {
@@ -701,6 +807,7 @@
         sl: "the master's stop filled",
         tp: "the master's target filled",
         breach: 'Vest closed the master (the account failed)',
+        lclose: "the master's limit close filled",
         vest: "the master's position was closed outside this tab",
       }[why];
       if (left.length) raiseOrphans(entry.symbol, left, what, entry.master);
@@ -727,11 +834,16 @@
         sl: part ? 'Stop filled part of the position' : 'Stop filled',
         tp: part ? 'Target filled' : 'Target filled, position closed',
         breach: 'Closed by Vest (account failed)',
+        lclose: part ? 'Limit reduce filled' : 'Limit close filled',
         vest: part ? 'Reduced outside this tab' : 'Closed outside this tab',
       }[why];
       const usd = (v) => (v >= 0 ? '+' : '−') + money(Math.abs(v));
-      const each = list.map((n) => `${accLabel(n.id)}${n.pnl === 0 || isNaN(n.pnl) ? '' : ' ' + usd(n.pnl)}`);
-      logEvent(why === 'tp' ? 'ok' : 'warn', `${what} (${symLabel(list[0].symbol)}): ${each.join(', ')}.`);
+      // under a cent (a tiny reduce) reads as nothing, not "−$0.00"
+      const each = list.map((n) => `${accLabel(n.id)}${!(Math.abs(n.pnl) >= 0.005) ? '' : ' ' + usd(n.pnl)}`);
+      logEvent(
+        why === 'tp' || why === 'lclose' ? 'ok' : 'warn',
+        `${what} (${symLabel(list[0].symbol)}): ${each.join(', ')}.`,
+      );
     }
   }
 
@@ -1126,6 +1238,7 @@
     const id = o.orderId || o.order_id || o.id,
       type = o.orderType || o.order_type;
     if (!id || type !== 'limit' || o.reduceOnly || o.reduce_only) return null;
+    if (/CLOSE|REDUCE/i.test(o.positionOrderType || o.position_order_type || '')) return null; // a limit close: an exit
     const side = String(o.side || '').toLowerCase();
     return {
       id,
@@ -1376,7 +1489,7 @@
         out[a.accountId] = {};
         for (const l of a.leverages || []) out[a.accountId][l.symbol] = l.leverage;
       }
-      return out;
+      return withPageLevs(out);
     } catch {
       return null;
     }
@@ -1408,8 +1521,10 @@
     orderType: 'market',
     leverage: String(leverage || S.levCache[accountId + '|' + symbol] || DEFAULT_LEVERAGE),
   });
-  // Market / IOC orders execute at once, so their fills can be checked; a resting limit order has nothing to find yet.
-  const isImmediate = (req) => !req || req.orderType === 'market' || req.timeInForce === 'IOC';
+  // Market, IOC and fill-or-kill orders execute at once (or not at all), so their fills can be checked; a resting limit
+  // order has nothing to find yet.
+  const isImmediate = (req) =>
+    !req || req.orderType === 'market' || req.timeInForce === 'IOC' || req.timeInForce === 'FOK';
   const who = (id) => ({ account: id, label: accLabel(id) }); // the account fields every diag record carries
   const msSince = (t0) => Math.round(performance.now() - t0);
   const entryByOrderId = (oid) => Object.values(S.posMap).find((e) => e.masterOrderId === oid);
@@ -1470,6 +1585,8 @@
     const masterMissed = !!m.missing;
     // the Trade tab already said its capped stop entry filled nothing: no second account of the same miss
     const quiet = masterMissed && _missNoted.delete(master.orderId);
+    // the master's entry filled nothing: followers that filled nothing either are the right outcome, said once below
+    const asMaster = masterMissed && kind === 'entry';
     if (masterMissed) {
       if (!quiet)
         logEvent(
@@ -1508,13 +1625,17 @@
               : kind === 'add'
                 ? `${p.label} did NOT fill the add — its original position is unchanged.`
                 : `${p.label} did NOT fill — not in this trade.`;
-          if (!quiet) logEvent('warn', msg);
+          if (!quiet && !asMaster) logEvent('warn', msg);
           if (p.undo) {
             p.undo();
             undone = true;
           } else if (kind === 'entry' && entry) delete entry.followers[p.accountId];
           if (p.diag) {
-            Object.assign(p.diag, { filled: false, met: false, reason: NO_FILL_WHY });
+            Object.assign(p.diag, {
+              filled: false,
+              met: asMaster,
+              reason: asMaster ? 'the master did not fill either' : master.ioc ? NO_FILL_LIMIT : NO_FILL_WHY,
+            });
             persistDiagSoon();
           }
           noFill.push(p.label);
@@ -1587,7 +1708,8 @@
       );
     if (!placed.length) return;
     const n = placed.length - unknown.length;
-    if (quiet && !filled) logEvent('info', "↳ the followers' copies didn't fill either: nothing is open.");
+    if ((quiet || asMaster) && !filled)
+      logEvent('info', "↳ the followers' copies didn't fill either: nothing is open.");
     else if (noFill.length) logEvent('warn', `Fills ${filled}/${n} — not filled: ${noFill.join(', ')}.`);
     else if (slipN)
       logEvent(
@@ -1959,9 +2081,11 @@
   // follower in a trade the master has left.
   // The retry keeps the same Idempotency-Key: if Vest ran the first one (a 504 or a dropped connection after it executed),
   // it won't run the reduce twice.
-  async function sendExit(f, path, body) {
+  // An exit order with one retry on 429 / 5xx (same Idempotency-Key). A market exit is noted as this tab's, so the feed's
+  // report of the position closing isn't taken for one Vest made; a limit exit isn't (it fills later, maybe much later).
+  async function sendExit(f, path, body, note = true) {
     const key = idem()['Idempotency-Key'];
-    noteExit(body && body.positionId); // the feed will report it closing: this tab did that
+    if (note) noteExit(body && body.positionId); // the feed will report it closing: this tab did that
     try {
       return await acctSend('POST', f, path, body, key);
     } catch (e) {
@@ -1974,13 +2098,14 @@
 
   // Mirror a MASTER action to every follower. Quantities are 1:1 unless cap-to-fit is on. Followers use the master's
   // leverage for each order (pre-synced at arm, so the leverage PUT is normally skipped).
-  function mirror(action, req, res, method = 'POST') {
+  function mirror(action, req, res, method = 'POST', via = null) {
     const followers = [...S.followers];
     if (!followers.length) return;
     const t0 = performance.now();
     const lat = () => '+' + msSince(t0) + 'ms';
     diag('master', {
       action,
+      via,
       symbol: req.symbol,
       side: req.side,
       qty: req.quantity,
@@ -1992,9 +2117,13 @@
       fast: false,
     });
     if (S.paused && (action === 'open' || action === 'append')) {
+      // a waiting limit moved on Vest's chart is a cancel (copied) then a new order (not, while paused)
+      const moved = action === 'open' && Date.now() - (_droppedAt[req.symbol] || 0) < MOVED_LIMIT_MS;
       logEvent(
         'warn',
-        `MASTER ${action === 'open' ? 'opened a trade' : 'added to a trade'}: NOT copied (paused: ${S.paused})`,
+        moved
+          ? `MASTER moved a waiting ${symLabel(req.symbol)} limit: the followers' copies were cancelled with the old one, and the new one is NOT copied (paused: ${S.paused}). Place theirs on Vest, or move it again once trading resumes.`
+          : `MASTER ${action === 'open' ? 'opened a trade' : 'added to a trade'}: NOT copied (paused: ${S.paused})`,
       );
       diag(action, { symbol: req.symbol, outcome: 'skipped', reason: 'paused', met: false });
       return;
@@ -2106,6 +2235,7 @@
               timeInForce: req.timeInForce,
             };
             if (req.price != null) body.price = req.price;
+            if (req.expirationTime != null) body.expirationTime = req.expirationTime; // a dragged limit add keeps its expiry
             try {
               const r = await acctPost(f, '/v3/positions/append', body);
               const was = fp.qty;
@@ -2168,16 +2298,16 @@
           ),
       );
     } else if (action === 'reduce') {
-      logEvent('info', `MASTER reduced ${req.quantity} ${req.symbol} on ${accLabel(S.master)}`);
-      if (!entry) return untracked('reduce');
-      if (req.orderType && req.orderType !== 'market') {
-        logEvent(
-          'warn',
-          `The master's reduce is a ${req.orderType} order: not copied (followers would exit at market now). Reduce them on Vest when it fills.`,
-        );
-        diag('reduce', { outcome: 'skipped', reason: 'non-market reduce', orderType: req.orderType });
-        return;
+      if (!entry) {
+        logEvent('info', `MASTER reduced ${req.quantity} ${req.symbol} on ${accLabel(S.master)}`);
+        return untracked('reduce');
       }
+      if (req.orderType && req.orderType !== 'market')
+        return mirrorLimitExit('reduce', req, res, entry, followers, lat, t0);
+      const held = heldBefore(req.positionId, entry);
+      if (req.reduceOnly === false && held > 0 && parseFloat(req.quantity) > held + sizeStepOf(entry.symbol) / 2)
+        return mirrorFlip(req, entry, followers, held, lat, t0);
+      logEvent('info', `MASTER reduced ${req.quantity} ${req.symbol} on ${accLabel(S.master)}`);
       enqueue(entry, async () => {
         const mBefore = entry.qty;
         entry.qty = fmtQty(Math.max(0, parseFloat(mBefore) - parseFloat(req.quantity)), req.symbol);
@@ -2240,9 +2370,12 @@
         setTimeout(() => enqueue(entry, () => syncLegs(entry)), RESYNC_AFTER_REDUCE_MS);
       });
     } else if (action === 'close') {
+      if (entry && req.orderType && req.orderType !== 'market')
+        return mirrorLimitExit('close', req, res, entry, followers, lat, t0);
       logEvent('info', `MASTER closed ${req.symbol} on ${accLabel(S.master)}`);
       if (!entry) return untracked('close');
       delete S.posMap[req.positionId];
+      _limitExits.delete(req.positionId);
       enqueue(entry, async () => {
         const placed = await Promise.all(
           followers.map(async (f) => {
@@ -2275,6 +2408,7 @@
             }
           }),
         );
+        cancelWaitingCopies(entry); // the trade is over: no follower keeps an add or a limit close waiting on it
         confirmFills(
           req.symbol,
           { accountId: S.master, orderId: res.orderId, qty: entry.qty || '0' },
@@ -2310,6 +2444,9 @@
       enqueue(entry, () => mirrorLeg(op, kind, req, entry, followers, lat, t0));
     } else if (action === 'cancel-order') {
       logEvent('info', `MASTER cancelled a resting order on ${accLabel(S.master)}`);
+      // a limit close or reduce: cancel each follower's copy
+      const exitEntry = Object.values(S.posMap).find((x) => x.exitOrders && x.exitOrders[req.orderId]);
+      if (exitEntry) return cancelLimitExit(exitEntry, req.orderId, lat, t0);
       // a resting limit add (the entry is already open): cancel each follower's add and take its size back off
       const addEntry = Object.values(S.posMap).find((x) => x.restingAdds && x.restingAdds[req.orderId]);
       if (addEntry) {
@@ -2333,15 +2470,332 @@
                 diag('cancel', { ...who(f), kind: 'add', outcome: 'rejected', error: err.message, met: false });
               }
             }),
-          ).then(() => setTimeout(() => enqueue(addEntry, () => syncLegs(addEntry)), RESYNC_AFTER_REDUCE_MS)),
+          ).then(() => {
+            // a Scale whose first order was cancelled before and whose last waiting order this was: if nothing filled,
+            // the trade is gone (the live feed usually says so first)
+            if (addEntry.openGone && !Object.keys(addEntry.restingAdds).length) return endUnfilled(addEntry);
+            setTimeout(() => enqueue(addEntry, () => syncLegs(addEntry)), RESYNC_AFTER_REDUCE_MS);
+          }),
         );
         return;
       }
       const e = entryByOrderId(req.orderId);
       if (!e) return _droppedOrders.has(req.orderId) ? undefined : untracked('cancel'); // the feed got there first
+      if (e.restingAdds && Object.keys(e.restingAdds).length) return cancelFirstSlice(e, lat, t0);
       dropEntry(e);
       cancelFollowerCopies(e, lat, t0);
     }
+  }
+
+  // ── Limit closes and reduces (Vest's Close dialog: Limit Close, all or part of the position). The order waits at its
+  // price, so each follower gets the same order at the same price (a reduce scaled to its size), tracked by the
+  // master's order id so a cancel takes the copies with it. When it fills, the live feed reports it ("Limit close
+  // filled") and the trade ends as after a stop: a follower whose copy hasn't filled by then is offered to flatten.
+  const heldBefore = (pid, entry) => {
+    const p = _preSize[pid];
+    return p && Date.now() - p.at < 10000 ? p.qty : parseFloat(entry.qty);
+  };
+  function mirrorLimitExit(kind, req, res, entry, followers, lat, t0) {
+    const sym = entry.symbol,
+      price = kind === 'close' ? req.limitPrice : req.price;
+    if (
+      kind === 'reduce' &&
+      req.reduceOnly === false &&
+      parseFloat(req.quantity) > heldBefore(req.positionId, entry) + sizeStepOf(sym) / 2
+    ) {
+      logEvent(
+        'warn',
+        `MASTER placed a limit order bigger than its ${symLabel(sym)} position (it turns the trade around when it fills): NOT copied. Place the followers' orders on Vest.`,
+      );
+      diag('reduce', { symbol: sym, outcome: 'skipped', reason: 'limit flip', met: false });
+      return;
+    }
+    const what = kind === 'close' ? 'limit close' : `limit reduce of ${req.quantity}`;
+    logEvent('info', `MASTER placed a ${what} at ${price} on ${symLabel(sym)} (${accLabel(S.master)})`);
+    const xo = { kind, price, followers: {} };
+    if (res.orderId) (entry.exitOrders = entry.exitOrders || {})[res.orderId] = xo;
+    _limitExits.add(req.positionId);
+    enqueue(entry, () =>
+      Promise.all(
+        followers.map(async (f) => {
+          const fp = entry.followers[f],
+            d = { ...who(f), symbol: sym, kind: 'limit', price };
+          if (!fp) {
+            logEvent('warn', `↳ ${accLabel(f)} isn't in this trade — ${what} skipped`);
+            diag(kind, { ...d, outcome: 'skipped', reason: 'not tracked', met: false });
+            return;
+          }
+          let body;
+          if (kind === 'close')
+            body = { ...closeBody(sym, fp.positionId, req.leverage, f), orderType: 'limit', limitPrice: price };
+          else {
+            const rq = scaleToFollower(req.quantity, fp.qty, entry.qty, sym);
+            if (!(parseFloat(rq) > 0)) {
+              logEvent('info', `↳ ${accLabel(f)} limit reduce rounds to 0 — skipped`);
+              diag(kind, { ...d, followerQty: fp.qty, scaledQty: rq, outcome: 'skipped', reason: 'rounds to 0' });
+              return;
+            }
+            body = {
+              positionId: fp.positionId,
+              orderType: 'limit',
+              leverage: req.leverage,
+              quantity: rq,
+              timeInForce: req.timeInForce || 'GTC',
+              reduceOnly: true,
+              price,
+              symbol: sym,
+            };
+          }
+          if (req.expirationTime != null) body.expirationTime = req.expirationTime; // a dragged line keeps its expiry
+          try {
+            const r = await sendExit(f, `/v3/positions/${kind}`, body, false);
+            xo.followers[f] = { orderId: r.orderId, positionId: fp.positionId };
+            _limitExits.add(fp.positionId);
+            logEvent(
+              'ok',
+              `↳ limit ${kind} at ${price}${body.quantity ? ' × ' + body.quantity : ''} placed on ${accLabel(f)} (${lat()})`,
+            );
+            diag(kind, {
+              ...d,
+              followerQty: fp.qty,
+              scaledQty: body.quantity,
+              outcome: 'accepted',
+              orderId: r.orderId,
+              expected: 'rest',
+              met: null,
+              ms: msSince(t0),
+            });
+          } catch (e) {
+            logEvent(
+              'warn',
+              `↳ ${accLabel(f)} limit ${kind} failed: ${e.message} — it stays in the trade. Place it on Vest, or close it when the master's fills.`,
+            );
+            diag(kind, { ...d, outcome: 'rejected', error: e.message, errorCode: errCode(e), met: false });
+          }
+        }),
+      ),
+    );
+  }
+  function cancelLimitExit(entry, orderId, lat, t0) {
+    const xo = entry.exitOrders[orderId];
+    delete entry.exitOrders[orderId];
+    noteDropped(orderId);
+    const masterPid = Object.keys(S.posMap).find((k) => S.posMap[k] === entry);
+    const waiting = (pid) =>
+      Object.values(entry.exitOrders).some((x) => Object.values(x.followers).some((o) => o.positionId === pid));
+    if (!Object.keys(entry.exitOrders).length) _limitExits.delete(masterPid);
+    enqueue(entry, () =>
+      Promise.all(
+        Object.entries(xo.followers).map(async ([f, o]) => {
+          if (!waiting(o.positionId)) _limitExits.delete(o.positionId);
+          try {
+            await acctPost(f, '/v3/positions/cancel-order', { orderId: o.orderId });
+            logEvent('ok', `↳ cancelled the limit ${xo.kind} on ${accLabel(f)} (${lat()})`);
+            diag('cancel', {
+              ...who(f),
+              orderId: o.orderId,
+              kind: xo.kind,
+              outcome: 'cancelled',
+              met: true,
+              ms: msSince(t0),
+            });
+          } catch (err) {
+            logEvent(
+              'warn',
+              `↳ ${accLabel(f)} cancel failed: ${err.message} — its limit ${xo.kind} may have filled or still be waiting. Check it on Vest.`,
+            );
+            diag('cancel', { ...who(f), kind: xo.kind, outcome: 'rejected', error: err.message, met: false });
+          }
+        }),
+      ),
+    );
+  }
+
+  // ── An opposite market order bigger than the position, without Reduce Only: Vest closes the position and opens the rest
+  // the other way, in one order (its "flip"). Each follower gets the same: one reduce, Reduce Only off, the same fraction
+  // of its own size, so it ends on the new side at its share. The trade then follows the new side; Vest keeps the
+  // position id (its ticket adds the new stop and target to it), and a re-read relinks the trade if it ever doesn't.
+  function followerHeld(f, fp) {
+    const st = S.acctState[f],
+      p = stateFresh(st) && st.positions.find((x) => x.id === fp.positionId);
+    return p ? p.qty : parseFloat(fp.qty);
+  }
+  function mirrorFlip(req, entry, followers, held, lat, t0) {
+    const sym = entry.symbol,
+      from = entry.side,
+      to = from === 'long' ? 'short' : 'long',
+      rest = fmtQty(parseFloat(req.quantity) - held, sym);
+    logEvent(
+      'info',
+      `MASTER turned its ${from} ${fmtQty(held, sym)} ${symLabel(sym)} into a ${to} ${rest} (one ${req.quantity} order) on ${accLabel(S.master)}`,
+    );
+    enqueue(entry, async () => {
+      Object.assign(entry, { side: to, qty: rest, legs: [] });
+      await Promise.all(
+        followers.map(async (f) => {
+          const fp = entry.followers[f],
+            d = { ...who(f), symbol: sym, masterQty: req.quantity, from, to };
+          if (!fp) {
+            logEvent('warn', `↳ ${accLabel(f)} isn't in this trade — the turn to ${to} skipped`);
+            diag('flip', { ...d, outcome: 'skipped', reason: 'not tracked', met: false });
+            return;
+          }
+          const fHeld = followerHeld(f, fp),
+            total = scaleToFollower(req.quantity, fmtQty(fHeld, sym), fmtQty(held, sym), sym),
+            fRest = Math.max(0, parseFloat(total) - fHeld);
+          try {
+            await sendExit(f, '/v3/positions/reduce', {
+              positionId: fp.positionId,
+              orderType: 'market',
+              leverage: req.leverage,
+              quantity: total,
+              timeInForce: req.timeInForce || 'IOC',
+              reduceOnly: false,
+              symbol: sym,
+            });
+            if (fRest > 0) Object.assign(fp, { qty: fmtQty(fRest, sym), legs: [] });
+            else delete entry.followers[f]; // its share of the new side rounds to nothing: it's out
+            logEvent(
+              'ok',
+              fRest > 0
+                ? `↳ ${accLabel(f)} turned ${to}: ${fmtQty(fRest, sym)} (${lat()})`
+                : `↳ ${accLabel(f)} closed — its share of the ${to} rounds to 0 (${lat()})`,
+            );
+            diag('flip', { ...d, followerQty: fHeld, sent: total, outcome: 'accepted', met: null, ms: msSince(t0) });
+          } catch (e) {
+            logEvent(
+              'warn',
+              `↳ ${accLabel(f)} turn to ${to} failed: ${e.message} — it is still ${from}. Close it on Vest.`,
+            );
+            diag('flip', { ...d, outcome: 'rejected', error: e.message, errorCode: errCode(e), met: false });
+          }
+        }),
+      );
+      setTimeout(() => enqueue(entry, () => relinkTrade(entry)), RESYNC_AFTER_REDUCE_MS);
+    });
+  }
+  // Re-read the trade's positions by market: side, size and legs, and the position id if it changed.
+  async function relinkTrade(entry) {
+    const masterPid = Object.keys(S.posMap).find((k) => S.posMap[k] === entry);
+    if (!masterPid) return;
+    const pick = async (acct, pid) => {
+      try {
+        const r = await api('/v3/positions/opened', (await mintAccountToken(acct)).token);
+        const on = ((r && r.positions) || []).filter((x) => x.symbol === entry.symbol && parseFloat(x.quantity) > 0);
+        return on.find((x) => posIdOf(x) === pid) || (on.length === 1 ? on[0] : null);
+      } catch {
+        return null;
+      }
+    };
+    const m = await pick(entry.master, masterPid);
+    if (m) {
+      const id = posIdOf(m);
+      if (id !== masterPid && !S.posMap[id]) {
+        delete S.posMap[masterPid];
+        S.posMap[id] = entry;
+      }
+      Object.assign(entry, { side: m.side, qty: String(m.quantity), legs: posLegs(m) });
+    }
+    await Promise.all(
+      Object.entries(entry.followers).map(async ([f, fp]) => {
+        const p = await pick(f, fp.positionId);
+        if (p) Object.assign(fp, { positionId: posIdOf(p), qty: String(p.quantity), legs: posLegs(p) });
+      }),
+    );
+  }
+
+  // ── Waiting orders on a trade (a Scale's other slices: limit adds; limit closes and reduces). When the master's trade
+  // ends (a close here, its stop or target, a limit close filling, a failed account), the followers' waiting adds on it
+  // are cancelled, so none fills into a trade the master is out of. Their limit closes and reduces are exits: cancelled
+  // when the master closes at market here (the follower closes with it), left alone when Vest closed the master (a
+  // limit close filling: the follower's copy at the same price is about to fill too; a straggler is offered to
+  // flatten). One that already filled or is gone is fine.
+  function noteDropped(orderId) {
+    if (!orderId) return;
+    _droppedOrders.add(orderId);
+    if (_droppedOrders.size > 500) _droppedOrders.delete(_droppedOrders.values().next().value);
+  }
+  async function cancelWaitingCopies(e, exits = true) {
+    const jobs = [];
+    for (const [mid, ra] of Object.entries(e.restingAdds || {})) {
+      noteDropped(mid);
+      for (const [f, o] of Object.entries(ra.followers)) jobs.push({ f, orderId: o.orderId, kind: 'add' });
+    }
+    for (const [mid, xo] of Object.entries(e.exitOrders || {})) {
+      noteDropped(mid);
+      if (!exits) continue;
+      for (const [f, o] of Object.entries(xo.followers)) {
+        _limitExits.delete(o.positionId);
+        jobs.push({ f, orderId: o.orderId, kind: xo.kind });
+      }
+    }
+    e.restingAdds = {};
+    e.exitOrders = {};
+    const n = {};
+    await Promise.all(
+      jobs.map(async ({ f, orderId, kind }) => {
+        try {
+          await acctPost(f, '/v3/positions/cancel-order', { orderId });
+          n[f] = (n[f] || 0) + 1;
+          diag('cancel', { ...who(f), orderId, kind, why: 'trade over', outcome: 'cancelled', met: true });
+        } catch (err) {
+          const code = errCode(err);
+          if (code != null && code < 429) {
+            // filled already, or gone with the position: nothing waiting
+            diag('cancel', { ...who(f), orderId, kind, why: 'trade over', outcome: 'nothing-to-cancel', met: true });
+            return;
+          }
+          logEvent(
+            'warn',
+            `↳ ${accLabel(f)} cancel failed: ${err.message} — a waiting ${kind} may be left. Check it on Vest.`,
+          );
+          diag('cancel', { ...who(f), orderId, kind, outcome: 'rejected', error: err.message, met: false });
+        }
+      }),
+    );
+    for (const [f, c] of Object.entries(n))
+      logEvent('ok', `↳ cancelled ${c} waiting order${c > 1 ? 's' : ''} on ${accLabel(f)} (the trade is over)`);
+  }
+  // A Scale's first order cancelled while its other orders wait: only each follower's first order goes; the trade stays.
+  function cancelFirstSlice(e, lat, t0) {
+    e.openGone = true;
+    enqueue(e, () =>
+      Promise.all(
+        Object.entries(e.followers).map(async ([f, fp]) => {
+          if (!fp.orderId) return;
+          try {
+            await acctPost(f, '/v3/positions/cancel-order', { orderId: fp.orderId });
+            logEvent('ok', `↳ cancelled order on ${accLabel(f)} (${lat()})`);
+            const orderId = fp.orderId;
+            fp.orderId = null; // gone: not cancelled again when the trade ends
+            diag('cancel', {
+              ...who(f),
+              orderId,
+              kind: 'first',
+              outcome: 'cancelled',
+              met: true,
+              ms: msSince(t0),
+            });
+          } catch (err) {
+            logEvent(
+              'warn',
+              `↳ ${accLabel(f)} cancel failed: ${err.message} — its first order may have filled. Check it on Vest.`,
+            );
+            diag('cancel', { ...who(f), kind: 'first', outcome: 'rejected', error: err.message, met: false });
+          }
+        }),
+      ),
+    );
+  }
+  // The last waiting order of a trade that never filled was cancelled: end it (unless part of it did fill).
+  function endUnfilled(e) {
+    enqueue(e, async () => {
+      const pid = Object.keys(S.posMap).find((k) => S.posMap[k] === e);
+      if (!pid) return;
+      const held = await tryOpenPosition(e.master, e.symbol, pid);
+      if (held && parseFloat(held.quantity) > 0) return void syncLegs(e);
+      if (dropEntry(e)) cancelFollowerCopies(e);
+    });
   }
 
   // ── A master limit that's gone (cancelled here, cancelled or expired elsewhere, or refused by Vest after accepting it):
@@ -2350,14 +2804,15 @@
   // one waits behind a gate until its cancel has gone through and the old position has cleared. The gate is set for
   // every follower at once, also one whose copy is still being placed (the cancel waits for it in the entry's queue).
   const _droppedOrders = new Set(); // master order ids whose entry was dropped (a late cancel response finds nothing)
+  const _droppedAt = {}; // symbol -> when a waiting master limit there was last dropped (a move is a cancel + a new one)
+  const MOVED_LIMIT_MS = 5000;
   function dropEntry(e) {
     const key = Object.keys(S.posMap).find((k) => S.posMap[k] === e);
     if (!key) return false;
     delete S.posMap[key];
-    if (e.masterOrderId) {
-      _droppedOrders.add(e.masterOrderId);
-      if (_droppedOrders.size > 500) _droppedOrders.delete(_droppedOrders.values().next().value);
-    }
+    _limitExits.delete(key);
+    noteDropped(e.masterOrderId);
+    if (e.resting) _droppedAt[e.symbol] = Date.now();
     return true;
   }
   function cancelFollowerCopies(e, lat = () => '', t0 = performance.now()) {
@@ -2371,8 +2826,9 @@
         if (fp && fp.positionId) await waitPositionGone(f, fp.positionId);
       });
     }
-    enqueue(e, () =>
-      Promise.all(
+    enqueue(e, async () => {
+      await cancelWaitingCopies(e); // a Scale's other slices first: the follower's order holder can't clear while they wait
+      return Promise.all(
         accts.map(async (f) => {
           const fp = e.followers[f];
           if (!fp || !fp.orderId) return sent[f]();
@@ -2416,8 +2872,8 @@
             });
           }
         }),
-      ),
-    );
+      );
+    });
   }
   // A master limit Vest accepted and then refused (its feed's command_events), e.g. "already exists" after a quick move:
   // handled like a master cancel. Without the live feed a refusal isn't seen here (Vest's own page shows it).
@@ -2432,7 +2888,7 @@
 
   // ───────────────────────── fast mode (fire follower opens at master-send) ─────────────────────────
   // Returns a `pending` descriptor if it fired follower opens for a master OPEN; otherwise null.
-  function maybeFastOpen(url, reqBody, auth) {
+  function maybeFastOpen(url, reqBody, auth, via = null) {
     if (!S.armed || !S.fast || S.flattening || S.paused || orderAction(url) !== 'open') return null;
     if (acctIdFromAuth(auth) !== S.master) return null;
     const req = parseJson(reqBody, null);
@@ -2444,7 +2900,16 @@
       t0 = performance.now();
     const pending = { side, sym, qty, lev, req, byId: {}, placed: [], jobs: [] };
     logEvent('info', `MASTER opening ${side} ${qty} ${sym} (${lev}x) — fast-firing followers…`);
-    diag('master', { action: 'open', symbol: sym, side, qty, leverage: lev, followers: followers.length, fast: true });
+    diag('master', {
+      action: 'open',
+      via,
+      symbol: sym,
+      side,
+      qty,
+      leverage: lev,
+      followers: followers.length,
+      fast: true,
+    });
     const lat = () => '+' + msSince(t0) + 'ms, fast';
     pending.jobs = followers.map((f) =>
       openFollower(f, { side, sym, qty, lev, req }, pending.byId, lat, true).then((rec) => {
@@ -2628,17 +3093,22 @@
       return render();
     }
     S.flattening = true;
-    _armEpoch++; // an arm in progress would adopt positions that are being closed
-    S.orphan = null;
-    Object.values(S.plans).forEach((p) => endPlan(p, null)); // nothing left for breakeven to manage
-    cancelStopEntries('Flatten All.'); // nothing new opens either
-    render();
-    logEvent(
-      'warn',
-      `FLATTEN ALL — closing every position and cancelling every order on ${ids.length} account(s).${S.armed ? ' Copying keeps running for your next trade.' : ''}`,
-    );
-    diag('flatten_all', { accounts: ids.length, armed: S.armed });
+    // everything between the flag and the sweep is inside the try: an error there must never leave it set
     try {
+      _armEpoch++; // an arm in progress would adopt positions that are being closed
+      S.orphan = null;
+      try {
+        Object.values(S.plans).forEach((p) => endPlan(p, null)); // nothing left for breakeven to manage
+        cancelStopEntries('Flatten All.'); // nothing new opens either
+        render();
+      } catch (e) {
+        diag('script_error', { message: String((e && e.message) || e), where: 'flatten-all' }); // the sweep still runs
+      }
+      logEvent(
+        'warn',
+        `FLATTEN ALL — closing every position and cancelling every order on ${ids.length} account(s).${S.armed ? ' Copying keeps running for your next trade.' : ''}`,
+      );
+      diag('flatten_all', { accounts: ids.length, armed: S.armed });
       await flattenSweep(ids);
     } finally {
       S.flattening = false; // never left set: master orders would be skipped as "during Flatten All" while ARMED shows
@@ -2670,17 +3140,37 @@
   }
 
   // ───────────────────────── trade panel: order math (pure) ─────────────────────────
-  // Everything here is a pure function of its inputs — no network, no state — so it's unit-tested.
+  // Everything here is a pure function of its inputs — no network, no state — so it's unit-tested
+  // (test/math.test.mjs with fixed cases, test/props.test.mjs with random ones). Prices and sizes are plain numbers;
+  // `side` is 'long' or 'short'.
+  /**
+   * How many decimals a tick or size step has (0.25 → 2, 0.0001 → 4, 1e-7 → 7).
+   *
+   * @param {number|string} step a tick or size step
+   * @returns {number} the number of decimal places
+   */
   const decimalsOf = (step) => {
     const s = String(step);
     const e = s.match(/^[\d.]+e-(\d+)$/i); // 1e-7 and the like
     if (e) return (s.split('e')[0].split('.')[1] || '').length + +e[1];
     return s.includes('.') ? s.split('.')[1].length : 0;
   };
-  /** Round a price to the symbol's tick (e.g. 0.25 for NDX). */
+  /**
+   * Round a price to the market's tick, to the nearest one.
+   *
+   * @param {number} price any price
+   * @param {number} tick the market's tick (0.25 for NQ)
+   * @returns {number} the price on the tick
+   */
   const roundTick = (price, tick) => +(Math.round(price / tick) * tick).toFixed(decimalsOf(tick));
-  /** Floor a size to the symbol's size step (e.g. 0.0001). */
-  // the tolerance grows with the count, so a float a hair under a whole number of steps isn't floored a step too low
+  /**
+   * Floor a size to the market's size step. The tolerance grows with the count, so a float a hair under a whole number
+   * of steps isn't floored a step too low.
+   *
+   * @param {number} qty any size
+   * @param {number} step the size step (0.0001 for NQ)
+   * @returns {number} the size, floored to whole steps
+   */
   const floorStep = (qty, step) => {
     const u = qty / step;
     return +(Math.floor(u + 1e-9 + Math.abs(u) * 1e-12) * step).toFixed(decimalsOf(step));
@@ -2693,7 +3183,13 @@
    *   end   — heaviest last  (weights 1 … N): let most of it run to the last target
    * Works in whole size-steps (largest-remainder method): each slice is floored, then the leftover steps go to
    * the slices that were rounded down the most — so the total is exact and slices stay as even as possible
-   * (1.0 over 3, start → 0.5000 / 0.3333 / 0.1667). Returns { qtys } or { error } if a slice would be empty.
+   * (1.0 over 3, start → 0.5000 / 0.3333 / 0.1667).
+   *
+   * @param {number} total the size to split
+   * @param {number} n how many targets
+   * @param {'even'|'start'|'end'} mode where the heavier slices go
+   * @param {number} step the size step
+   * @returns {{qtys: number[]} | {error: string}} one size per target, or why it can't be split (a slice would be empty)
    */
   function splitQty(total, n, mode, step) {
     if (!(total > 0) || !(n >= 1)) return { error: 'Size must be above zero' };
@@ -2717,6 +3213,14 @@
    * Turn point distances into trigger prices from an entry price.
    * long: stop below, targets above · short: stop above, targets below. Targets must be increasing distances.
    * `stopPts: null` is a trade without a stop (stop: null); an empty `targetPts` is one without targets.
+   *
+   * @param {object} o the plan
+   * @param {'long'|'short'} o.side the trade's direction
+   * @param {number} o.entry the entry price
+   * @param {number|null} o.stopPts the stop's distance in points, or null for no stop
+   * @param {number[]} o.targetPts each target's distance in points, nearest first
+   * @param {number} o.tick the market's tick
+   * @returns {{stop: number|null, targets: number[]} | {error: string}} the trigger prices, or why they can't be set
    */
   function planPrices({ side, entry, stopPts, targetPts, tick }) {
     if (!(entry > 0)) return { error: 'No live price yet' };
@@ -2735,20 +3239,46 @@
     return { stop, targets };
   }
 
-  /** Size from a dollar risk: qty = risk ÷ (stop points × $ per point per unit), floored to the size step. */
+  /**
+   * Size from a dollar risk: risk ÷ (stop points × $ per point per unit), floored to the size step.
+   *
+   * @param {number} riskUsd the dollars to risk
+   * @param {number} stopPts the stop's distance in points
+   * @param {number} pointValue dollars per point per unit ($1 on NQ)
+   * @param {number} step the size step
+   * @returns {number} the size, or 0 when any input is missing
+   */
   const riskQty = (riskUsd, stopPts, pointValue, step) =>
     riskUsd > 0 && stopPts > 0 && pointValue > 0 ? floorStep(riskUsd / (stopPts * pointValue), step) : 0;
 
-  /** Breakeven stop price: entry plus an offset in your favour (e.g. +1 pt covers fees), tick-rounded. */
-  // Entry (an average can sit between ticks) plus the offset, rounded to the tick on the profit side: never a loss.
-  // A negative offset would put the stop on the losing side of the entry: it counts as 0.
+  /**
+   * The breakeven stop price: the entry (an average can sit between ticks) plus an offset in your favour (+1 pt covers
+   * fees), rounded to the tick on the profit side, so never a loss. A negative offset would put the stop on the losing
+   * side of the entry: it counts as 0.
+   *
+   * @param {object} o the position
+   * @param {'long'|'short'} o.side the trade's direction
+   * @param {number} o.entry the average entry price
+   * @param {number} o.offsetPts points to lock in past the entry
+   * @param {number} o.tick the market's tick
+   * @returns {number} the stop price
+   */
   const breakevenPrice = ({ side, entry, offsetPts, tick }) => {
     const n = (entry + (side === 'long' ? 1 : -1) * Math.max(0, offsetPts || 0)) / tick;
     return +((side === 'long' ? Math.ceil(n - 1e-9) : Math.floor(n + 1e-9)) * tick).toFixed(decimalsOf(tick));
   };
   /**
-   * Should the stop move to breakeven now?  mode: 'off' | 'tp1' (after the first target fills) | 'points'
-   * (price has moved `triggerPts` in your favour). Never fires twice.
+   * Should the stop move to breakeven now? Never fires twice.
+   *
+   * @param {object} o the plan and the price now
+   * @param {'off'|'tp1'|'points'} o.mode never, after the first target fills, or once price has moved `triggerPts`
+   * @param {'long'|'short'} o.side the trade's direction
+   * @param {number} o.entry the average entry price
+   * @param {number} o.price the price now
+   * @param {number} o.triggerPts points in your favour that trigger it ('points' mode)
+   * @param {boolean} o.tp1Filled whether the first target has filled ('tp1' mode)
+   * @param {boolean} o.alreadyMoved whether the stop was already moved
+   * @returns {boolean} true to move the stop now
    */
   function breakevenDue({ mode, side, entry, price, triggerPts, tp1Filled, alreadyMoved }) {
     if (alreadyMoved || mode === 'off' || !mode) return false;
@@ -2758,24 +3288,47 @@
     return false;
   }
 
+  const TRADING_POWER_SPREAD = 0.001; // Vest's ticket leaves 0.1% for the spread
   /**
    * Vest's "Trading Power", the order value its own ticket allows at 100%: free cash (less any open loss) times leverage,
    * less room for the opening fee and a 0.1% allowance for the spread.
+   *
+   * @param {object} o the account
+   * @param {number} o.free free cash
+   * @param {number} o.upnl open P&L (only a loss counts)
+   * @param {number} o.leverage the order's leverage
+   * @param {number} o.takerFee the market's taker fee (0.000025 on NQ)
+   * @returns {number} the largest order value, in dollars
    */
-  const TRADING_POWER_SPREAD = 0.001;
   const tradingPower = ({ free, upnl, leverage, takerFee }) =>
     leverage > 0 && free > 0
       ? (Math.max(0, free + Math.min(0, upnl || 0)) * leverage) /
         (1 + leverage * (takerFee || 0)) /
         (1 + TRADING_POWER_SPREAD)
       : 0;
-  /** The largest size that power buys at `price` (Vest prices margin at the margin mark price), floored to the step. */
+  /**
+   * The largest size that trading power buys, floored to the step.
+   *
+   * @param {number} power the trading power, in dollars
+   * @param {number} price the margin mark price (what Vest prices a new order's margin at)
+   * @param {number} step the size step
+   * @returns {number} the size, or 0 when either is missing
+   */
   const maxQtyFor = (power, price, step) => (power > 0 && price > 0 ? floorStep(power / price, step) : 0);
 
   /**
-   * Where a position of `qty` (the whole position after this order) fails or passes, measured from the price now.
-   * `equity` is the account's equity at that price; the opening fee comes straight out of it. Fail: equity reaches the
-   * floor (drawdown, or the daily-loss floor when higher). Pass: equity reaches the target (evaluations only).
+   * Where a position fails or passes, measured from the price now. Fail: equity reaches the floor (drawdown, or the
+   * daily-loss floor when higher). Pass: equity reaches the target (evaluations only).
+   *
+   * @param {object} o the position and the account
+   * @param {'long'|'short'} o.side the trade's direction
+   * @param {number} o.qty the whole position after this order
+   * @param {number} o.price the price now
+   * @param {number} o.equity the account's equity at that price
+   * @param {number} o.openFee the opening fee (comes straight out of equity)
+   * @param {number} o.floor the equity that fails the account
+   * @param {number|null} o.target the equity that passes it (null when funded)
+   * @returns {{fail: number|null, pass: number|null}} the two prices; null where there is none
    */
   function failPassPrices({ side, qty, price, equity, openFee, floor, target }) {
     if (!(qty > 0) || !(price > 0) || !Number.isFinite(equity)) return { fail: null, pass: null };
@@ -2785,21 +3338,51 @@
     const pass = target > 0 && target > e ? price + (dir * (target - e)) / qty : null;
     return { fail: fail > 0 ? fail : null, pass: pass > 0 ? pass : null };
   }
+  // The allowed range, so the panel can say where the stop may go and how much can be risked. Size = risk ÷ stop, the
+  // size is capped by Vest's max, and a stop-out (plus both fees) must stay under the room left to the floor.
   /**
-   * The allowed range, so the panel can say where the stop may go and how much can be risked. Size = risk ÷ stop, the
-   * size is capped by Vest's max, and a stop-out (plus both fees) must stay under the room left to the floor.
-   *   minStopFor:    the smallest stop (whole ticks) at which `risk` fits in the max size
-   *   maxRiskAt:     the most that can be risked (whole dollars) at this stop with the max size
-   *   maxRiskForRoom: the most that can be risked at this stop before a stop-out, fees included, reaches the floor
-   *   maxStopForRoom: the widest stop (whole ticks) for `qty` before a stop-out, fees included, reaches the floor
+   * The smallest stop at which `risk` fits in the max size.
+   *
+   * @param {number} risk the dollars to risk
+   * @param {number|null} maxQty the largest size allowed
+   * @param {number} tick the market's tick
+   * @returns {number|null} the stop in points (whole ticks), or null when the max isn't known
    */
   const minStopFor = (risk, maxQty, tick) =>
     risk > 0 && maxQty > 0 ? +(Math.ceil(risk / maxQty / tick - 1e-9) * tick).toFixed(decimalsOf(tick)) : null;
+  /**
+   * The most that can be risked at this stop with the max size.
+   *
+   * @param {number} maxQty the largest size allowed
+   * @param {number} stopPts the stop's distance in points
+   * @returns {number|null} whole dollars, or null when either is missing
+   */
   const maxRiskAt = (maxQty, stopPts) => (maxQty > 0 && stopPts > 0 ? Math.floor(maxQty * stopPts + 1e-9) : null);
+  /**
+   * The most that can be risked at this stop before a stop-out, both fees included, reaches the floor.
+   *
+   * @param {object} o the account and the stop
+   * @param {number} o.room dollars left above the floor
+   * @param {number} o.price the price now
+   * @param {number} o.stopPts the stop's distance in points
+   * @param {number} o.takerFee the market's taker fee
+   * @returns {number|null} whole dollars, or null when an input is missing
+   */
   const maxRiskForRoom = ({ room, price, stopPts, takerFee }) =>
     room > 0 && price > 0 && stopPts > 0
       ? Math.max(0, Math.floor(room / (1 + ((2 * price - stopPts) * (takerFee || 0)) / stopPts) - 0.01))
       : null;
+  /**
+   * The widest stop for `qty` before a stop-out, both fees included, reaches the floor.
+   *
+   * @param {object} o the account and the size
+   * @param {number} o.room dollars left above the floor
+   * @param {number} o.qty the position size
+   * @param {number} o.price the price now
+   * @param {number} o.takerFee the market's taker fee
+   * @param {number} o.tick the market's tick
+   * @returns {number|null} points (whole ticks; 0 when no stop fits), or null when an input is missing
+   */
   const maxStopForRoom = ({ room, qty, price, takerFee, tick }) => {
     if (!(room > 0) || !(qty > 0) || !(price > 0)) return null;
     const f = takerFee || 0,
@@ -2809,22 +3392,53 @@
   /**
    * The size step for the unit the Trade tab sizes in. Vest sizes NQ, ES and RTY in whole minis or micros as well as
    * units: `micro` is how many units one micro is on this market (a mini is 10). Units keep the market's own step.
+   *
+   * @param {number} step the market's size step
+   * @param {number|undefined} micro units per micro (undefined on markets without minis and micros)
+   * @param {'units'|'micro'|'mini'} unit the unit the Trade tab sizes in
+   * @returns {number} the size step in units
    */
   const unitStep = (step, micro, unit) =>
     micro > 0 && unit === 'micro' ? micro : micro > 0 && unit === 'mini' ? micro * 10 : step;
+  // Stop entries (a buy stop above the price, a sell stop below), which Vest doesn't have: the copier watches the price
+  // and sends the order itself.
   /**
-   * Stop entries (a buy stop above the price, a sell stop below), which Vest doesn't have: the copier watches the price
-   * and sends the order itself. `stopEntryHit`: has the price reached the level? `stopEntryLimit`: with a max slip, the
-   * worst price an immediate-or-cancel limit may fill at (the level plus the slip for a buy, minus for a sell, on the
-   * tick toward the level, so never more slip than asked); without one (0 or blank), null: a market order.
+   * Has the price reached a stop entry's level?
+   *
+   * @param {'long'|'short'} side a buy stop or a sell stop
+   * @param {number} level the stop's price
+   * @param {number|null} px the price now
+   * @returns {boolean} true once a buy stop's price is at or above the level, a sell stop's at or below
    */
   const stopEntryHit = (side, level, px) => px > 0 && level > 0 && (side === 'long' ? px >= level : px <= level);
+  /**
+   * With a max slip, the worst price an immediate-or-cancel limit may fill at: the level plus the slip for a buy, minus
+   * for a sell, on the tick toward the level, so never more slip than asked.
+   *
+   * @param {object} o the stop entry
+   * @param {'long'|'short'} o.side a buy stop or a sell stop
+   * @param {number} o.level the stop's price
+   * @param {number} o.slipPts the max slip in points (0 or blank: none)
+   * @param {number} o.tick the market's tick
+   * @returns {number|null} the limit price, or null for a market order
+   */
   const stopEntryLimit = ({ side, level, slipPts, tick }) => {
     if (!(slipPts > 0) || !(level > 0)) return null;
     const n = (level + (side === 'long' ? 1 : -1) * slipPts) / tick;
     return +((side === 'long' ? Math.floor(n + 1e-9) : Math.ceil(n - 1e-9)) * tick).toFixed(decimalsOf(tick));
   };
-  /** What a stop-out costs from the price now: the move to the stop on the whole position, plus both fees. */
+  /**
+   * What a stop-out costs from the price now: the move to the stop on the whole position, plus both fees.
+   *
+   * @param {object} o the position and its stop
+   * @param {'long'|'short'} o.side the trade's direction
+   * @param {number} o.qty the position size
+   * @param {number} o.price the price now
+   * @param {number} o.stopPrice the stop's price
+   * @param {number} o.openFee the opening fee
+   * @param {number} o.takerFee the market's taker fee (charged again on the stop's fill)
+   * @returns {number} the loss in dollars
+   */
   const stopOutLoss = ({ side, qty, price, stopPrice, openFee, takerFee }) =>
     (side === 'long' ? 1 : -1) * qty * (price - stopPrice) + (openFee || 0) + qty * stopPrice * (takerFee || 0);
 
@@ -3491,8 +4105,8 @@
     const unchanged = () =>
       S.master === master && S.followers.size === followers.length && followers.every((f) => S.followers.has(f));
     S.arming = true;
-    render();
     try {
+      render();
       logEvent('info', 'Checking open positions…');
       const plan = await planArm(master, followers);
       if (plan.error) {
@@ -3828,14 +4442,20 @@
   function downloadDiag() {
     persistDiag();
     logEvent('info', `Diagnostics exported (${S.diag.length} records, with the activity log).`);
-    const payload = {
+    // account ids leave as their names ("Account 64"), plus a one-way tag per account (`accountTags`) so files from one
+    // person can still be told apart from another's (tools/diag-stats.py) without the ids
+    const { scrub, alias } = accountScrubber();
+    const payload = scrub({
       exportedAt: new Date().toISOString(),
       version: VERSION,
       build: fingerprint() || null,
       records: S.diag.length,
       diagnostics: S.diag,
       log: [...S.log].reverse().map((e) => ({ t: e.t.toISOString(), level: e.level, msg: e.msg })), // oldest first
-    };
+    });
+    payload.accountTags = Object.fromEntries(
+      Object.entries(alias).map(([id, name]) => [name, fnv('vc-account|' + id)]),
+    );
     saveFile(`vest-copier-diagnostics-${stamp()}.json`, 'application/json', JSON.stringify(payload, null, 2));
   }
 
@@ -4854,7 +5474,6 @@
   let _root = null; // the panel's shadow root
   const money = (n) =>
     isNaN(n) ? '—' : '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const pct = (n) => (isNaN(n) ? '—' : (n * 100).toFixed(0) + '%');
   const esc = (s) =>
     String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
   const acctNum = (label) => (String(label).match(/(\d+)\s*$/) || ['', '--'])[1]; // "Account 07" → "07"
@@ -9073,7 +9692,7 @@
     '[role="menu"], [role="dialog"], [role="listbox"], [data-name="popup-menu-container"], [data-name="menu-inner"]';
   function chartPopupOver(pr) {
     const f = chartFrame();
-    let doc = null;
+    let doc;
     try {
       doc = f && f.contentDocument;
     } catch {
@@ -9661,8 +10280,15 @@
     return { equity: cash + upnl, upnl };
   }
 
-  /** Everything the panel shows / would send, from the current settings + live price. Pure apart from reading state. */
-  function tradeCalc(setup) {
+  /**
+   * Everything the Trade tab shows or would send, from the current settings and the live price. Pure apart from
+   * reading state.
+   *
+   * @param {object} [setup] a trade setup to work out (default: the Trade tab's own, `S.trade`)
+   * @param {object} [levs] every account's saved leverage (default: the Trade tab's last read, `S.levs`)
+   * @returns {object} sizes, prices, limits, warnings and fixes for the Trade tab (see the return at the end)
+   */
+  function tradeCalc(setup, levs = S.levs) {
     const t = setup || S.trade,
       fixedUnit = setup && setup.unit && MICRO_UNITS[setup.symbol] ? setup.unit : null,
       sym = t.symbol,
@@ -9678,7 +10304,7 @@
 
     // Max size: Vest's 100% for the master and, in strict 1:1 while armed, for every follower too (they copy the same
     // size), so the smallest of them. Followers copy at the master's leverage. Cap-to-fit scales followers to fit.
-    const lev = master ? orderLeverage(levFor(S.levs, master, sym), maxLeverageFor(sym, master)) : null;
+    const lev = master ? orderLeverage(levFor(levs, master, sym), maxLeverageFor(sym, master)) : null;
     const mpx = marginPriceOf(sym);
     let maxQty = null,
       limitedBy = null;
@@ -9942,7 +10568,6 @@
       margin,
       risk2,
       chips,
-      pick,
       stopOn,
     };
   }
@@ -10254,8 +10879,12 @@
   // until it finishes, so two of these never work on the same legs at once.
   function adjust(job) {
     S.adjusting = (S.adjusting || 0) + 1;
-    updateTrade();
-    return job()
+    // the redraw and the job both run inside the chain, so an error in either still reaches the finally
+    return Promise.resolve()
+      .then(() => {
+        updateTrade();
+        return job();
+      })
       .catch((e) => {
         logEvent('warn', `Couldn't finish adjusting stop & targets (${e.message}) — check them on Vest.`);
         diag('adjust', { outcome: 'error', error: e.message });
@@ -10282,7 +10911,7 @@
       render();
       return toast('Read and accept the terms first.');
     }
-    const c = tradeCalc(opt.setup);
+    let c = tradeCalc(opt.setup);
     if (opt.stopEntry && (c.error || c.blocked)) {
       logEvent('warn', `Trade panel: ${stopName(opt.stopEntry)} NOT placed — ${c.error || c.blocked}`);
       return false;
@@ -10311,9 +10940,9 @@
       limitPx = +((side === 'long' ? Math.floor(n + 1e-9) : Math.ceil(n - 1e-9)) * meta.tick).toFixed(pDec);
     }
     S.placing = true;
-    updateTrade();
     let placed = false;
     try {
+      updateTrade();
       const px = priceOf(sym); // the price at the moment of the click
       if (limitPx) {
         const lp = fmtNum(limitPx, pDec);
@@ -10352,6 +10981,36 @@
         throw new Error(
           `couldn't work out ${meta.label} leverage for ${accLabel(master)} — open Vest's ticket for ${meta.label} once, then retry`,
         );
+      // The size on screen was worked out at the panel's leverage. If Vest's is another one now (changed elsewhere, or
+      // the panel missed it), it's worked out again at this one: a click that would now send another size is refused so
+      // the new size is seen first; a stop entry that has triggered sends it.
+      if (levs && lev !== c.lev) {
+        if (!(opt.stopEntry && opt.stopEntry.levs)) S.levs = levs; // a fresh read: the panel follows it
+        const was = c.lev,
+          c2 = tradeCalc(opt.setup, levs);
+        if (c2.error || c2.blocked)
+          throw new Error(
+            `leverage is ${lev}x now (the panel had ${was}x): ${(c2.error || c2.blocked).replace(/\.$/, '')}`,
+          );
+        if (Math.abs(c2.qty - c.qty) >= meta.step / 2) {
+          if (!opt.stopEntry)
+            throw new Error(
+              `leverage is ${lev}x now (the panel had ${was}x), so the size is ${fmtQty(c2.qty, sym)}, not ${fmtQty(c.qty, sym)} — check it and click again`,
+            );
+          logEvent(
+            'info',
+            `Trade panel: leverage is ${lev}x now (was ${was}x): ${stopName(opt.stopEntry)} sized ${fmtQty(c2.qty, sym)}, not ${fmtQty(c.qty, sym)}`,
+          );
+        }
+        c = c2;
+        Object.assign(sizing, {
+          qty: c.qty,
+          maxQty: c.maxQty,
+          limitedBy: c.limitedBy ? accLabel(c.limitedBy) : null,
+          leverage: c.lev,
+          leverageWas: was,
+        });
+      }
       if (opt.stopEntry && held)
         throw new Error(
           `${accLabel(master)} already has a ${parseFloat(held.quantity) > 0 ? 'position' : 'waiting order'} on ${meta.label}: a stop entry opens a new trade only, so nothing was sent`,
@@ -10375,7 +11034,7 @@
       }
       if (held && !(parseFloat(held.quantity) > 0))
         throw new Error(
-          `an order is already waiting on ${meta.label} for ${accLabel(master)} — cancel it in Vest first (Vest allows one per market)`,
+          `an order is already waiting on ${meta.label} for ${accLabel(master)} — cancel it in Vest first (the Trade tab places one waiting order per market; Vest's own ticket can add more)`,
         );
       if (held && limitPx)
         throw new Error(
@@ -10521,7 +11180,8 @@
   // fills come from /executions by order id, and any price that legs are measured from must be near the market.
   const nearMarket = (px, ref, tol = NEAR_MARKET) => px > 0 && ref > 0 && Math.abs(px - ref) <= ref * tol;
   async function orderFill(accountId, sym, orderId, ref) {
-    for (let i = 0; orderId && i < 4; i++) {
+    if (!orderId) return null;
+    for (let i = 0; i < 4; i++) {
       if (i) await sleep(POLL_MS);
       const f = await fillInfo(accountId, sym, orderId, i ? 0 : FEED_FILL_WAIT_MS);
       if (f && nearMarket(f.price, ref)) return f.price;
@@ -10899,9 +11559,9 @@
   // true if taken (else it snaps back), onCancel() }]. TradingView shows a line's × once it has a cancel handler and lets it
   // be dragged once it has a move handler, so each gets one only when it does something.
   function lineSet() {
-    let lines = {},
-      keys = {},
-      want = {},
+    const lines = {},
+      keys = {};
+    let want = {},
       win = null;
     const drop = (id) => {
       try {
@@ -11434,8 +12094,8 @@
     };
     const name = leg.kind === 'sl' ? 'stop' : `target ${tps.indexOf(leg) + 1}`;
     S.placing = true;
-    updateTrade();
     (async () => {
+      updateTrade(); // inside: an error here still reaches the finally that clears the flag
       try {
         await send('POST', '/v3/positions/cancel-order', master, { orderId: o.id });
       } catch (e) {
@@ -11594,8 +12254,8 @@
       fmt = (n) => fmtNum(n, decimalsOf(tick));
     if (!master) return;
     S.placing = true;
-    updateTrade();
     try {
+      updateTrade();
       // read the position fresh: its entry and stop as Vest has them now
       const pos = await openPosition(master, sym);
       if (!pos) throw new Error(`${accLabel(master)} has no open ${meta.label} position`);
@@ -11644,8 +12304,8 @@
       meta = SYMBOLS[sym];
     if (!master) return;
     S.placing = true;
-    updateTrade();
     try {
+      updateTrade();
       const pos = await openPosition(master, sym);
       if (!pos) throw new Error(`${accLabel(master)} has no open ${meta.label} position`);
       const lev = orderLeverage(levFor(await fetchLeverages(), master, sym), maxLeverageFor(sym, master));
@@ -11701,8 +12361,8 @@
     const tick = meta.tick,
       fmt = (n) => fmtNum(n, decimalsOf(tick));
     S.placing = true;
-    updateTrade();
     try {
+      updateTrade();
       // read the position fresh: its side, size and the legs Vest has on it now
       const r = await api('/v3/positions/opened', (await mintAccountToken(master)).token);
       const pos = ((r && r.positions) || []).find((x) => x.symbol === sym && parseFloat(x.quantity) > 0);
@@ -11987,8 +12647,8 @@
       meta = SYMBOLS[sym];
     if (!master) return;
     S.placing = true;
-    updateTrade();
     try {
+      updateTrade();
       const pos = await openPosition(master, sym);
       if (!pos) throw new Error(`${accLabel(master)} has no open ${meta.label} position`);
       const have = parseFloat(pos.quantity),
@@ -12160,6 +12820,8 @@
         return;
       }
       if (!pos) return endPlan(p, 'Breakeven: trade closed — stopped watching.');
+      // turned around (an opposite order bigger than the position, Vest's flip): its stop is gone, the plan doesn't apply
+      if (pos.side && pos.side !== p.side) return endPlan(p, 'Breakeven: the trade turned around — stopped watching.');
       const avg = parseFloat(pos.openPrice);
       const entry =
         avg > 0 && nearMarket(avg, px, NEAR_MARKET_LOOSE)
@@ -12341,6 +13003,11 @@
   }
 
   function updateTrade() {
+    // test builds: window.__vcFailDraw = n makes the next n redraws during an order throw (a busy flag must still clear)
+    if (window.__VC_TEST__ && S.placing && window.__vcFailDraw > 0) {
+      window.__vcFailDraw--;
+      throw new Error('test: the redraw failed');
+    }
     const body = _root && _root.querySelector('.body');
     if (!body || body.dataset.view !== 'trade' || !body.querySelector('.trade')) return;
     const c = tradeCalc(),
@@ -12564,9 +13231,10 @@
     $('tr-pick').hidden = !pk;
     // Slip (stop orders): the most past the level a fill may be; blank = a market order
     $('tr-sliprow').hidden = c.t.orderType !== 'stop' || !!h;
-    // the chart bracket's switch: only with Market (Limit and Stop draw it only while picking a price)
+    // the chart bracket's switch, with every order type (Limit and Stop draw it while picking a price: with it off they
+    // drew nothing and the switch to turn it back on was only under Market, owner 2026-10-13)
     const lines = $('tr-lines');
-    lines.hidden = c.t.orderType !== 'market';
+    lines.hidden = false;
     lines.classList.toggle('on', !!S.chartBracket);
     lines.setAttribute('aria-checked', String(!!S.chartBracket));
     if (c.t.orderType === 'stop') {
@@ -13216,10 +13884,11 @@
   // description, ready for the file to be dragged in. Account ids are replaced by their labels ("Account 07") so the
   // file is safer to post publicly; nothing is sent anywhere by the copier.
   const ISSUE_FORM = 'bug_report.yml';
-  function buildReport(note) {
-    // Every account id becomes a name: active accounts by their label, closed ones by the label recorded next to the
-    // id in the diagnostics, anything else by a placeholder. Position and order ids are Vest's random ids for single
-    // orders (useless without a login) and stay, since they tie related events together.
+  // Every account id in a file the user saves becomes a name: active accounts by their label, closed ones by the label
+  // recorded next to the id in the diagnostics, anything else by a placeholder. Position and order ids are Vest's
+  // random ids for single orders (useless without a login) and stay, since they tie related events together. Used by
+  // the report and by the log's Download.
+  function accountScrubber() {
     const ACCOUNT_KEYS = new Set(['account', 'accountId', 'master', 'followers', 'id']);
     const isUuid = (v) =>
       typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
@@ -13244,6 +13913,10 @@
         // account ids inside longer text, e.g. an error message holding an API path with the id in it
         return val.replace(/[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}/gi, (m) => alias[m] || m);
       });
+    return { scrub, alias };
+  }
+  function buildReport(note) {
+    const { scrub } = accountScrubber();
     const accounts = Object.values(S.byId).map((r) => ({
       label: r.label,
       type: r.type,
@@ -13522,7 +14195,6 @@
     })();
     return _histBusy;
   }
-  const acctName = (id) => (S.byId[id] && S.byId[id].label) || histLabels[id] || 'An account';
   // A trade's own story, from Vest's position details (its orders and the stop / target history): the entry and adds,
   // each exit with its price and why (TP1, TP2, stop, breakeven, closed), and the stop moves. Cached per position.
   const _details = {};
@@ -15127,7 +15799,6 @@
   // The userscript manager, for the diagnostics (Tampermonkey's GM_info, available even with @grant none). No secrets in it.
   function scriptManager() {
     try {
-      // eslint-disable-next-line no-undef
       const g = typeof GM_info !== 'undefined' ? GM_info : null;
       if (!g) return null;
       return {
@@ -15172,8 +15843,13 @@
       vestSizeUnit: vestSizeUnit(),
       manager: scriptManager(),
     });
-    // The copier's own crashes (not Vest's): Tampermonkey runs it from a "userscript" source.
-    const ours = (stack) => /userscript|vest-copier/i.test(String(stack || ''));
+    // The copier's own crashes (not Vest's): Tampermonkey runs it from a "userscript" source; any manager's address for
+    // this script is in OWN_SRC.
+    const ours = (stack) => {
+      const s = String(stack || '');
+      return /userscript|vest-copier/i.test(s) || (!!OWN_SRC && s.includes(OWN_SRC));
+    };
+    if (window.__VC_TEST__) window.__vcOurs = (stack) => ({ ours: ours(stack), own: OWN_SRC });
     window.addEventListener('error', (e) => {
       if (ours(e.filename) || ours(e.error && e.error.stack))
         diag('script_error', {

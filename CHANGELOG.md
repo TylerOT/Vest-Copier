@@ -2,6 +2,20 @@
 
 Newest first. To update, click **Install** on the update row that appears in the panel whenever there's a newer version.
 
+## v0.40.2
+Copying keeps up with Vest's newer order options, and % sizing follows a leverage change at once.
+
+- **% and Max sizes follow a leverage change right away.** Changing leverage on Vest's ticket and trading within seconds could size the order for the previous leverage (8x went out at the 15x size). Buy and Sell now update the moment you change it, and the size is checked again when you click.
+- **Limit Close is copied as a limit close.** Followers get the same limit close at the same price, instead of closing at market straight away. Cancel yours and theirs are cancelled; when it fills, the log says "Limit close filled".
+- **Closing part of a trade with a limit** is copied too: the same price, sized to each follower.
+- **Scale orders:** cancelling them, or closing the trade while some still wait, cancels every follower order of the Scale, not only the first.
+- **One order that turns a trade around** (selling 2 while long 1, with Reduce Only off): followers turn around with you instead of only closing.
+- **Fill or Kill** orders have the followers' fills checked, like IOC.
+- **Lines switch** now shows with Limit and Stop too, so the bracket can be turned back on from any order type.
+- **The Download file names your accounts** ("Account 64") instead of using their ids.
+- **Clearer log:** one line when an order that fills now or not at all fills nothing anywhere, no more "−$0.00", and moving a waiting limit while trading is paused says the followers' copies are gone.
+- Minor improvements.
+
 ## v0.40.1
 - **Placing a stop or target by clicking the chart** no longer floods the browser console with chart errors when the mouse stays still after the click. The guide line that follows the pointer no longer gets in the way of the click. The same goes for a limit placed with one click.
 

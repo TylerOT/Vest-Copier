@@ -211,7 +211,7 @@ every order like any other master order.
   stop off (it reads *None*; **+ stop** puts it back with the same points), and **×** on a target removes it, every one
   if you like. Without a stop, Auto BE is off and a warning names the price where the account fails, since nothing
   closes the trade for you. Followers copy the trade the same way.
-- **Bracket on the chart** (on by default; the **Lines** switch at the end of the Order row, shown with Market, or
+- **Bracket on the chart** (on by default; the **Lines** switch at the end of the Order row, or
   Appearance turns it off): your entry, stop, targets and fail price are
   drawn on Vest's chart, while the Trade tab is open, as dashed lines for the side you point at, and follow the price and your points. Drag the stop
   or a target line to set its points. In Limit or Stop mode they appear once you've clicked Buy or Sell and follow the
