@@ -40,8 +40,8 @@ accounts trade the same size. Switch to strict 1:1 in Edit if you want identical
 
 Good session? **P&L → Share** turns it into a picture you can paste straight into X, Discord or a group chat: today's
 total across your accounts with a summary of your trades (or the latest ones), or one trade with every exit and when it happened (any trade from the
-last 30 days that made money). You can show percentages instead of dollars, leave the account numbers off and put
-your @name on it.
+last 30 days that made money), or everything Vest has paid you out, with your last 8 weeks. You can show percentages
+instead of dollars and put your @name on it. No account numbers on any of them.
 
 <table>
   <tr>

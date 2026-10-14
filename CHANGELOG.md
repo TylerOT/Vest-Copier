@@ -2,6 +2,12 @@
 
 Newest first. To update, click **Install** on the update row that appears in the panel whenever there's a newer version.
 
+## v0.40.4
+Share has a new card: your payouts.
+
+- **Payouts:** a third tab in Share. It adds up everything Vest has paid into your Primary Account from your funded and instant accounts, closed ones included: the total, how many payouts from how many accounts, your last 8 weeks as bars with your best week in lime, and your biggest payout. Amounts are what you received after Vest's split. A payout still processing shows apart and isn't added in; refunded ones are left out.
+- **No account numbers on any card.** The Hide account numbers switch is gone: the cards never show them now.
+
 ## v0.40.3
 Share's Today card shows your whole day, losses included.
 

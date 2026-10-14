@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Vest Copier
 // @namespace    vestcopier
-// @version      0.40.3
+// @version      0.40.4
 // @description  Copies a master Vest account's trades to your other Vest accounts, live, and adds a points-based order panel.
 // @author       xAmped
 // @license      STRATUH Copier License — free to use, no selling; see LICENSE
@@ -38,7 +38,7 @@
     })(),
   };
 
-  const VERSION = '0.40.3';
+  const VERSION = '0.40.4';
   // Where this script runs from, read off its own first stack frame (each script manager names it differently): the
   // diagnostics use it to tell the copier's own errors from Vest's. Null when the stack shows no address.
   const OWN_SRC = (() => {
@@ -6259,6 +6259,11 @@
     .ghostbtn:hover {
       background: var(--s3);
     }
+    .ghostbtn:disabled {
+      background: var(--s2);
+      color: var(--faint);
+      cursor: not-allowed;
+    }
     a.ghostbtn {
       text-decoration: none;
     }
@@ -8514,6 +8519,29 @@
       display: block;
       width: 100%;
       height: auto;
+    }
+    .prev canvas[hidden] {
+      display: none;
+    }
+    /* Payouts with none paid yet: a line in place of the picture */
+    .sh-empty {
+      aspect-ratio: 1;
+      display: grid;
+      place-content: center;
+      gap: 6px;
+      text-align: center;
+      padding: 0 28px;
+      color: var(--muted);
+      font-size: 12.5px;
+      line-height: 1.45;
+    }
+    .sh-empty[hidden] {
+      display: none;
+    }
+    .sh-empty b {
+      color: var(--text);
+      font-weight: 500;
+      font-size: 13px;
     }
     .sh-name {
       width: 116px;
@@ -14332,7 +14360,7 @@
   // Amounts hidden: % change on the day's starting equity, no $ anywhere. The only network use is the three fonts, from
   // jsDelivr, loaded the first time Share opens (the card still draws with system fonts without them).
   const SHARE_NAME_KEY = 'vc-share-name',
-    SHARE_OPTS_KEY = 'vc-share-opts'; // { hide, nums, code, sort, style }: the Share sheet's options, remembered
+    SHARE_OPTS_KEY = 'vc-share-opts'; // { hide, code, sort, style }: the Share sheet's options, remembered
   const CARD_W = 1200,
     CARD_H = 675,
     CARD_SCALE = 2;
@@ -14396,12 +14424,11 @@
       hasDay,
       trades: dayTrades(),
       style: S.share ? S.share.style : 'summary',
-      followers: accts.filter((r) => r.id !== S.master).length,
       total: hasDay
         ? d.today
         : Object.values(S.byId).reduce((a, r) => a + (isNaN(r.equity) ? 0 : r.equity - r.size), 0),
       pct: hasDay && startEq > 0 ? d.today / startEq : null,
-      accounts: accts.map((r) => ({ n: acctNum(r.label), master: r.id === S.master })),
+      accounts: accts.map((r) => ({ master: r.id === S.master })),
       copies: st.copies,
       missed: st.missed,
       complete: st.complete,
@@ -14409,7 +14436,6 @@
       curve,
       name,
       code: S.share ? S.share.code : true,
-      nums: !(S.share && S.share.nums), // false: the tiles carry no account numbers
       at: Date.now(),
     };
   }
@@ -14944,38 +14970,9 @@
       );
     }
     runs(ctx, L, 146 + 16 + size * 0.92 + 44, parts);
-    // bottom left: the day's trades in the style picked in Share (`drawTradeRow`); with none yet, the accounts as tiles
-    // (the master in lime), unless numbers are hidden or the style is None. Bottom right: the code and the site.
+    // bottom left: the day's trades in the style picked in Share (`drawTradeRow`); no account numbers on any card, ever
+    // (owner, 2026-10-14), so with no trades yet it stays empty. Bottom right: the code and the site.
     if (d.trades.length) drawTradeRow(ctx, d, hide, L, T);
-    else if (d.nums && !wide) {
-      const tilesY = CARD_H - 40 - 50;
-      ctx.font = `500 13px ${CF.mono}`;
-      ctx.fillStyle = T.dim;
-      ctx.letterSpacing = '1.8px';
-      const n = d.accounts.length;
-      ctx.fillText(
-        d.followers > 0 && d.accounts.some((a) => a.master)
-          ? `MASTER + ${d.followers} FOLLOWER${d.followers === 1 ? '' : 'S'}`
-          : `${n} ACCOUNT${n === 1 ? '' : 'S'}`,
-        L,
-        tilesY - 14,
-      );
-      ctx.letterSpacing = '0px';
-      d.accounts.slice(0, 10).forEach((a, i) => {
-        const x = L + i * 72;
-        ctx.fillStyle = a.master ? T.lime : 'rgba(255,255,255,0.06)';
-        ctx.fillRect(x, tilesY, 64, 50);
-        if (!a.master) {
-          ctx.strokeStyle = 'rgba(255,255,255,0.08)';
-          ctx.strokeRect(x + 0.5, tilesY + 0.5, 63, 49);
-        }
-        ctx.font = `600 15px ${CF.mono}`;
-        ctx.fillStyle = a.master ? T.ink : T.muted;
-        ctx.textAlign = 'center';
-        ctx.fillText(a.n, x + 32, tilesY + 31);
-        ctx.textAlign = 'left';
-      });
-    }
     ctx.textAlign = 'right';
     ctx.font = `500 14px ${CF.mono}`;
     ctx.fillStyle = T.dim;
@@ -15248,8 +15245,329 @@
       ctx.letterSpacing = '0px';
     }
   }
+  // ── Payouts: everything Vest has paid into the Primary Account from the funded and instant accounts, for the Payouts
+  // card. The same list as Vest's own payout history: GET /v3/capital/withdrawals with the login and no account = every
+  // account's claims, closed and failed accounts included, newest first, paged by `cursor` / `next`. A payout counts
+  // once EXECUTED, at `trader_amount` (what landed after Vest's split), dated by `created_at` (the claim, as Vest lists
+  // it); PROCESSING is kept apart and never added in; REFUNDED and FAILED are left out. Read when the Payouts tab opens,
+  // cached like the trade history. Read-only.
+  const PAYOUT_PAGE = 200,
+    PAYOUT_PAGES = 25;
+  S.payoutHist = null; // { at, payouts: [{ at, acct, amount }] oldest first, processing: [...], error }
+  let _payBusy = null;
+  function loadPayouts(force = false) {
+    if (_payBusy) return _payBusy;
+    if (!force && S.payoutHist && !S.payoutHist.error && Date.now() - S.payoutHist.at < HIST_TTL_MS)
+      return Promise.resolve(S.payoutHist);
+    _payBusy = (async () => {
+      const payouts = [],
+        processing = [],
+        statuses = {};
+      try {
+        let cursor = null,
+          pages = 0;
+        do {
+          const r = await api(
+            `/v3/capital/withdrawals?limit=${PAYOUT_PAGE}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`,
+          );
+          for (const w of (r && r.withdrawals) || []) {
+            const st = String(w.status || '').toUpperCase();
+            statuses[st] = (statuses[st] || 0) + 1;
+            const p = {
+              at: msOf(w.created_at ?? w.createdAt),
+              acct: w.account_id ?? w.accountId ?? null,
+              amount: num(w.trader_amount ?? w.traderAmount),
+            };
+            if (!p.at || !(p.amount > 0)) continue;
+            if (st === 'EXECUTED') payouts.push(p);
+            else if (st === 'PROCESSING') processing.push(p);
+          }
+          cursor = r && r.next;
+        } while (cursor && ++pages < PAYOUT_PAGES);
+        const byAt = (a, b) => a.at - b.at;
+        S.payoutHist = { at: Date.now(), payouts: payouts.sort(byAt), processing: processing.sort(byAt) };
+        diag('payout_card', {
+          outcome: 'read',
+          payouts: payouts.length,
+          processing: processing.length,
+          statuses,
+          more: !!cursor,
+        });
+      } catch (e) {
+        S.payoutHist = { at: Date.now(), payouts: [], processing: [], error: e.message };
+        diag('payout_card', { outcome: 'error', error: e.message });
+      } finally {
+        _payBusy = null;
+      }
+      if (S.shareOpen) render();
+      return S.payoutHist;
+    })();
+    return _payBusy;
+  }
+  // What the Payouts card shows, from the list: the total, the counts, the biggest, the first and latest, and what's
+  // still processing. null until a payout has been made (a first one still processing included: the sheet says so).
+  function payoutSummary(h) {
+    if (!h || h.error || !h.payouts.length) return null;
+    const ps = h.payouts;
+    return {
+      payouts: ps,
+      processing: h.processing,
+      total: ps.reduce((a, p) => a + p.amount, 0),
+      pending: h.processing.reduce((a, p) => a + p.amount, 0),
+      count: ps.length,
+      accts: new Set(ps.map((p) => p.acct)).size,
+      biggest: ps.reduce((a, p) => (p.amount > a.amount ? p : a)),
+      first: ps[0].at,
+      latest: ps[ps.length - 1].at,
+      period: 'All time',
+      asOf: Date.now(),
+    };
+  }
+  // ── The Payouts card (1080 × 1080, drawn at 2×; design: docs/redesign/payouts-card/, C, picked 2026-10-14): the total
+  // all time, where it came from, what's still processing; the last 8 weeks as bars (Monday to Sunday ET, this week on
+  // the right, the best week lime, a quiet week a stub, weeks before the first payout empty); the biggest payout ever;
+  // the counts as tiles. No account numbers on it, ever.
+  const ET_MON = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+  const etParts = (t, o) => {
+    const p = {};
+    for (const x of new Intl.DateTimeFormat('en-GB', { timeZone: ET_TZ, ...o }).formatToParts(new Date(t)))
+      p[x.type] = x.value;
+    return p;
+  };
+  const etDayMon = (t) => {
+    const p = etParts(t, { day: 'numeric', month: 'numeric' });
+    return `${+p.day} ${ET_MON[p.month - 1]}`;
+  };
+  const etYear = (t) => etParts(t, { year: 'numeric' }).year;
+  const etDayYear = (t) => `${etDayMon(t)} ${etYear(t)}`;
+  // the day number of a time's ET calendar date, and of the Monday of its week
+  const etDayNo = (t) => {
+    const p = etParts(t, { year: 'numeric', month: 'numeric', day: 'numeric' });
+    return Date.UTC(+p.year, +p.month - 1, +p.day) / 864e5;
+  };
+  const etMonday = (t) => {
+    const d = etDayNo(t);
+    return d - ((new Date(d * 864e5).getUTCDay() + 6) % 7);
+  };
+  const PAYOUT_WEEKS = 8;
+  // The card's weeks, oldest first, this week last: { w: its Monday's day number, sum: paid, pend: still processing,
+  // before: a week before the first payout (drawn empty) }
+  function payoutWeeks(h) {
+    const now = etMonday(h.asOf),
+      firstWk = etMonday(h.first);
+    const weeks = Array.from({ length: PAYOUT_WEEKS }, (_, i) => {
+      const w = now - 7 * (PAYOUT_WEEKS - 1 - i);
+      return { w, sum: 0, pend: 0, before: w < firstWk };
+    });
+    for (const [list, key] of [
+      [h.payouts, 'sum'],
+      [h.processing, 'pend'],
+    ])
+      for (const p of list) {
+        const wk = weeks.find((x) => x.w === etMonday(p.at));
+        if (wk) wk[key] += p.amount;
+      }
+    return weeks;
+  }
+  function drawPayoutCard(cv, h, o) {
+    const ctx = cv.getContext('2d');
+    cv.width = cv.height = TRADE_W * CARD_SCALE;
+    ctx.setTransform(CARD_SCALE, 0, 0, CARD_SCALE, 0, 0);
+    const T = { bg: '#0c0c0d', text: '#f0f0f1', muted: '#a1a1a8', dim: '#6b6b73', lime: '#c8f542', ink: '#0c0c0d' };
+    const W = TRADE_W,
+      L = 60,
+      R = W - 60;
+    const usd = (n, cents = true) =>
+      '$' + n.toLocaleString('en-US', { minimumFractionDigits: cents ? 2 : 0, maximumFractionDigits: cents ? 2 : 0 });
+    const spaced = (t, x, y, color, font = `500 13px ${CF.mono}`, ls = '1.8px') => {
+      ctx.font = font;
+      ctx.letterSpacing = ls;
+      ctx.fillStyle = color;
+      ctx.fillText(t, x, y);
+      ctx.letterSpacing = '0px';
+    };
+    ctx.fillStyle = T.bg;
+    ctx.fillRect(0, 0, W, W);
+    const glow = ctx.createRadialGradient(W - 160, 300, 0, W - 160, 300, 420);
+    glow.addColorStop(0, 'rgba(200, 245, 66, 0.09)');
+    glow.addColorStop(1, 'rgba(200, 245, 66, 0)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 0, W, W);
+    drawAscii(ctx, -10, 860, 110, 19);
+    // top: the lockup, then the "as of" stamp and the source
+    ctx.textBaseline = 'alphabetic';
+    const wEnd = drawLockup(ctx, L, 58, 28);
+    ctx.fillStyle = 'rgba(255,255,255,0.16)';
+    ctx.fillRect(wEnd + 14, 62, 1, 20);
+    spaced('COPIER', wEnd + 28, 77, T.dim, `500 13px ${CF.mono}`, '2.3px');
+    ctx.textAlign = 'right';
+    ctx.font = `500 14px ${CF.mono}`;
+    ctx.fillStyle = T.muted;
+    ctx.fillText(etStamp(h.asOf), R, 70);
+    ctx.fillText('from Vest', R, 89);
+    const fw = ctx.measureText('from Vest').width;
+    ctx.fillStyle = T.lime;
+    ctx.fillText('✓', R - fw - 8, 89);
+    ctx.textAlign = 'left';
+    // the tag (the period sits in it), the total as big as fits, where it came from, what's still processing
+    ctx.font = `500 16px ${CF.mono}`;
+    ctx.fillStyle = T.lime;
+    ctx.fillText(`[Payouts · ${h.period}${o.name ? ' · @' + o.name.replace(/^@/, '') : ''}]`, L, 172);
+    const big = usd(h.total);
+    let size = 168;
+    const bigFont = () => `500 condensed ${size}px ${CF.display}`;
+    ctx.font = bigFont();
+    while (ctx.measureText(big).width > R - L && size > 80) {
+      size -= 6;
+      ctx.font = bigFont();
+    }
+    ctx.fillStyle = T.lime;
+    const base = 194 + size * 0.92;
+    ctx.fillText(big, L - 4, base);
+    const sans = (w) => `${w} 24px ${CF.sans}`;
+    runs(ctx, L, base + 50, [
+      ['paid out from ', T.muted, sans(400)],
+      [plural(h.accts, 'account'), T.text, sans(500)],
+      [' · ', T.muted, sans(400)],
+      [plural(h.count, 'payout'), T.text, sans(500)],
+    ]);
+    if (h.pending)
+      runs(ctx, L, base + 86, [
+        ['+ ', T.dim, `500 15px ${CF.mono}`],
+        [usd(h.pending), T.muted],
+        [' still processing, not in the total', T.dim],
+      ]);
+    // the last 8 weeks: a bar per week with payouts (its amount on top, the best lime), a stub for a quiet week since
+    // the first payout, nothing before it; what's processing a dashed box on its week, never part of the bar
+    const weeks = payoutWeeks(h);
+    const best = weeks.reduce((a, b) => (b.sum > a.sum ? b : a));
+    const capY = 520,
+      top = 600,
+      bot = 830,
+      gap = 16;
+    spaced(`LAST ${PAYOUT_WEEKS} WEEKS`, L, capY, T.muted);
+    if (h.count > 1) {
+      ctx.textAlign = 'right';
+      const when = etYear(h.biggest.at) === etYear(h.asOf) ? etDayMon(h.biggest.at) : etDayYear(h.biggest.at);
+      spaced(`BIGGEST PAYOUT ${usd(h.biggest.amount)} · ${when}`, R, capY, T.dim);
+      ctx.textAlign = 'left';
+    }
+    ctx.save();
+    ctx.setLineDash([3, 5]);
+    ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+    ctx.beginPath();
+    ctx.moveTo(L, bot + 0.5);
+    ctx.lineTo(R, bot + 0.5);
+    ctx.stroke();
+    ctx.restore();
+    const bw = (R - L - gap * (PAYOUT_WEEKS - 1)) / PAYOUT_WEEKS;
+    const mx = Math.max(...weeks.map((x) => x.sum + x.pend)) || 1;
+    weeks.forEach((wk, i) => {
+      const x = L + i * (bw + gap),
+        isBest = wk === best && wk.sum > 0;
+      if (!wk.before || wk.pend) {
+        const bh = wk.sum ? Math.max(3, (wk.sum / mx) * (bot - top)) : 2;
+        ctx.fillStyle = isBest ? T.lime : wk.sum ? 'rgba(255,255,255,0.13)' : 'rgba(255,255,255,0.09)';
+        ctx.fillRect(x, bot - bh, bw, bh);
+        if (isBest) {
+          ctx.save();
+          ctx.shadowColor = 'rgba(200,245,66,0.45)';
+          ctx.shadowBlur = 18;
+          ctx.fillRect(x, bot - bh, bw, 2);
+          ctx.restore();
+        }
+        let labelY = bot - bh - 12;
+        if (wk.pend) {
+          const ph = (wk.pend / mx) * (bot - top),
+            py = bot - (wk.sum ? bh : 0) - ph;
+          ctx.save();
+          ctx.setLineDash([4, 4]);
+          ctx.strokeStyle = 'rgba(240,240,241,0.35)';
+          ctx.strokeRect(x + 0.5, py + 0.5, bw - 1, ph - 1);
+          ctx.restore();
+          ctx.font = `500 13px ${CF.mono}`;
+          ctx.fillStyle = T.dim;
+          ctx.textAlign = 'center';
+          ctx.fillText('+' + usd(Math.round(wk.pend), false), x + bw / 2, py + ph / 2 + 5);
+          ctx.textAlign = 'left';
+          labelY = py - 12;
+        }
+        if (wk.sum) {
+          ctx.font = `500 14px ${CF.mono}`;
+          ctx.fillStyle = isBest ? T.lime : T.muted;
+          ctx.textAlign = 'center';
+          ctx.fillText(usd(Math.round(wk.sum), false), x + bw / 2, labelY);
+          ctx.textAlign = 'left';
+        }
+      }
+      // under each bar its Monday, from the calendar date (read in UTC, as it was built), the last one THIS WEEK
+      ctx.font = `500 13px ${CF.mono}`;
+      ctx.fillStyle = i === PAYOUT_WEEKS - 1 ? T.muted : T.dim;
+      ctx.textAlign = 'center';
+      const d = new Date(wk.w * 864e5);
+      ctx.fillText(
+        i === PAYOUT_WEEKS - 1 ? 'THIS WEEK' : `${d.getUTCDate()} ${ET_MON[d.getUTCMonth()]}`,
+        x + bw / 2,
+        bot + 28,
+      );
+      ctx.textAlign = 'left';
+    });
+    // bottom left: the counts as tiles (one payout: its date instead of "since")
+    const tiles = [
+      ['PAYOUTS', String(h.count)],
+      ['ACCOUNTS', String(h.accts)],
+      [h.count === 1 ? 'PAID' : 'SINCE', etDayYear(h.first)],
+    ];
+    let tx = L;
+    const ty = W - 60 - 66;
+    for (const [label, value] of tiles) {
+      ctx.font = `500 11px ${CF.mono}`;
+      ctx.letterSpacing = '1.5px';
+      const lw = ctx.measureText(label).width;
+      ctx.letterSpacing = '0px';
+      ctx.font = `500 20px ${CF.mono}`;
+      const w = Math.max(112, 32 + Math.max(lw, ctx.measureText(value).width));
+      ctx.fillStyle = 'rgba(255,255,255,0.05)';
+      ctx.fillRect(tx, ty, w, 66);
+      ctx.strokeStyle = 'rgba(255,255,255,0.07)';
+      ctx.strokeRect(tx + 0.5, ty + 0.5, w - 1, 65);
+      spaced(label, tx + 16, ty + 24, T.dim, `500 11px ${CF.mono}`, '1.5px');
+      ctx.font = `500 20px ${CF.mono}`;
+      ctx.fillStyle = T.text;
+      ctx.fillText(value, tx + 16, ty + 51);
+      tx += w + 12;
+    }
+    // bottom right: the site, and the code box above it
+    ctx.textAlign = 'right';
+    ctx.font = `500 14px ${CF.mono}`;
+    ctx.fillStyle = T.dim;
+    ctx.fillText('Free copier · stratuh.com', R, W - 60);
+    ctx.textAlign = 'left';
+    if (o.code) {
+      ctx.font = `700 15px ${CF.mono}`;
+      ctx.letterSpacing = '2.4px';
+      const cw = ctx.measureText(SUPPORT_CODE).width + 28;
+      ctx.font = `500 12px ${CF.mono}`;
+      ctx.letterSpacing = '1px';
+      const lw = ctx.measureText('VEST CODE').width + 24;
+      const bx = R - cw - lw,
+        by = W - 60 - 22 - 34;
+      ctx.strokeStyle = 'rgba(200,245,66,0.45)';
+      ctx.strokeRect(bx + 0.5, by + 0.5, cw + lw - 1, 33);
+      ctx.fillStyle = T.lime;
+      ctx.fillRect(bx + lw, by, cw, 34);
+      ctx.fillStyle = T.dim;
+      ctx.fillText('VEST CODE', bx + 12, by + 22);
+      ctx.font = `700 15px ${CF.mono}`;
+      ctx.letterSpacing = '2.4px';
+      ctx.fillStyle = T.ink;
+      ctx.fillText(SUPPORT_CODE, bx + lw + 14, by + 23);
+      ctx.letterSpacing = '0px';
+    }
+  }
   const ymd = (t) => new Date(t).toISOString().slice(0, 10);
   const cardFile = () => {
+    if (S.share && S.share.kind === 'payouts') return `stratuh-payouts-${ymd(Date.now())}.png`;
     const g = S.share && S.share.kind === 'trade' && shareTrade();
     return g
       ? `stratuh-trade-${ymd(g.closedAt)}-${new Date(g.closedAt).toTimeString().slice(0, 5).replace(':', '')}.png`
@@ -15279,21 +15597,22 @@
     const list = shareTrades();
     return list.find((g) => g.key === S.share.trade) || list[0] || null;
   };
-  // The Share sheet: Today or One trade, the picture as it will be copied, its options, Copy image and Save PNG. Built
-  // once (the name being typed survives the panel's refreshes); the picture is redrawn when its data or an option
-  // changes. One trade lists the profitable trades of the last 30 days from Vest's position history.
+  // The Share sheet: Today, One trade or Payouts, the picture as it will be copied, its options, Copy image and Save PNG.
+  // Built once (the name being typed survives the panel's refreshes); the picture is redrawn when its data or an option
+  // changes. One trade lists the profitable trades of the last 30 days from Vest's position history; Payouts shows
+  // only the name and the code. No account numbers on any card (owner, 2026-10-14), so nothing to hide there.
   function renderShare(body) {
     if (!S.share) {
       const o = store.get(SHARE_OPTS_KEY, {}) || {};
       S.share = {
         hide: o.hide === true,
-        nums: o.nums === true,
         code: o.code !== false,
         sort: o.sort === 'best' ? 'best' : 'latest',
         style: SHARE_STYLES.some(([k]) => k === o.style) ? o.style : 'summary',
         kind: 'day',
         trade: null,
       };
+      if ('nums' in o) saveShareOpts(); // the old Hide account numbers switch (until v0.40.3): dropped from what's saved
     }
     ensureDay();
     loadHistory(); // the day's trades (chips) and the One trade list
@@ -15304,10 +15623,10 @@
           <button class="switch ${on ? 'on' : ''}" data-sh="${key}" role="switch" aria-checked="${on}" aria-label="${name}"><span class="knob"></span></button></div>`;
       body.innerHTML = `
         <div class="share">
-          <div class="tabseg" role="tablist"><button class="tab" role="tab" data-kind="day">Today</button><button class="tab" role="tab" data-kind="trade">One trade</button></div>
+          <div class="tabseg" role="tablist"><button class="tab" role="tab" data-kind="day">Today</button><button class="tab" role="tab" data-kind="trade">One trade</button><button class="tab" role="tab" data-kind="payouts">Payouts</button></div>
           <div class="tabseg" id="sh-sort" role="tablist" aria-label="Order" hidden><button class="tab" role="tab" data-sort="latest">Latest</button><button class="tab" role="tab" data-sort="best">Most profitable</button></div>
           <div class="sh-list" id="sh-list" hidden></div>
-          <div class="prev"><canvas id="sh-cv" width="${CARD_W}" height="${CARD_H}" aria-label="The picture to share"></canvas></div>
+          <div class="prev"><canvas id="sh-cv" width="${CARD_W}" height="${CARD_H}" aria-label="The picture to share"></canvas><div class="sh-empty" id="sh-empty" hidden></div></div>
           <div>
             <div class="opt" data-shopt="style"><div class="opt-txt"><div class="opt-name">Trades on the card</div><div class="opt-short" id="sh-style-short"></div></div>
               <div class="sh-dd"><button class="sh-ddb" id="sh-style" aria-haspopup="listbox" aria-expanded="false"><span></span>${ICON.down}</button>
@@ -15316,13 +15635,12 @@
                   `<button class="mi" role="option" data-style="${k}"><span class="mt">${name}</span><span class="mk">${ICON.check}</span></button>`,
               ).join('')}</div></div></div>
             ${opt('hide', 'Hide amounts', 'Shows % gain (or points) instead of dollars.', S.share.hide)}
-            ${opt('nums', 'Hide account numbers', 'Leaves the account tiles off.', S.share.nums)}
             <div class="opt"><div class="opt-txt"><div class="opt-name">Name on the card</div><div class="opt-short">Optional. Leave it empty to post without one.</div></div>
               <input class="tr-in sh-name" id="sh-name" maxlength="24" placeholder="@name" aria-label="Name on the card"></div>
             ${opt('code', `Add code ${SUPPORT_CODE}`, '5% off Vest for whoever sees it.', S.share.code)}
           </div>
           <div class="sh-btns"><button class="armbtn" id="sh-copy">${ICON.copy}<span>Copy image</span></button><button class="ghostbtn" id="sh-save">${ICON.save} Save PNG</button></div>
-          <div class="hint">Shows P&amp;L, sizes and prices only. Never balances, account ids or logins.</div>
+          <div class="hint" id="sh-hint"></div>
         </div>`;
       const nm = body.querySelector('#sh-name');
       nm.value = store.get(SHARE_NAME_KEY, '') || '';
@@ -15355,6 +15673,7 @@
           (b.onclick = () => {
             S.share.kind = b.dataset.kind;
             if (S.share.kind === 'trade') loadHistory();
+            if (S.share.kind === 'payouts') loadPayouts();
             renderShare(body);
           }),
       );
@@ -15385,13 +15704,18 @@
       body.querySelector('#sh-copy').onclick = () => copyCard(body, cv);
       loadCardFonts().then(() => drawShare(body, true));
     }
-    const trade = S.share.kind === 'trade';
+    const trade = S.share.kind === 'trade',
+      payouts = S.share.kind === 'payouts';
+    if (payouts) loadPayouts(); // cached: re-read only once it's a few minutes old
     body.querySelectorAll('[data-kind]').forEach((b) => {
       b.classList.toggle('on', b.dataset.kind === S.share.kind);
       b.setAttribute('aria-selected', String(b.dataset.kind === S.share.kind));
     });
-    body.querySelector('[data-shopt="nums"]').hidden = trade; // the trade card names no accounts
-    body.querySelector('[data-shopt="style"]').hidden = trade; // Today only
+    body.querySelector('[data-shopt="style"]').hidden = S.share.kind !== 'day'; // Today only
+    body.querySelector('[data-shopt="hide"]').hidden = payouts; // a payout card without amounts says nothing
+    body.querySelector('#sh-hint').textContent = payouts
+      ? 'Shows what Vest paid out. Never balances or logins.'
+      : 'Shows P&L, sizes and prices only. Never balances, account ids or logins.';
     const style = SHARE_STYLES.find(([k]) => k === S.share.style) || SHARE_STYLES[0];
     body.querySelector('#sh-style span').textContent = style[1];
     body.querySelector('#sh-style-short').textContent = style[2];
@@ -15455,6 +15779,39 @@
   function drawShare(body, force) {
     const cv = body.querySelector('#sh-cv');
     if (!cv) return;
+    // Payouts with none paid yet (or still reading): a line in place of the picture, Copy and Save off
+    const empty = body.querySelector('#sh-empty');
+    let note = '';
+    if (S.share.kind === 'payouts') {
+      const h = S.payoutHist;
+      const sum = payoutSummary(h);
+      if (!sum)
+        note = !h
+          ? '<span>Reading your payouts from Vest…</span>'
+          : h.error
+            ? `<span>Couldn't read your payouts from Vest (${esc(h.error)}).</span>`
+            : h.processing.length
+              ? '<b>No payouts yet</b><span>Your first payout is still processing. It shows here once Vest has paid it.</span>'
+              : '<b>No payouts yet</b><span>Every payout Vest makes to this login adds up here, closed accounts included.</span>';
+      empty.hidden = !note;
+      if (note && empty.dataset.html !== note) empty.innerHTML = empty.dataset.html = note;
+      cv.hidden = !!note;
+      body.querySelector('#sh-copy').disabled = body.querySelector('#sh-save').disabled = !!note;
+      if (!sum) {
+        cv.dataset.key = '';
+        return;
+      }
+      const o = { code: S.share.code, name: shareName() };
+      // the stamp moves with the minute; the data with each read
+      const key = JSON.stringify({ k: 'payouts', at: h.at, m: Math.floor(Date.now() / 60000), ...o });
+      if (!force && cv.dataset.key === key) return;
+      cv.dataset.key = key;
+      drawPayoutCard(cv, sum, o);
+      return;
+    }
+    empty.hidden = true;
+    cv.hidden = false;
+    body.querySelector('#sh-copy').disabled = body.querySelector('#sh-save').disabled = false;
     if (S.share.kind === 'trade') {
       const g = shareTrade();
       if (!g) {
@@ -15480,11 +15837,11 @@
     cv.dataset.key = key;
     drawCard(cv, d, S.share.hide);
   }
-  if (window.__VC_TEST__) window.__vcShare = { dayTrades, groupTrades, details: () => _details };
+  if (window.__VC_TEST__)
+    window.__vcShare = { dayTrades, groupTrades, details: () => _details, loadPayouts, payoutSummary, payoutWeeks };
   const saveShareOpts = () =>
     store.set(SHARE_OPTS_KEY, {
       hide: S.share.hide,
-      nums: S.share.nums,
       code: S.share.code,
       sort: S.share.sort,
       style: S.share.style,

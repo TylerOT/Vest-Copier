@@ -404,10 +404,16 @@ when they're on.
   - **One trade:** a list of your profitable trades from the last 30 days, sorted **Latest** or **Most profitable**, read from Vest's position history on every
     account you have, finished ones included (a passed evaluation, a closed or failed funded account). The same trade
     copied across accounts shows once ("× 5"); pick one and the card shows the side, size and entry, the total "on 5
-    accounts", each exit (TP1, TP2, stop or breakeven) with its price and points, and the trade's timeline. **Copy image** puts it on
+    accounts", each exit (TP1, TP2, stop or breakeven) with its price and points, and the trade's timeline.
+  - **Payouts:** everything Vest has paid into your Primary Account from your funded and instant accounts, closed
+    ones included: the total, how many payouts from how many accounts, your last 8 weeks as bars (Monday to Sunday,
+    your best week in lime) and your biggest payout. Amounts are what you received after Vest's split; a payout still
+    processing shows apart and isn't added in, and refunded ones are left out. Until your first payout is paid the tab
+    says so. **Copy image** puts it on
   the clipboard to paste into X, Discord or a group chat; **Save PNG** saves it. **Hide amounts** shows the % change instead of
-  dollars, with the master's points on each trade (Day summary then shows only how many trades and won / lost); **Hide account numbers** leaves the account tiles off; **Name on the card** is optional; **Add code AMPED** puts the code on it. It never shows balances,
-  account ids or logins. If the browser blocks the clipboard, the picture is saved to Downloads instead.
+  dollars, with the master's points on each trade (Day summary then shows only how many trades and won / lost; not on
+  Payouts); **Name on the card** is optional; **Add code AMPED** puts the code on it. No card shows account numbers,
+  balances, account ids or logins. If the browser blocks the clipboard, the picture is saved to Downloads instead.
 - **Claim all profit** (bottom of the P&L tab; stop copying first) — claims every funded account's available profit to your Primary
   Account, the same claim as the Claim Profit window Vest itself offers, for the full amount. First a **preview**: what each account
   claims and what you receive after its split, or the reason it can't claim (an open position or order, no profit, an
