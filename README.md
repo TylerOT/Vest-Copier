@@ -66,8 +66,8 @@ minutes:
 
    Get it from the store links above, not from download buttons on other sites (some are ads for other software).
 2. **Chrome, Edge or Brave only:** go to `chrome://extensions`, click **Details** under Tampermonkey and switch
-   **Allow User Scripts** on. It's off by default, and the copier won't run without it. No such switch? Turn on
-   **Developer mode** (top right of the same page) instead. Firefox skips this step.
+   **Allow User Scripts** on. It's off by default, and the copier won't run without it. No such switch? Use
+   **Developer mode** instead: its switch is at the page's top right. Firefox skips this step.
 3. **Install the copier:** open
    **[vest-copier.user.js](https://github.com/xAmped/Vest-Copier/releases/latest/download/vest-copier.user.js)**.
    Tampermonkey shows an install page. Click **Install**.
@@ -112,7 +112,8 @@ guides), **Report a problem**, docking and reload.
 
 **Flatten all** closes everything on every account at once (no confirmation, and copying keeps running, so it doubles
 as a quick exit). At the bottom: the latest activity line (click for the log), then the code and a status dot with
-your version and the API budget (click it for Vest's build and the site check).
+your version and, while copying, your time to Vest. Click it for the last 5 minutes of readings, how close your last
+copy filled, **Test connection**, Vest's build and the site check.
 
 ## Things it won't do
 

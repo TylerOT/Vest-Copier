@@ -76,9 +76,17 @@ their own browser.
 - **Footer:** the latest activity line. Click it to open the log (the last six lines; scroll for more), with **Download**
   (saves one file with the whole log and the diagnostics) and **Clear**. The panel remembers whether you left it open. When the line is a problem,
   **Get help** sits next to it.
-- **Bottom bar:** the AMPED code on the left (click to copy it); on the right a coloured dot with your **version** and
-  the live **API budget**. Green = a checked Vest build; amber = Vest updated its site and the check is running; red =
-  the check failed and copying is off. Click it for Vest's build, your version, the API budget, Vest's slowest answer today and **Run site check**.
+- **Bottom bar:** the AMPED code on the left (click to copy it); on the right a coloured dot with your **version** and,
+  while copying, your **time to Vest** (e.g. `v0.41.0 · 64ms`): the copier makes a small read to Vest every 20 s, which
+  also keeps its connection ready for your next copy. The dot: lime under 80 ms (good), grey 80-200 ms (OK), amber over
+  200 ms (slow: followers' fills may land a tick or more from yours in fast markets), red when Vest isn't answering;
+  grey with just the version when you're not copying. While Vest has updated its site, the bar shows that instead (amber
+  while the check runs, red if it failed and copying is off). Click it for the **status card**: the time to Vest in
+  big numbers with its level, the last 5 minutes as bars against the 80 and 200 ms lines and how steady it is,
+  **Last copy** (how far your followers filled from you on the last copied trade, in points, and how long after),
+  **Test connection** (about 10 quick checks, copying or not, then one plain verdict, kept until you close the card),
+  **Run site check**, and Vest's build, your version, the API budget and Vest's slowest answer today. None of it
+  promises a fill: it says what your connection means for copies.
 - **Alerts** show above the footer only when they apply: followers left in a trade without the master (**Flatten** /
   **Keep it**), a new version, Vest's screen on another account while copying, the theme's first-time bar, and short messages.
 
@@ -94,8 +102,8 @@ drawn inside the chart, so the panel fades out of their way while one is open ov
 **Minimised,** it's a small pill: the logo, the state and one button. While copying it shows the open P&L and
 **Flatten** (one click, like Flatten all); when ready, **Start**; when something needs you, **Open** (and the account's
 name). Click anywhere else on it to open the panel, or press and move to drag it. A red edge means something needs you
-(followers waiting on Flatten / Keep, Vest's live feed lost while copying, or copying off after a site check); amber
-means Vest updated its site and the check is running. Position, size and open or minimised are all remembered.
+(followers waiting on Flatten / Keep, Vest's live feed lost while copying, copying off after a site check, or Vest not
+answering: "No answer"); amber means Vest updated its site and the check is running, or Vest is slow (with the time). Position, size and open or minimised are all remembered.
 
 ---
 
@@ -311,9 +319,10 @@ is put away until you're flat again.
 
 **⋯ → Settings.** Each setting shows one line under its name; the **?** next to it opens the full explanation.
 
-- **Fast mode** (on by default) — fires follower entries the *instant* you send yours, for the most simultaneous
-  fills. Trade-off: followers open *before* your master order is confirmed. If your master entry is
-  then rejected, you'll be warned about "orphan" follower positions.
+- **Fast mode** (on by default) — copies each order the *instant* you send yours (entries, closes, reduces, adds,
+  stops and targets), for the most simultaneous fills. Trade-off: followers act *before* Vest confirms your master
+  order. If your master entry is then rejected, you'll be warned about "orphan" follower positions; if a close is
+  rejected, the log says the master is still in. Limit orders and cancels are copied once Vest answers.
 - **Auto-flatten orphans** (off by default) — if followers end up in a trade the master isn't in (its entry was refused
   or didn't fill, or Vest closed the master), closes them automatically instead of asking. It never acts when the master might be in
   the trade.

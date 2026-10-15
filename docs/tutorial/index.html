@@ -149,7 +149,7 @@ dd { margin: 0; font-size: 15.5px; }
   <p class="lede">Trade one Vest account and have the same trade placed on your other accounts, live, from inside the Vest page. It also adds a Trade tab where you set your stop and targets in points. Formerly Vest Copier: same script, same link, new look.</p>
   <div class="video"><iframe src="https://www.youtube-nocookie.com/embed/mFJGsJ0IInY" title="STRATUH Copier tutorial video" loading="lazy" allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowfullscreen></iframe></div>
   <p class="video-link">Prefer YouTube? <a href="https://youtu.be/mFJGsJ0IInY">Watch the tutorial there</a> (10 minutes).</p>
-  <div class="meta"><span class="pill">v0.40.4</span><span class="pill">next.vestmarkets.com</span><span class="pill">5-minute setup</span><a class="pill" href="https://github.com/xAmped/Vest-Copier">github.com/xAmped/Vest-Copier</a></div>
+  <div class="meta"><span class="pill">v0.41.0</span><span class="pill">next.vestmarkets.com</span><span class="pill">5-minute setup</span><a class="pill" href="https://github.com/xAmped/Vest-Copier">github.com/xAmped/Vest-Copier</a></div>
 </header>
 
 <div class="wrap">
@@ -256,7 +256,7 @@ dd { margin: 0; font-size: 15.5px; }
       </div>
       <div class="formula">follower size = master size × (follower equity ÷ master equity)<br><span class="c">// only when scaling down: × 0.95 buffer, rounded down to the market's size step</span><br><span class="c">// within 0.5% of the master's equity: copied 1:1</span></div>
       <p>Example: a $25k master trading 1 NQ drives a $5k follower at about 0.19 NQ. Both lose the same share of their account if the stop is hit. An account too small to hold even the minimum size is skipped, with a line in the log saying so.</p>
-      <p><b>Fast mode</b> (Settings, on by default) sends the followers' entries the instant you send yours, instead of waiting for Vest to answer the master. <b>Auto-flatten</b> (off by default) closes followers left in a trade the master isn't in. Looks live under <b>⋯ → Appearance</b>: text size, the chart bracket, chart marks, session shading and the STRATUH theme.</p>
+      <p><b>Fast mode</b> (Settings, on by default) sends the followers' orders (entries, closes, adds, stops and targets) the instant you send yours, instead of waiting for Vest to answer the master. <b>Auto-flatten</b> (off by default) closes followers left in a trade the master isn't in. Looks live under <b>⋯ → Appearance</b>: text size, the chart bracket, chart marks, session shading and the STRATUH theme.</p>
     </section>
 
     <section id="copies">

@@ -2,6 +2,18 @@
 
 Newest first. To update, click **Install** on the update row that appears in the panel whenever there's a newer version.
 
+## v0.41.0
+Followers copy you at the same moment, not after Vest answers, and the panel shows your connection to Vest.
+
+- **Fast mode copies everything at market now, not just entries.** Closes, partial closes, adds, and stop and target moves go to your followers the instant you send yours, instead of after Vest confirms your order. In our tests followers' closes filled about 25 ms after the master's, where they used to wait about 150 ms for Vest's answer first, and longer the further you are from Vest's servers. Limit orders, cancels, removing a stop or target, and orders that turn a trade around still wait for Vest's answer, so nothing risky goes out before your own order is confirmed.
+- **Close, Reduce and Flatten all get you out straight away.** They no longer check with Vest first when the copier already knows your position, and Close is never greyed out while your stop and targets are being set after an entry. Flatten all closes everything it knows about at once, on every account together.
+- **Your connection to Vest, in the panel.** The bottom bar shows how long Vest takes to answer (for example 64 ms), coloured by how good it is. Click it for the last 5 minutes as bars, how steady it is, how close your last copy filled to the master, and a **Test connection** button that checks it in a few seconds, copying or not. Minimised, the panel turns amber with the time when Vest is slow, and red with "No answer" when it stops answering.
+- **A size check.** If a follower's size ever stops matching its share of the master's, the log names it so you can fix it on Vest.
+- **If Vest refuses your order after your followers already copied it,** the copier says exactly what that left, and takes back an add your master didn't get.
+- **Several Vest tabs:** the Download now includes what every tab recorded, so a report from any tab has the full story.
+- **The first trade after Start copying** no longer waits on a leverage change when your followers' leverage already matches.
+- **Fixes:** the panel could keep crashing after a Vest update when the browser's storage was full; a new tab could wrongly say "the page reloaded while copying".
+
 ## v0.40.4
 Share has a new card: your payouts.
 

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Vest Copier
 // @namespace    vestcopier
-// @version      0.40.4
+// @version      0.41.0
 // @description  Copies a master Vest account's trades to your other Vest accounts, live, and adds a points-based order panel.
 // @author       xAmped
 // @license      STRATUH Copier License — free to use, no selling; see LICENSE
@@ -38,7 +38,7 @@
     })(),
   };
 
-  const VERSION = '0.40.4';
+  const VERSION = '0.41.0';
   // Where this script runs from, read off its own first stack frame (each script manager names it differently): the
   // diagnostics use it to tell the copier's own errors from Vest's. Null when the stack shows no address.
   const OWN_SRC = (() => {
@@ -99,6 +99,8 @@
   const MIN_LEG_USD = 1; // Vest's minimum notional for a sized stop/target leg
 
   // ───────────────────────── state ─────────────────────────
+  // This tab, on every diagnostics record and log line it saves (several Vest tabs can be open at once).
+  const TAB_TAG = Math.random().toString(36).slice(2, 8);
   const S = {
     groups: [], // [{size,type,rows:[row]}]
     byId: {}, // id -> row
@@ -114,7 +116,7 @@
     rulesOpen: false, // rules view is showing
     summaryOpen: false, // P&L summary view is showing
     levCache: {}, // "accountId|symbol" -> leverage known to be set (skip redundant PUT)
-    fast: false, // fast mode: fire follower OPENS at master-send (before the master confirms)
+    fast: false, // fast mode: copy the master's market orders at its send (before Vest answers it)
     autoFlatten: false, // auto-close orphan followers if the master open is rejected
     orphan: null, // { list: [{ accountId, positionId, symbol, leverage }] } follower positions without the master
     arming: false, // an arm is in progress
@@ -370,13 +372,14 @@
     let pending = null,
       levChange = null;
     try {
-      if (method === 'POST') pending = maybeFastOpen(url, body, auth, 'fetch');
+      offerUser(auth);
+      // first: a reduce notes the position's size as it goes out, which the fast copy below reads
+      if (method !== 'GET') levChange = notePageRequest(url, method, body);
     } catch {
       /* best effort: nothing to do if this fails */
     }
     try {
-      offerUser(auth);
-      if (method !== 'GET') levChange = notePageRequest(url, method, body);
+      if (method !== 'GET') pending = maybeFast(url, body, auth, method, 'fetch');
     } catch {
       /* best effort: nothing to do if this fails */
     }
@@ -395,12 +398,10 @@
             .text()
             .then(
               (t) =>
-                pending
-                  ? reconcileFast(pending, t, r.status)
-                  : onRequest(url, body, t, auth, method, r.status, 'fetch'),
-              () => pending && reconcileFast(pending, null, r.status, true),
+                pending ? settleFast(pending, t, r.status) : onRequest(url, body, t, auth, method, r.status, 'fetch'),
+              () => pending && settleFast(pending, null, r.status, true),
             ),
-        () => pending && reconcileFast(pending, null, 0), // network failure: Vest may or may not have the order
+        () => pending && settleFast(pending, null, 0), // network failure: Vest may or may not have the order
       );
     }
     return p;
@@ -425,8 +426,8 @@
     if (vc) {
       let pending = null;
       try {
-        pending = vc.method === 'POST' ? maybeFastOpen(vc.url, b, vc.auth, 'xhr') : null;
-        if (vc.method !== 'GET') vc.lev = notePageRequest(vc.url, vc.method, b);
+        if (vc.method !== 'GET') vc.lev = notePageRequest(vc.url, vc.method, b); // first, as in the fetch hook
+        pending = vc.method !== 'GET' ? maybeFast(vc.url, b, vc.auth, vc.method, 'xhr') : null;
       } catch {
         /* best effort: nothing to do if this fails */
       }
@@ -441,7 +442,7 @@
             /* best effort: nothing to do if this fails */
           }
           if (vc.lev) pageLeverageDone(vc.lev, this.status);
-          if (pending) reconcileFast(pending, r, this.status);
+          if (pending) settleFast(pending, r, this.status);
           else onRequest(vc.url, b, r, vc.auth, vc.method, this.status, 'xhr');
         },
         { once: true },
@@ -516,7 +517,7 @@
     return change;
   }
   function pageLeverageDone(change, status) {
-    if (status >= 200 && status < 300) return;
+    if (status >= 200 && status < 300) return void presetFollowerLeverage(change);
     if (_levSet[change.key] === change) delete _levSet[change.key];
     if (S.tradeOpen) refreshTradeState(); // Vest's own leverage back on the panel
     refreshStopLeverage();
@@ -684,6 +685,7 @@
           qty,
           openPrice: num(p.open_price),
           collateral: num(p.collateral) || 0,
+          leverage: num(p.leverage) || (prev && prev.leverage) || null, // a close sends it (Vest requires the field)
           triggers: prev ? prev.triggers : [],
         };
         if (prev) st.positions[i] = next;
@@ -936,15 +938,7 @@
     } finally {
       if (timer) clearTimeout(timer);
     }
-    try {
-      const rem = r.headers.get('x-ratelimit-remaining');
-      if (rem != null) {
-        S.rate = { remaining: +rem, limit: +r.headers.get('x-ratelimit-limit') || S.rate.limit };
-        renderRate();
-      }
-    } catch {
-      /* best effort: nothing to do if this fails */
-    }
+    noteRate(r);
     const text = await r.text();
     // an account token Vest revoked early (log out / in elsewhere): drop it and retry once with a fresh one. A 401
     // means nothing ran, so the retry (same Idempotency-Key) is safe.
@@ -958,13 +952,26 @@
     if (!r.ok) throw new Error(`${path} -> ${r.status}`);
     return parseJson(text, text);
   };
+  // Vest's rate budget from an answer's headers (200 requests a second): the status card shows what's left.
+  function noteRate(r) {
+    try {
+      const rem = r.headers.get('x-ratelimit-remaining');
+      if (rem != null) {
+        S.rate = { remaining: +rem, limit: +r.headers.get('x-ratelimit-limit') || S.rate.limit };
+        renderRate();
+      }
+    } catch {
+      /* best effort: nothing to do if this fails */
+    }
+  }
   // Account tokens last ~15 minutes. Cached, and concurrent requests for the same account share one mint.
   const acctTokens = {},
     minting = {},
     tokenOwner = {}; // account token -> account id, to renew a revoked one
-  const mintAccountToken = (id) => {
+  // `margin`: renew a token this close to expiring (the keep-warm tick renews early, so an order never waits on one).
+  const mintAccountToken = (id, margin = TOKEN_REFRESH_MARGIN_MS) => {
     const c = acctTokens[id];
-    if (c && c.exp - TOKEN_REFRESH_MARGIN_MS > Date.now()) return Promise.resolve(c);
+    if (c && c.exp - margin > Date.now()) return Promise.resolve(c);
     return (minting[id] =
       minting[id] ||
       (async () => {
@@ -1200,6 +1207,7 @@
           qty: num(p.quantity),
           openPrice: num(p.openPrice),
           collateral: num(p.collateral) || 0,
+          leverage: num(p.leverage) || null,
           triggers: posLegs(p).map((l) => ({ id: l.id, kind: l.kind, price: l.price })),
         }))
         .filter((p) => p.qty > 0),
@@ -1480,6 +1488,118 @@
     }, BALANCE_POLL_MS);
   }
 
+  // ── Keep-warm, while copying. With Vest's live feed up the copier otherwise talks to Vest about once a minute, and a
+  // connection left idle that long can be closed: the next order would then wait for a new one (two extra round trips
+  // before it even leaves). Every WARM_MS while copying (and at Start), account tokens close to expiring are renewed (an
+  // order never waits on one) and one small read goes out on the copier's connection, timed: the time to Vest the
+  // status card shows (`S.net`: the last 5 minutes' reads, one every 20 s), summed up in the diagnostics every few
+  // minutes. A read that gets no answer within NET_TIMEOUT_MS (or a server error) is a miss: "Vest not answering"
+  // until one answers again. Test connection (`testConnection`) makes its own reads and never touches these.
+  const WARM_MS = 20000,
+    TOKEN_EARLY_MS = 180000,
+    NET_TIMEOUT_MS = 5000, // no answer this long: a miss (Vest's reads usually answer in well under a second)
+    NET_WINDOW_MS = 5 * 60000, // the card's bars: the last 5 minutes...
+    NET_BARS = 15, // ...one per read
+    NET_GOOD_MS = 80, // under this: good; to NET_OK_MS: OK; over: slow
+    NET_OK_MS = 200,
+    NET_DIAG_MS = 5 * 60000;
+  S.net = { samples: [], last: null, at: 0, fails: 0, missSince: null, test: null };
+  let _netDiagAt = 0;
+  const pctOf = (sorted, p) => sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * p))];
+  const netLevel = (ms) => (ms < NET_GOOD_MS ? 'good' : ms <= NET_OK_MS ? 'ok' : 'slow');
+  // One small read on the copier's own connection, timed to Vest's answer: ms, null when Vest didn't answer properly
+  // (no answer, or a refusal: an order would fail too), or undefined when there's nothing to read with yet.
+  async function timedRead() {
+    const id = S.master && S.byId[S.master] ? S.master : Object.keys(S.byId)[0];
+    if (!id || !userTokenOk()) return undefined;
+    let token;
+    try {
+      token = (await mintAccountToken(id)).token;
+    } catch {
+      return null;
+    }
+    const ctl = typeof AbortController === 'function' ? new AbortController() : null,
+      timer = ctl && setTimeout(() => ctl.abort(), NET_TIMEOUT_MS);
+    const t0 = performance.now();
+    try {
+      const r = await _fetch(API + '/v3/positions/opened', {
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+        ...(ctl ? { signal: ctl.signal } : {}),
+      });
+      const ms = Math.round(performance.now() - t0); // to Vest's answer arriving, before reading its body
+      noteRate(r);
+      await r.text();
+      if (r.status === 401 && acctTokens[id] && acctTokens[id].token === token) delete acctTokens[id]; // a new one next
+      return r.ok ? ms : null;
+    } catch {
+      return null;
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
+  // The steadiness of the last 5 minutes' answers: half the spread between the fastest and slowest, leaving out the
+  // single highest and lowest once there are five or more (one stray read doesn't make a connection uneven). null with
+  // fewer than three answers.
+  function netJitter() {
+    const v = S.net.samples
+      .filter((x) => x.ms != null)
+      .map((x) => x.ms)
+      .sort((a, b) => a - b);
+    if (v.length < 3) return null;
+    const w = v.length >= 5 ? v.slice(1, -1) : v;
+    return Math.round((w[w.length - 1] - w[0]) / 2);
+  }
+  // What the readout shows: off (not copying), none (copying, no read yet), good, ok, slow, down (not answering).
+  function netState() {
+    if (!S.armed) return 'off';
+    const n = S.net,
+      last = n.samples[n.samples.length - 1];
+    if (n.missSince) return 'down';
+    return last ? netLevel(last.ms) : 'none';
+  }
+  function noteNet(ms) {
+    const n = S.net,
+      now = Date.now();
+    n.samples = [...n.samples.filter((x) => now - x.at < NET_WINDOW_MS), { ms, at: now }].slice(-NET_BARS);
+    n.at = now;
+    if (ms == null) {
+      n.fails++;
+      n.missSince = n.missSince || now;
+    } else {
+      n.last = ms;
+      n.missSince = null;
+    }
+    renderConn();
+    if (now - _netDiagAt < NET_DIAG_MS) return;
+    _netDiagAt = now;
+    const s = n.samples
+      .filter((x) => x.ms != null)
+      .map((x) => x.ms)
+      .sort((a, b) => a - b);
+    diag('connection', {
+      reads: n.samples.length,
+      missed: n.samples.length - s.length,
+      medianMs: s.length ? pctOf(s, 0.5) : null,
+      p90Ms: s.length ? pctOf(s, 0.9) : null,
+      maxMs: s.length ? s[s.length - 1] : null,
+      jitterMs: netJitter(),
+    });
+  }
+  async function warmTick() {
+    if (!S.armed || !S.master || !userTokenOk()) return;
+    const ids = [S.master, ...S.followers];
+    try {
+      await Promise.all(ids.map((id) => mintAccountToken(id, TOKEN_EARLY_MS)));
+    } catch {
+      /* a token that can't be renewed now is renewed by the next request that needs it */
+    }
+    if (!S.armed) return;
+    if (feedLive()) Object.values(S.posMap).forEach(checkShares); // the size check, from what the feed shows
+    const ms = await timedRead();
+    if (ms !== undefined && S.armed) noteNet(ms);
+  }
+  setInterval(warmTick, WARM_MS);
+
   // Every account's saved per-symbol leverage, in one call (GET /v3/user-state, user token). null if it can't be read.
   async function fetchLeverages() {
     try {
@@ -1513,6 +1633,22 @@
     const path = `/v3/user-state/accounts/${id}/leverages/${encodeURIComponent(sym)}`;
     return api(path, token, { method: 'PUT', body: JSON.stringify({ leverage: String(lev) }) });
   }
+  // The master's leverage changed on Vest's ticket while copying: each follower gets it now, so the next copied entry
+  // doesn't wait on a leverage change before it goes out. A follower holding a position on that market is left alone,
+  // as when copying starts (its copied entry still sets it, as before).
+  function presetFollowerLeverage(change) {
+    if (!S.armed || change.id !== S.master) return;
+    const want = levKey(change.lev);
+    for (const f of S.followers) {
+      const key = f + '|' + change.sym,
+        st = S.acctState[f];
+      if (S.levCache[key] === want || (st && st.positions.some((p) => p.symbol === change.sym))) continue;
+      setFollowerLeverage(f, change.sym, want).then(
+        () => (S.levCache[key] = want),
+        (e) => diag('leverage', { ...who(f), symbol: change.sym, set: want, error: e.message, early: true }),
+      );
+    }
+  }
   // Vest requires a leverage on close orders: the request's, else the one synced for this account and market, else a
   // default.
   const closeBody = (symbol, positionId, leverage, accountId) => ({
@@ -1538,7 +1674,7 @@
   // Vest's fill history asked.
   async function fillInfo(accountId, symbol, orderId, feedWait = FEED_FILL_WAIT_MS) {
     const ff = await feedFill(orderId, feedWait);
-    if (ff) return ff.missing ? null : { price: ff.price, at: ff.at };
+    if (ff) return ff.missing ? null : { price: ff.price, at: ff.at, src: 'feed' };
     try {
       const { token } = await mintAccountToken(accountId);
       const nowS = Math.floor(Date.now() / 1000),
@@ -1554,6 +1690,20 @@
     }
   }
 
+  // A fill time as epoch ms, from Vest's seconds, milliseconds, nanoseconds or a date string; null when unreadable.
+  const fillMs = (v) => {
+    const n = typeof v === 'number' ? v : /^\d+(\.\d+)?$/.test(String(v)) ? +v : Date.parse(v);
+    if (!Number.isFinite(n) || n <= 0) return null;
+    return Math.round(n > 1e17 ? n / 1e6 : n > 1e14 ? n / 1e3 : n < 1e11 ? n * 1000 : n);
+  };
+  // The last copied trade's result for the status card: { pts, gapMs } (the followers' average distance from the
+  // master's fill, and how long after), or { notSent } when a follower's order couldn't go out.
+  S.lastCopy = null;
+  function noteLastCopy(c) {
+    S.lastCopy = { ...c, at: Date.now() };
+    renderConn();
+  }
+  const noteNotSent = () => noteLastCopy({ notSent: true });
   // Confirm that every order actually filled. Vest can accept an order (HTTP 200, ids returned) and still not execute
   // it, so each one is looked up in /v3/executions, with retries for propagation lag. Only immediate (market) orders
   // are checked; a resting limit order has nothing to find yet.
@@ -1610,6 +1760,7 @@
       slipSum = 0,
       slipMax = 0,
       slipN = 0;
+    const gaps = []; // how long after the master each copy filled, where both times are known to the millisecond
     await Promise.all(
       placed.map(async (p) => {
         const r = await tryFill(p.accountId, p.orderId);
@@ -1652,14 +1803,22 @@
           slipN++;
         }
         if (p.diag) {
+          // when each filled, as Vest stamps it (the feed's execution time, else the fill history's): the gap is how far
+          // behind the master the copy filled, the number that decides its slippage
+          const fAt = fillMs(fp.at),
+            mAt = mp ? fillMs(mp.at) : null;
           const o = {
             filled: true,
             fillPrice: fp.price,
             masterFillPrice: mp ? mp.price : null,
             slipPts: d,
             slipUsd: d != null ? +(Math.abs(d) * qty * pv).toFixed(4) : null,
+            fillAt: fAt,
+            masterFillAt: mAt,
+            fillGapMs: fAt && mAt ? fAt - mAt : null,
             met: true,
           };
+          if (fAt && mAt && (fAt % 1000 || mAt % 1000)) gaps.push(Math.max(0, fAt - mAt)); // whole seconds: unknown
           const lev = parseFloat(p.diag.leverage),
             fEq = +p.diag.fEq;
           if (lev > 0 && qty > 0) {
@@ -1692,12 +1851,12 @@
         leverage: p.diag && p.diag.leverage,
       }));
       raiseOrphans(symbol, list, 'the master entry did not fill', master.accountId);
-    } else if (filledWithoutMaster.length && kind === 'add') {
-      const names = filledWithoutMaster.map((p) => p.label).join(', ');
-      logEvent(
-        'warn',
-        `${names} added but the master didn't — they now hold more than the master. Reduce them on Vest.`,
-      );
+    } else if (filledWithoutMaster.length && kind === 'add' && entry) {
+      // Vest accepted the master's add and then didn't run it: the followers' adds that filled are taken back
+      takeBackAdds(entry, filledWithoutMaster, master.req || { symbol, leverage: null }, {
+        why: `MASTER add didn't fill, but ${filledWithoutMaster.map((p) => p.label).join(', ')} added: taking it back`,
+        confirmed: true,
+      });
     }
     if (m.fill === undefined && master.orderId && !masterMissed)
       unknown.unshift(accLabel(master.accountId) + ' (master)');
@@ -1706,7 +1865,14 @@
         'warn',
         `Couldn't confirm fills for ${unknown.join(', ')} — Vest's fill history didn't answer. Check them on Vest.`,
       );
+    if (entry && (kind === 'entry' || kind === 'add')) scheduleShareCheck(entry);
     if (!placed.length) return;
+    // the status card's "Last copy": how far the followers filled from the master, on average, and how long after
+    if (slipN)
+      noteLastCopy({
+        pts: slipSum / slipN,
+        gapMs: gaps.length ? Math.round(gaps.reduce((a, b) => a + b, 0) / gaps.length) : null,
+      });
     const n = placed.length - unknown.length;
     if ((quiet || asMaster) && !filled)
       logEvent('info', "↳ the followers' copies didn't fill either: nothing is open.");
@@ -1852,8 +2018,9 @@
   }
 
   // Copy a master add / move / remove of one stop or target to every follower.
-  async function mirrorLeg(op, kind, req, entry, followers, lat, t0) {
+  async function mirrorLeg(op, kind, req, entry, followers, lat, t0, fast = null) {
     const KIND = kind === 'sl' ? 'SL' : 'TP';
+    const changed = []; // the followers whose stop or target did change (said if Vest refuses the master's)
     const path = kind === 'sl' ? '/v3/positions/stop-loss' : '/v3/positions/take-profit';
     const idKey = kind === 'sl' ? 'stopLossId' : 'takeProfitId';
     const masterLegId = req[idKey] || req.orderId || req.id;
@@ -1936,6 +2103,7 @@
               logEvent('ok', `↳ removed ${KIND} on ${accLabel(f)} (${lat()})`);
             }
           }
+          changed.push(accLabel(f));
           diag('bracket', {
             ...d,
             outcome: { add: 'added', move: 'moved', remove: 'removed' }[op],
@@ -1957,10 +2125,39 @@
     }
     if (op === 'remove') entry.legs = (entry.legs || []).filter((l) => l.id !== masterLegId);
     if (op === 'add') setTimeout(() => enqueue(entry, () => syncLegs(entry)), LEG_SYNC_DELAY_MS); // learn the new leg ids
+    // fast mode sent it to the followers: if Vest didn't take the master's, say exactly what each side has now (on the
+    // side: the trade's next copied action doesn't wait for this answer)
+    if (fast) fast.answer.then((ok) => !ok && legRefused(op, kind, req, entry, changed, fast));
+  }
+  // A stop or target change fast mode copied, that Vest didn't take on the master: what each side has now.
+  function legRefused(op, kind, req, entry, changed, fast) {
+    const name = kind === 'sl' ? 'stop' : 'target',
+      verb = op === 'add' ? `got a new ${name} at ${req.triggerPrice}` : `moved their ${name} to ${req.triggerPrice}`,
+      head = fast.lost
+        ? `MASTER ${name} change: no answer from Vest (connection lost)`
+        : `MASTER ${name} change refused by Vest (HTTP ${fast.status})`;
+    logEvent(
+      'warn',
+      changed.length
+        ? `${head}: ${changed.join(', ')} ${verb}${fast.lost ? '' : ", the master's didn't"}. Check the master's ${name} on Vest${op === 'add' ? '' : ' and move theirs to match'}.`
+        : `${head}: the followers' copies didn't go through either, so nothing changed.`,
+    );
+    enqueue(entry, () => syncLegs(entry)); // the copier's view of every leg, from Vest
   }
 
   // Canonical leverage key (2 dp), so "50", "50.0" and an effective "50.001027" compare equal and skip a redundant PUT.
   const levKey = (lev) => String(Math.round(parseFloat(lev) * 100) / 100);
+  // Every account's saved leverage as read at Start copying. A follower not set by the sync (the master on Vest's
+  // default leverage: "matched per trade") is checked against it before its first copied order on a market: when its
+  // own leverage there (saved, else its plan's max, Vest's rule) is already the order's, nothing is changed, so the
+  // order goes out at once instead of after a leverage change (seen live 2026-10-15: the first copy of a session 200-400
+  // ms slower, 2.5-4.75 pts worse).
+  let _armLevs = null;
+  function levAlreadySet(f, sym, lev) {
+    if (!_armLevs) return false;
+    const own = orderLeverage(levFor(_armLevs, f, sym), maxLeverageFor(sym, f));
+    return own > 0 && levKey(own) === levKey(lev);
+  }
 
   // Open ONE follower: sized (cap-to-fit), leverage synced if needed, stop and targets attached. Writes the follower's
   // record into `followersMap` (shared by the normal and fast paths) and returns a `placed` record, or null.
@@ -1992,6 +2189,7 @@
     if (cq.scaled) logEvent('info', `↳ ${accLabel(f)} scaled ${o.qty} → ${cq.qty} (margin cap)`);
     try {
       const key = f + '|' + o.sym;
+      if (S.levCache[key] === undefined && levAlreadySet(f, o.sym, o.lev)) S.levCache[key] = levKey(o.lev);
       if (S.levCache[key] !== levKey(o.lev)) {
         try {
           await setFollowerLeverage(f, o.sym, o.lev);
@@ -2015,7 +2213,13 @@
       const clearing = waitClear(f, o.sym);
       if (clearing) await clearing; // a cancel on this market is still going through
       const r = await acctPost(f, '/v3/positions/open', payload);
-      const rec = { positionId: r.positionId, orderId: r.orderId, legs: legsOf(payload, r), qty: cq.qty };
+      const rec = {
+        positionId: r.positionId,
+        orderId: r.orderId,
+        legs: legsOf(payload, r),
+        qty: cq.qty,
+        share: parseFloat(cq.qty) / parseFloat(o.qty), // its share of the master's size (the size check)
+      };
       if (followersMap) followersMap[f] = rec;
       if (!isImmediate(o.req)) watchRestingOpen(f, payload, rec);
       logEvent('ok', `↳ OPENED ${cq.qty} ${o.sym} ${o.side} on ${accLabel(f)} (${lat()})`);
@@ -2032,6 +2236,7 @@
       });
       return { accountId: f, orderId: r.orderId, positionId: r.positionId, label: accLabel(f), qty: cq.qty, diag: d };
     } catch (e) {
+      noteNotSent();
       logEvent('warn', `↳ ${accLabel(f)} OPEN failed: ${e.message}`);
       diag('open', {
         ...base,
@@ -2096,14 +2301,142 @@
     }
   }
 
+  // ── Size check. Each follower should hold its share of the master's position (1:1, or its cap-to-fit share from the
+  // entry; `fp.share`). After each copied entry, add or reduce settles, and every WARM_MS from Vest's live feed while
+  // copying, a follower off its share by more than rounding (SHARE_TOL, at least two size steps) is named in the log,
+  // once per size it is at. It has to be off on two looks SHARE_SETTLE_MS apart (targets filling a moment apart on
+  // each account aren't a drift). The copier doesn't resize anyone: the trader decides. Seen 2026-10-15 in a user's
+  // report: followers at a quarter of their share for three minutes and nothing said.
+  const SHARE_TOL = 0.05,
+    SHARE_SETTLE_MS = 3000;
+  const _shareOff = {}; // "masterPositionId|accountId" -> { qty, at, warned }
+  function checkShares(entry) {
+    const pid = Object.keys(S.posMap).find((k) => S.posMap[k] === entry);
+    if (!pid) return;
+    const step = sizeStepOf(entry.symbol),
+      live = feedLive();
+    const sizeOf = (acct, positionId, known) => {
+      const st = S.acctState[acct],
+        p = live && stateFresh(st) && st.positions.find((x) => x.id === positionId);
+      return p ? p.qty : parseFloat(known);
+    };
+    const mq = sizeOf(entry.master, pid, entry.qty);
+    if (!(mq > 0)) return; // the master is out: the orphan check covers that
+    for (const [f, fp] of Object.entries(entry.followers)) {
+      if (!(fp.share > 0)) continue;
+      const key = pid + '|' + f,
+        fq = sizeOf(f, fp.positionId, fp.qty),
+        want = mq * fp.share;
+      if (!(Math.abs(fq - want) > Math.max(2 * step, SHARE_TOL * want))) {
+        delete _shareOff[key];
+        continue;
+      }
+      const seen = _shareOff[key];
+      if (!seen || seen.qty !== fq) {
+        _shareOff[key] = { qty: fq, at: Date.now(), warned: false };
+        continue;
+      }
+      if (seen.warned || Date.now() - seen.at < SHARE_SETTLE_MS) continue;
+      seen.warned = true;
+      logEvent(
+        'warn',
+        `Size check: ${accLabel(f)} holds ${fmtQty(fq, entry.symbol)} ${symLabel(entry.symbol)}, its share of the master's ${fmtQty(mq, entry.symbol)} is ${fmtQty(floorStep(want, step), entry.symbol)}. Check it on Vest.`,
+      );
+      diag('size_check', { ...who(f), symbol: entry.symbol, held: fq, share: +want.toFixed(6), masterQty: mq });
+    }
+  }
+  // two looks after a copied action, once it has settled
+  function scheduleShareCheck(entry) {
+    setTimeout(() => checkShares(entry), SHARE_SETTLE_MS / 2);
+    setTimeout(() => checkShares(entry), SHARE_SETTLE_MS * 2);
+  }
+
+  // ── An add the master didn't get (Vest refused it, didn't run it, or its answer was lost and the master didn't grow):
+  // each follower's copy of it is taken back, by exactly what it added, reduce-only (it can never turn a position
+  // around), so every follower is back at its share. A copy is taken back only once its fill is confirmed: one that
+  // didn't fill left nothing to take back, and reducing anyway would cut the follower's original position. A lost
+  // answer is checked first: if the master did grow, its add went through and the followers keep theirs.
+  // `items`: [{ accountId, orderId, qty }]; `confirmed`: their fills are already confirmed (the fill check found them).
+  const TAKE_BACK_CHECK_MS = 1500; // a lost answer: how long the feed gets to show the master's size first
+  function takeBackAdds(entry, items, req, { why, checkMaster = false, confirmed = false, restoreQty = false }) {
+    const sym = entry.symbol,
+      step = sizeStepOf(sym),
+      masterPid = Object.keys(S.posMap).find((k) => S.posMap[k] === entry);
+    logEvent('warn', why + '.');
+    return enqueue(entry, async () => {
+      if (!Object.values(S.posMap).includes(entry)) return; // the trade closed meanwhile: nothing left to take back
+      if (checkMaster) {
+        await sleep(TAKE_BACK_CHECK_MS);
+        const st = S.acctState[entry.master],
+          p = feedLive() && stateFresh(st) && st.positions.find((x) => x.id === masterPid),
+          r = p ? null : await tryOpenPosition(entry.master, sym, masterPid),
+          now = p ? p.qty : r ? parseFloat(r.quantity) : null;
+        if (now == null || now >= parseFloat(entry.qty) - step / 2) {
+          logEvent(
+            now == null ? 'warn' : 'info',
+            now == null
+              ? "↳ couldn't read the master's size: the followers' adds are left as they are. Check them on Vest."
+              : "↳ the master's add went through after all (its answer was lost): the followers keep theirs.",
+          );
+          return;
+        }
+      }
+      if (restoreQty) entry.qty = fmtQty(Math.max(0, parseFloat(entry.qty) - parseFloat(req.quantity)), sym);
+      await Promise.all(
+        items.map(async (it) => {
+          const f = it.accountId,
+            fp = entry.followers[f],
+            d = { ...who(f), symbol: sym, kind: 'take-back', qty: it.qty };
+          if (!fp) return;
+          if (!confirmed) {
+            const fill = await fillInfo(f, sym, it.orderId);
+            if (fill === null) return void diag('append', { ...d, outcome: 'nothing-to-take-back', met: true });
+            if (fill === undefined) {
+              logEvent(
+                'warn',
+                `↳ ${accLabel(f)}: couldn't confirm its add filled. If it did, reduce it by ${it.qty} on Vest.`,
+              );
+              return void diag('append', { ...d, outcome: 'take-back-unknown', met: false });
+            }
+          }
+          try {
+            await sendExit(f, '/v3/positions/reduce', {
+              positionId: fp.positionId,
+              orderType: 'market',
+              leverage: req.leverage || closeBody(sym, fp.positionId, null, f).leverage,
+              quantity: it.qty,
+              timeInForce: 'IOC',
+              reduceOnly: true,
+              symbol: sym,
+            });
+            fp.qty = fmtQty(Math.max(0, parseFloat(fp.qty) - parseFloat(it.qty)), sym);
+            logEvent('ok', `↳ took back the add of ${it.qty} on ${accLabel(f)}: back at its share`);
+            diag('append', { ...d, outcome: 'taken-back', met: true });
+          } catch (e) {
+            logEvent(
+              'warn',
+              `↳ ${accLabel(f)}: couldn't take back its add (${e.message}). Reduce it by ${it.qty} on Vest.`,
+            );
+            diag('append', { ...d, outcome: 'take-back-failed', error: e.message, errorCode: errCode(e), met: false });
+          }
+        }),
+      );
+      setTimeout(() => enqueue(entry, () => syncLegs(entry)), RESYNC_AFTER_REDUCE_MS);
+      scheduleShareCheck(entry);
+    });
+  }
+
   // Mirror a MASTER action to every follower. Quantities are 1:1 unless cap-to-fit is on. Followers use the master's
   // leverage for each order (pre-synced at arm, so the leverage PUT is normally skipped).
-  function mirror(action, req, res, method = 'POST', via = null) {
+  // `fast`: fast mode copies this at the master's send (maybeFastAction): `res` is empty and `fast.answer` brings Vest's
+  // answer (null when refused or lost) for the fill check.
+  function mirror(action, req, res, method = 'POST', via = null, fast = null) {
     const followers = [...S.followers];
     if (!followers.length) return;
     const t0 = performance.now();
-    const lat = () => '+' + msSince(t0) + 'ms';
-    diag('master', {
+    const lat = () => '+' + msSince(t0) + 'ms' + (fast ? ', fast' : '');
+    const answer = () => Promise.resolve(fast ? fast.answer : res); // the master's order id, once Vest has answered
+    const mrec = diag('master', {
       action,
       via,
       symbol: req.symbol,
@@ -2114,8 +2447,10 @@
       orderId: res.orderId || null,
       triggerPrice: req.triggerPrice,
       followers: followers.length,
-      fast: false,
+      fast: !!fast,
+      netMs: S.net.last, // the last round trip to Vest the keep-warm read measured
     });
+    if (fast) fast.rec = mrec;
     if (S.paused && (action === 'open' || action === 'append')) {
       // a waiting limit moved on Vest's chart is a cancel (copied) then a new order (not, while paused)
       const moved = action === 'open' && Date.now() - (_droppedAt[req.symbol] || 0) < MOVED_LIMIT_MS;
@@ -2264,6 +2599,7 @@
                 },
               };
             } catch (e) {
+              noteNotSent();
               logEvent('warn', `↳ ${accLabel(f)} ADD failed: ${e.message}`);
               diag('append', {
                 ...d,
@@ -2279,24 +2615,35 @@
         );
         return placed.filter(Boolean);
       });
-      run.then(
-        (placed) =>
-          isImmediate(req) &&
-          confirmFills(
-            sym,
-            {
-              accountId: S.master,
-              orderId: res.orderId,
-              qty: req.quantity,
-              undo: () => {
-                entry.qty = added(entry.qty, -req.quantity);
-              },
+      run.then(async (placed) => {
+        const m = await answer();
+        if (fast && !m) {
+          // Vest didn't take the master's add (refused, or no answer): the followers' copies are taken back
+          return takeBackAdds(entry, placed, req, {
+            why: fast.lost
+              ? "MASTER add: no answer from Vest (connection lost), but fast mode had already added to the followers: checking the master's size"
+              : `MASTER add refused by Vest (HTTP ${fast.status}), but fast mode had already added to the followers: taking their add back`,
+            checkMaster: fast.lost,
+            restoreQty: true,
+          });
+        }
+        if (!isImmediate(req) || !m) return;
+        confirmFills(
+          sym,
+          {
+            accountId: S.master,
+            orderId: m.orderId,
+            qty: req.quantity,
+            req,
+            undo: () => {
+              entry.qty = added(entry.qty, -req.quantity);
             },
-            placed,
-            entry,
-            'add',
-          ),
-      );
+          },
+          placed,
+          entry,
+          'add',
+        );
+      });
     } else if (action === 'reduce') {
       if (!entry) {
         logEvent('info', `MASTER reduced ${req.quantity} ${req.symbol} on ${accLabel(S.master)}`);
@@ -2354,6 +2701,7 @@
               });
               fp.qty = fmtQty(Math.max(0, parseFloat(fp.qty) - parseFloat(rq)), req.symbol);
             } catch (e) {
+              noteNotSent();
               logEvent('warn', `↳ ${accLabel(f)} REDUCE failed: ${e.message} — it still holds its full size.`);
               diag('reduce', {
                 ...d,
@@ -2368,6 +2716,7 @@
         );
         // an IOC reduce can fill partly or not at all: re-read the true sizes shortly after
         setTimeout(() => enqueue(entry, () => syncLegs(entry)), RESYNC_AFTER_REDUCE_MS);
+        scheduleShareCheck(entry);
       });
     } else if (action === 'close') {
       if (entry && req.orderType && req.orderType !== 'market')
@@ -2402,6 +2751,7 @@
               });
               return { accountId: f, orderId: r.orderId, label: accLabel(f), qty: fp.qty, diag: dd };
             } catch (e) {
+              noteNotSent();
               logEvent('warn', `↳ ${accLabel(f)} CLOSE failed: ${e.message} — it is still OPEN. Close it on Vest.`);
               diag('close', { ...d, outcome: 'rejected', error: e.message, errorCode: errCode(e), met: false });
               return null;
@@ -2409,12 +2759,14 @@
           }),
         );
         cancelWaitingCopies(entry); // the trade is over: no follower keeps an add or a limit close waiting on it
-        confirmFills(
-          req.symbol,
-          { accountId: S.master, orderId: res.orderId, qty: entry.qty || '0' },
-          placed.filter(Boolean),
-          null,
-          'close',
+        answer().then((m) =>
+          confirmFills(
+            req.symbol,
+            { accountId: S.master, orderId: m && m.orderId, qty: entry.qty || '0' },
+            placed.filter(Boolean),
+            null,
+            'close',
+          ),
         );
       });
     } else if (action === 'stop-loss' || action === 'take-profit') {
@@ -2441,7 +2793,7 @@
               : `MASTER moved ${KIND} → ${req.triggerPrice} on ${accLabel(S.master)}`,
       );
       if (!entry) return untracked(`${KIND} change`);
-      enqueue(entry, () => mirrorLeg(op, kind, req, entry, followers, lat, t0));
+      enqueue(entry, () => mirrorLeg(op, kind, req, entry, followers, lat, t0, fast));
     } else if (action === 'cancel-order') {
       logEvent('info', `MASTER cancelled a resting order on ${accLabel(S.master)}`);
       // a limit close or reduce: cancel each follower's copy
@@ -2674,20 +3026,30 @@
       setTimeout(() => enqueue(entry, () => relinkTrade(entry)), RESYNC_AFTER_REDUCE_MS);
     });
   }
-  // Re-read the trade's positions by market: side, size and legs, and the position id if it changed.
+  // Re-read the trade's positions by market: side, size and legs, and the position id if it changed. A follower left
+  // on the other side from the master, or still in while the master is out (a flip that turned the followers and not
+  // the master), is out of the trade and offered to flatten: never two accounts held opposite ways.
   async function relinkTrade(entry) {
     const masterPid = Object.keys(S.posMap).find((k) => S.posMap[k] === entry);
     if (!masterPid) return;
+    // the position, null when there's none, undefined when it couldn't be read
     const pick = async (acct, pid) => {
       try {
         const r = await api('/v3/positions/opened', (await mintAccountToken(acct)).token);
         const on = ((r && r.positions) || []).filter((x) => x.symbol === entry.symbol && parseFloat(x.quantity) > 0);
         return on.find((x) => posIdOf(x) === pid) || (on.length === 1 ? on[0] : null);
       } catch {
-        return null;
+        return undefined;
       }
     };
-    const m = await pick(entry.master, masterPid);
+    let m;
+    try {
+      const r = await api('/v3/positions/opened', (await mintAccountToken(entry.master)).token);
+      const on = ((r && r.positions) || []).filter((x) => x.symbol === entry.symbol && parseFloat(x.quantity) > 0);
+      m = on.find((x) => posIdOf(x) === masterPid) || (on.length === 1 ? on[0] : null);
+    } catch {
+      return; // the master can't be read: nothing is judged on a guess
+    }
     if (m) {
       const id = posIdOf(m);
       if (id !== masterPid && !S.posMap[id]) {
@@ -2696,11 +3058,31 @@
       }
       Object.assign(entry, { side: m.side, qty: String(m.quantity), legs: posLegs(m) });
     }
+    const off = [];
     await Promise.all(
       Object.entries(entry.followers).map(async ([f, fp]) => {
         const p = await pick(f, fp.positionId);
-        if (p) Object.assign(fp, { positionId: posIdOf(p), qty: String(p.quantity), legs: posLegs(p) });
+        // the master is out and this one can't be read: it may still be in, and the trade is about to be let go of, so
+        // it's raised with the others (a Flatten of a position that's gone does nothing)
+        if (p === undefined && !m) return void off.push({ accountId: f, positionId: fp.positionId, side: null });
+        if (!p) return;
+        Object.assign(fp, { positionId: posIdOf(p), qty: String(p.quantity), legs: posLegs(p) });
+        if (!m || p.side !== m.side) off.push({ accountId: f, positionId: posIdOf(p), side: p.side });
       }),
+    );
+    if (!off.length) return;
+    off.forEach((o) => delete entry.followers[o.accountId]);
+    if (!m) delete S.posMap[Object.keys(S.posMap).find((k) => S.posMap[k] === entry)];
+    diag('flip', {
+      outcome: 'mismatch',
+      masterSide: m ? m.side : null,
+      followers: off.map((o) => accLabel(o.accountId)),
+    });
+    raiseOrphans(
+      entry.symbol,
+      off.map((o) => ({ accountId: o.accountId, positionId: o.positionId })),
+      m ? `the master is ${m.side} and they are the other way` : 'the master is out and they are still in',
+      entry.master,
     );
   }
 
@@ -2886,7 +3268,85 @@
     cancelFollowerCopies(e);
   }
 
-  // ───────────────────────── fast mode (fire follower opens at master-send) ─────────────────────────
+  // ───────────────────────── fast mode (copy at master-send) ─────────────────────────
+  // Fast mode copies the master's order the moment it goes out, not after Vest answers: the followers' orders leave
+  // with the master's, so they fill as close to it as the connection allows. Returns a `pending` descriptor for the
+  // answer (settleFast), or null when the order is copied from the answer as usual.
+  function maybeFast(url, reqBody, auth, method, via) {
+    return method === 'POST' && orderAction(url) === 'open'
+      ? maybeFastOpen(url, reqBody, auth, via)
+      : maybeFastAction(url, reqBody, auth, method, via);
+  }
+  const settleFast = (pending, resBody, status, unreadable = false) =>
+    pending.action
+      ? reconcileFastAction(pending, resBody, status)
+      : reconcileFast(pending, resBody, status, unreadable);
+
+  // Everything after the entry that is safe to send early: a close, a market reduce, a market add, a stop or target
+  // added or moved. What takes risk off goes early (a close Vest refuses leaves the followers flatter than the master,
+  // never more exposed); an add that Vest refuses is taken back (takeBackAdds). Still from Vest's answer:
+  //  - a flip (an opposite reduce, Reduce Only off, bigger than the position): refused on the master after the followers
+  //    turned, it would leave them on the other side of it, hedging across accounts (Vest's terms §5(l)/(m));
+  //  - removing a stop or target: refused on the master, the follower would be left without one the master still has;
+  //  - limit closes, reduces and adds (their order id tracks the copies; they rest at their price anyway);
+  //  - cancels (a cancel Vest refuses usually means the master's limit just filled: the followers keep theirs).
+  function maybeFastAction(url, reqBody, auth, method, via) {
+    if (!S.armed || !S.fast || S.flattening) return null; // during Flatten All the answer path says "not copied"
+    const action = orderAction(url);
+    if (!action || action === 'open' || action === 'cancel-order') return null;
+    if (acctIdFromAuth(auth) !== S.master) return null;
+    const req = parseJson(reqBody, null);
+    if (!req || typeof req !== 'object') return null;
+    if ((action === 'close' || action === 'reduce') && (req.orderType || 'market') !== 'market') return null;
+    if (action === 'append' && !isImmediate(req)) return null;
+    const m = String(method || 'POST').toUpperCase();
+    if (m === 'DELETE') return null;
+    if (action === 'reduce' && req.reduceOnly === false) {
+      const e = S.posMap[req.positionId];
+      if (!e || parseFloat(req.quantity) > heldBefore(req.positionId, e) + sizeStepOf(e.symbol) / 2) return null;
+    }
+    checkShape(action, req, m);
+    const pending = { action, req, method: m, rec: null };
+    pending.answer = new Promise((resolve) => (pending.settle = resolve)); // Vest's answer, or null if refused / lost
+    mirror(action, req, {}, m, via, pending);
+    return pending;
+  }
+  // Vest's answer to a master order already copied at send. Accepted: the master's order id goes where the fill check
+  // needs it. Refused or lost: the followers' copies already went, so the log says what that leaves and the trade's
+  // sizes and stops are read again (the next copies scale from the truth).
+  function reconcileFastAction(p, resBody, status) {
+    if (p.done) return;
+    p.done = true;
+    const res = parseJson(resBody, {}) || {};
+    if (status >= 200 && status < 300) {
+      refreshSoon();
+      if (p.rec && res.orderId) p.rec.orderId = res.orderId;
+      return p.settle(res);
+    }
+    p.lost = !(status >= 400); // no answer: Vest may or may not have run it
+    p.status = status;
+    p.settle(null);
+    const { action, req } = p,
+      lost = p.lost;
+    diag('master_refused', { action, method: p.method, status, fast: true, reason: res.msg || res.message || null });
+    // an add is settled by takeBackAdds and a stop or target change by mirrorLeg, which know what each follower did
+    if (action === 'append' || KIND_OF[action]) return;
+    const what = action === 'close' ? 'close' : 'reduce';
+    const left =
+      action === 'close'
+        ? 'the followers are out of the trade and the master is still in it: close the master on Vest'
+        : 'the followers were reduced and the master was not: their sizes are read again';
+    logEvent(
+      'warn',
+      lost
+        ? `MASTER ${what}: no answer from Vest (connection lost), but fast mode had already sent it to the followers. Check the master on Vest.`
+        : `MASTER ${what} refused by Vest (HTTP ${status}), but fast mode had already sent it to the followers: ${left}.`,
+    );
+    const e = S.posMap[req.positionId];
+    if (e) enqueue(e, () => syncLegs(e));
+  }
+  const KIND_OF = { 'stop-loss': 'stop', 'take-profit': 'target' };
+
   // Returns a `pending` descriptor if it fired follower opens for a master OPEN; otherwise null.
   function maybeFastOpen(url, reqBody, auth, via = null) {
     if (!S.armed || !S.fast || S.flattening || S.paused || orderAction(url) !== 'open') return null;
@@ -2967,6 +3427,24 @@
       );
       return;
     }
+    if (status >= 200 && status < 300 && res.positionId && S.posMap[res.positionId]) {
+      // Vest answered with a position the copier already copies: a second entry on a market already in a trade, which
+      // Vest doesn't run (it refuses it a moment later, code 10006). The trade carries on as it is; a follower's copy is
+      // raised only if it really filled (it never offers the followers' positions in that trade for flattening).
+      logEvent(
+        'warn',
+        `MASTER sent a second entry on ${symLabel(pending.sym)} while already in a trade there: Vest doesn't run that (adds go through Add). The trade carries on.`,
+      );
+      diag('master', { action: 'open', outcome: 'second-entry', positionId: res.positionId, orderId: res.orderId });
+      Promise.all(pending.jobs).then(async () => {
+        const filled = [];
+        for (const [accountId, v] of Object.entries(pending.byId))
+          if (v.orderId && (await fillInfo(accountId, pending.sym, v.orderId)))
+            filled.push({ accountId, positionId: v.positionId, orderId: v.orderId, leverage: pending.lev });
+        raiseOrphans(pending.sym, filled, 'a second entry filled on the follower and not on the master', S.master);
+      });
+      return;
+    }
     Promise.all(pending.jobs).then(() => {
       const list = Object.entries(pending.byId).map(([accountId, v]) => ({
         accountId,
@@ -2988,6 +3466,11 @@
   // `checkMaster`: when the master's outcome is uncertain, auto-flatten only if the master is confirmed to hold nothing
   // on that market; otherwise the trader decides.
   async function raiseOrphans(sym, list, why, checkMaster = null) {
+    // never a position that belongs to a trade the copier is still copying (the master is in it with them)
+    const copying = new Set(
+      Object.values(S.posMap).flatMap((e) => Object.values(e.followers).map((fp) => fp.positionId)),
+    );
+    list = list.filter((o) => !(o.positionId && copying.has(o.positionId)));
     if (!list.length) return;
     let masterIn = false;
     if (checkMaster) {
@@ -3048,9 +3531,45 @@
   // ───────────────────────── flatten-all ─────────────────────────
   // Close every open position and cancel every resting order on ALL loaded accounts, whatever is selected, in one click:
   // an emergency button, and a quick way out of a trade across many accounts. The copier stays armed (or disarmed) as it
-  // was, ready for the next trade. While the sweep runs nothing new is copied, an arm in progress is cancelled, follower
-  // orders still in flight are waited for, and a second sweep catches anything that landed during the first.
-  async function flattenAccount(id) {
+  // was, ready for the next trade. Everything the copier already knows about (Vest's live feed, or the last read) is
+  // closed and cancelled at once, on every account together, before anything is read. Then, as a safety net: nothing
+  // new is copied, an arm in progress is cancelled, follower orders still in flight are waited for, and each account
+  // is read and swept, twice, catching anything the first round didn't know about or that landed meanwhile.
+  const closeOne = (id, sym, pid, lev) =>
+    sendExit(id, '/v3/positions/close', closeBody(sym, pid, lev || DEFAULT_LEVERAGE)).then(
+      () => logEvent('ok', `↳ closed ${symLabel(sym)} on ${accLabel(id)}`),
+      (e) => logEvent('warn', `↳ ${accLabel(id)} close failed: ${e.message}`),
+    );
+  // an order already gone (filled, or cancelled with its position) is nothing to cancel: no warning
+  const cancelOne = (id, oid) =>
+    acctPost(id, '/v3/positions/cancel-order', { orderId: oid }).then(
+      () => logEvent('ok', `↳ cancelled a resting order on ${accLabel(id)}`),
+      (e) =>
+        errCode(e) === 404
+          ? diag('cancel', { ...who(id), orderId: oid, why: 'flatten all', outcome: 'nothing-to-cancel', met: true })
+          : logEvent('warn', `↳ ${accLabel(id)} cancel failed: ${e.message}`),
+    );
+  // The first round, sent without waiting for anything: returns the position and order ids it went for.
+  function flattenKnown(ids) {
+    const sent = new Set();
+    for (const id of ids) {
+      const st = S.acctState[id];
+      if (!stateFresh(st)) continue;
+      for (const p of st.positions)
+        if (p.id && p.qty > 0) {
+          sent.add(p.id);
+          closeOne(id, p.symbol, p.id, p.leverage || (S.byId[id] && S.byId[id].leverage));
+        }
+      for (const o of st.orders || [])
+        if (o.id) {
+          sent.add(o.id);
+          cancelOne(id, o.id);
+        }
+    }
+    return sent;
+  }
+  // `skip`: ids the first round already went for (the first sweep can read them before Vest has closed them).
+  async function flattenAccount(id, skip = null) {
     const { token } = await mintAccountToken(id);
     const [posR, ordR] = await Promise.all([
       api('/v3/positions/opened', token),
@@ -3058,31 +3577,18 @@
     ]);
     // a resting limit's size-0 position holds only its pending stop and targets: cancelling the order clears it, and a
     // close would only be refused (Vest 10009) while the log said "closed"
-    const positions = ((posR && posR.positions) || []).filter((p) => p.quantity == null || num(p.quantity) > 0),
-      orders = (ordR && ordR.orders) || [];
-    for (const o of orders) {
-      // resting orders first
-      const oid = o.orderId || o.order_id || o.id;
-      if (!oid) continue;
-      try {
-        await acctPost(id, '/v3/positions/cancel-order', { orderId: oid });
-        logEvent('ok', `↳ cancelled a resting order on ${accLabel(id)}`);
-      } catch (e) {
-        logEvent('warn', `↳ ${accLabel(id)} cancel failed: ${e.message}`);
-      }
-    }
-    for (const p of positions) {
-      const pid = posIdOf(p),
-        sym = p.symbol;
-      if (!pid || !sym) continue;
-      const lev = p.leverage || (S.byId[id] && S.byId[id].leverage) || DEFAULT_LEVERAGE;
-      try {
-        await sendExit(id, '/v3/positions/close', closeBody(sym, pid, lev));
-        logEvent('ok', `↳ closed ${sym} on ${accLabel(id)}`);
-      } catch (e) {
-        logEvent('warn', `↳ ${accLabel(id)} close failed: ${e.message}`);
-      }
-    }
+    const left = (x) => !(skip && skip.has(x)),
+      positions = ((posR && posR.positions) || []).filter(
+        (p) => (p.quantity == null || num(p.quantity) > 0) && posIdOf(p) && p.symbol && left(posIdOf(p)),
+      ),
+      orders = ((ordR && ordR.orders) || []).filter(
+        (o) => (o.orderId || o.order_id || o.id) && left(o.orderId || o.order_id || o.id),
+      );
+    // resting orders first (one could fill after its position closed), each kind all at once
+    await Promise.all(orders.map((o) => cancelOne(id, o.orderId || o.order_id || o.id)));
+    await Promise.all(
+      positions.map((p) => closeOne(id, p.symbol, posIdOf(p), p.leverage || (S.byId[id] && S.byId[id].leverage))),
+    );
     return positions.length + orders.length;
   }
   async function flattenAll() {
@@ -3095,6 +3601,12 @@
     S.flattening = true;
     // everything between the flag and the sweep is inside the try: an error there must never leave it set
     try {
+      let known = null;
+      try {
+        known = flattenKnown(ids); // out first; everything else after
+      } catch (e) {
+        diag('script_error', { message: String((e && e.message) || e), where: 'flatten-known' }); // the sweep still runs
+      }
       _armEpoch++; // an arm in progress would adopt positions that are being closed
       S.orphan = null;
       try {
@@ -3108,32 +3620,32 @@
         'warn',
         `FLATTEN ALL — closing every position and cancelling every order on ${ids.length} account(s).${S.armed ? ' Copying keeps running for your next trade.' : ''}`,
       );
-      diag('flatten_all', { accounts: ids.length, armed: S.armed });
-      await flattenSweep(ids);
+      diag('flatten_all', { accounts: ids.length, armed: S.armed, sentAtOnce: known ? known.size : 0 });
+      await flattenSweep(ids, known);
     } finally {
       S.flattening = false; // never left set: master orders would be skipped as "during Flatten All" while ARMED shows
       setTimeout(refreshBalances, BALANCE_AFTER_TRADE_MS);
       render();
     }
   }
-  async function flattenSweep(ids) {
+  async function flattenSweep(ids, known = null) {
     const inFlight = Object.values(S.posMap)
       .map((e) => e.queue)
       .filter(Boolean);
     await Promise.race([Promise.all(inFlight), sleep(FLATTEN_WAIT_MS)]);
     S.posMap = {};
-    const sweep = () =>
+    const sweep = (skip) =>
       Promise.all(
         ids.map((id) =>
-          flattenAccount(id).catch((e) => {
+          flattenAccount(id, skip).catch((e) => {
             logEvent('warn', `↳ ${accLabel(id)} couldn't be read: ${e.message}`);
             return 1;
           }),
         ),
       );
-    await sweep();
+    await sweep(known);
     await sleep(FLATTEN_RECHECK_MS);
-    const left = (await sweep()).reduce((a, b) => a + b, 0);
+    const left = (await sweep(null)).reduce((a, b) => a + b, 0);
     if (left)
       logEvent('warn', 'Flatten All: some positions or orders needed a second pass — check every account on Vest.');
     else logEvent('ok', 'Flatten All complete — every account is flat.');
@@ -3789,7 +4301,7 @@
       const name = vestMarketName();
       const map = name && (await loadDisplayMap());
       const sym = map && map[name];
-      if (sym && sym !== S.trade.symbol && SYMBOLS[sym] && !S.placing && !S.adjusting) switchMarket(sym);
+      if (sym && sym !== S.trade.symbol && SYMBOLS[sym] && !S.placing && !S.adjusting && !S.exiting) switchMarket(sym);
     } finally {
       _following = false;
     }
@@ -3953,7 +4465,13 @@
               : `${accLabel(f)} holds ${fp.side} ${fp.symbol} but the master doesn't — close it first`,
           };
         }
-        adopted[m.positionId].followers[f] = { positionId: fp.positionId, orderId: null, legs: fp.legs, qty: fp.qty };
+        adopted[m.positionId].followers[f] = {
+          positionId: fp.positionId,
+          orderId: null,
+          legs: fp.legs,
+          qty: fp.qty,
+          share: parseFloat(fp.qty) / parseFloat(m.qty), // as it is now: the size check watches from here
+        };
         const unmatched = m.legs.filter((l) => !matchLeg(m.legs, fp.legs, l.id));
         if (unmatched.length) {
           const which = unmatched.map((l) => `${l.kind === 'sl' ? 'stop' : 'target'} at ${l.price}`).join(', ');
@@ -3975,6 +4493,7 @@
   // open position. Returns the per-follower record for diagnostics.
   async function syncLeverage(master, followers, openSymbols) {
     const levs = await fetchLeverages();
+    _armLevs = levs; // a follower whose own leverage already matches a copied order's skips the change (openFollower)
     if (!levs) {
       logEvent('warn', "Couldn't read leverage — each follower's leverage will be set on its first copied trade.");
       return [];
@@ -4064,15 +4583,24 @@
       /* best effort: nothing to do if this fails */
     }
   }
+  // A tab that remembers copying (this page reloaded mid-copy) says so, unless another tab is copying: a tab duplicated
+  // from the copying one starts with its memory (seen 2026-10-15: a new tab said "reloaded" while the first copied on).
+  // The other tabs answer the hello within a moment; the check waits that long.
+  const WAS_ARMED_WAIT_MS = 600;
   function checkWasArmed() {
     tabSay('hello');
+    let was = false;
     try {
-      if (sessionStorage.getItem(WAS_ARMED_KEY) !== '1') return;
-      sessionStorage.removeItem(WAS_ARMED_KEY);
-      logEvent('warn', 'The page reloaded while copying, so copying stopped. Press Start copying to continue.');
+      was = sessionStorage.getItem(WAS_ARMED_KEY) === '1';
+      if (was) sessionStorage.removeItem(WAS_ARMED_KEY);
     } catch {
       /* best effort: nothing to do if this fails */
     }
+    if (was)
+      setTimeout(() => {
+        if (!armedElsewhere())
+          logEvent('warn', 'The page reloaded while copying, so copying stopped. Press Start copying to continue.');
+      }, WAS_ARMED_WAIT_MS);
   }
   async function arm() {
     if (S.arming) return;
@@ -4086,7 +4614,8 @@
     if (S.paused) return toast(pauseBlocks());
     if (!S.master) return toast('Pick a master account first.');
     if (!S.followers.size) return toast('Pick at least one follower.');
-    if (S.placing || S.adjusting || claimBusy()) return toast('Wait for the current order or claim to finish.');
+    if (S.placing || S.adjusting || S.exiting || claimBusy())
+      return toast('Wait for the current order or claim to finish.');
     if (armedElsewhere())
       return toast('The copier is copying in another Vest tab. Stop it there first: two would copy every trade twice.');
     if (healthState().changed) {
@@ -4160,6 +4689,8 @@
           legs: v.legs,
         })),
       }));
+      Object.assign(S.net, { samples: [], missSince: null }); // a fresh 5 minutes for this run
+      warmTick(); // a first round trip to Vest, and the copier's connection open, from the moment copying starts
       diag('arm', {
         outcome: 'armed',
         capFit: S.capFit,
@@ -4250,19 +4781,42 @@
       }
     },
   };
+  // Several Vest tabs share this browser's storage, each with its own log. What other tabs saved is kept (their lines,
+  // newest first, up to LOG_MAX together), so a Download from any tab has every tab's activity (seen 2026-10-15: a
+  // user's two tabs overwrote each other and the copying tab's lines were lost). This tab shows only its own lines.
+  const storedLog = () => {
+    const mine = S.log.map((e) => ({ t: e.t.toISOString(), level: e.level, msg: e.msg, tab: e.tab || TAB_TAG })),
+      keyOf = (e) => e.t + '|' + e.msg,
+      have = new Set(mine.map(keyOf)),
+      l = store.get(LOG_KEY, []);
+    const others = Array.isArray(l)
+      ? l.filter(
+          (e) => e && typeof e.msg === 'string' && typeof e.t === 'string' && e.tab !== TAB_TAG && !have.has(keyOf(e)),
+        )
+      : [];
+    return [...mine, ...others].sort((a, b) => (a.t < b.t ? 1 : a.t > b.t ? -1 : 0)).slice(0, LOG_MAX);
+  };
   function persistLog() {
-    store.set(
-      LOG_KEY,
-      S.log.map((e) => ({ t: e.t.toISOString(), level: e.level, msg: e.msg })),
-    );
+    clearTimeout(_logTimer);
+    _logTimer = null;
+    store.set(LOG_KEY, storedLog());
   }
+  // Saving the log rewrites all 500 lines; a copy logs a line per follower, and the first ones are written while the
+  // master's own order is being sent. So it's saved a moment later, once, and at once when the page goes away.
+  let _logTimer = null;
+  const persistLogSoon = () => {
+    if (!_logTimer) _logTimer = setTimeout(persistLog, 300);
+  };
+  window.addEventListener('pagehide', () => _logTimer && persistLog());
   function loadLog() {
     const l = store.get(LOG_KEY, []);
+    const before = S.log; // lines from before the page finished loading stay
     S.log = Array.isArray(l)
       ? l
           .filter((e) => e && typeof e.msg === 'string' && !isNaN(new Date(e.t)))
-          .map((e) => ({ t: new Date(e.t), level: String(e.level || 'info'), msg: e.msg }))
+          .map((e) => ({ t: new Date(e.t), level: String(e.level || 'info'), msg: e.msg, tab: e.tab || null }))
       : [];
+    if (before.length) S.log = [...before, ...S.log].slice(0, LOG_MAX);
   }
   // The risk acknowledgement is versioned: raising TERMS_VERSION asks everyone to accept the new terms once.
   const TERMS_VERSION = 3; // 3 (v0.39): the support code is part of the terms
@@ -4324,7 +4878,10 @@
   function toggleFast() {
     S.fast = !S.fast;
     saveOpts();
-    logEvent('info', S.fast ? 'Fast mode on — follower entries fire the instant the master sends.' : 'Fast mode off.');
+    logEvent(
+      'info',
+      S.fast ? 'Fast mode on — followers copy each order the instant the master sends it.' : 'Fast mode off.',
+    );
     render();
   }
   function toggleAutoFlatten() {
@@ -4364,15 +4921,15 @@
     render();
   }
   function logEvent(level, msg) {
-    S.log.unshift({ t: new Date(), level, msg });
+    S.log.unshift({ t: new Date(), level, msg, tab: TAB_TAG });
     S.log = S.log.slice(0, LOG_MAX);
     LOG(msg);
-    persistLog();
+    persistLogSoon();
     renderLog();
   }
   function clearLog() {
     S.log = [];
-    persistLog();
+    store.set(LOG_KEY, []); // every tab's lines: Clear means clear
     renderLog();
   }
   const stamp = () => new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
@@ -4408,10 +4965,22 @@
   };
   function loadDiag() {
     const d = store.get(DIAG_KEY, []);
-    S.diag = Array.isArray(d) ? d : [];
+    S.diag = [...(Array.isArray(d) ? d : []), ...S.diag]; // records from before the page finished loading stay
   }
   // Kept under a size budget: this page's storage is shared with Vest's own site, which must never run out of room.
+  // Every Vest tab saves here: records other tabs saved and this one doesn't have are kept, in time order, so a
+  // Download from any tab has every tab's records (each says which tab wrote it: `tab`).
+  const diagKey = (r) => (r.tab && r.n ? r.tab + '.' + r.n : `${r.t}|${r.type}|${r.account || ''}|${r.orderId || ''}`);
   function persistDiag() {
+    const stored = store.get(DIAG_KEY, []);
+    if (Array.isArray(stored) && stored.length) {
+      const have = new Set(S.diag.map(diagKey));
+      const more = stored.filter((r) => r && typeof r === 'object' && typeof r.t === 'string' && !have.has(diagKey(r)));
+      if (more.length) {
+        S.diag = [...S.diag, ...more].sort((a, b) => (a.t < b.t ? -1 : a.t > b.t ? 1 : 0));
+        if (S.diag.length > DIAG_MAX) S.diag.splice(0, S.diag.length - DIAG_MAX);
+      }
+    }
     let json = JSON.stringify(S.diag);
     while (json.length > DIAG_MAX_BYTES && S.diag.length > 10) {
       S.diag.splice(0, Math.ceil(S.diag.length / 10));
@@ -4430,8 +4999,9 @@
       persistDiag();
     }, 1200);
   }
+  let _diagN = 0;
   function diag(type, data) {
-    const rec = { t: new Date().toISOString(), type, ...data };
+    const rec = { t: new Date().toISOString(), type, ...data, tab: TAB_TAG, n: ++_diagN };
     S.diag.push(rec);
     if (S.diag.length > DIAG_MAX) S.diag.splice(0, S.diag.length - DIAG_MAX);
     persistDiagSoon();
@@ -4440,8 +5010,12 @@
   // The log's Download (and the site check's): one file with the diagnostics and the activity log together (two
   // downloads from one click get the second blocked by Chrome unless the site is allowed several).
   function downloadDiag() {
-    persistDiag();
-    logEvent('info', `Diagnostics exported (${S.diag.length} records, with the activity log).`);
+    logEvent('info', `Diagnostics exported (${S.diag.length} records, with the activity log).`); // the file's last line
+    const payload = diagFile();
+    saveFile(`vest-copier-diagnostics-${stamp()}.json`, 'application/json', JSON.stringify(payload, null, 2));
+  }
+  function diagFile() {
+    persistDiag(); // takes in what other tabs saved
     // account ids leave as their names ("Account 64"), plus a one-way tag per account (`accountTags`) so files from one
     // person can still be told apart from another's (tools/diag-stats.py) without the ids
     const { scrub, alias } = accountScrubber();
@@ -4449,14 +5023,16 @@
       exportedAt: new Date().toISOString(),
       version: VERSION,
       build: fingerprint() || null,
+      tab: TAB_TAG, // the tab it was downloaded from (each record and log line says which tab wrote it)
+      copying: S.armed, // whether that tab was copying
       records: S.diag.length,
       diagnostics: S.diag,
-      log: [...S.log].reverse().map((e) => ({ t: e.t.toISOString(), level: e.level, msg: e.msg })), // oldest first
+      log: storedLog().reverse(), // every tab's lines, oldest first
     });
     payload.accountTags = Object.fromEntries(
       Object.entries(alias).map(([id, name]) => [name, fnv('vc-account|' + id)]),
     );
-    saveFile(`vest-copier-diagnostics-${stamp()}.json`, 'application/json', JSON.stringify(payload, null, 2));
+    return payload;
   }
 
   // ───────────────────────── health ─────────────────────────
@@ -4516,6 +5092,9 @@
   };
   const BUILD_KEY = 'vc-known-build-v3';
   let _unknownBuildChecked = false;
+  // The build the site check accepted in this page, kept in memory too: with the browser's storage full the save fails,
+  // and the panel must still know the check passed (a user's report: 412 crashes in 40 minutes, 2026-10-12).
+  let _acceptedBuild = null;
   // First run on this browser: trust the build that is loaded now.
   function initBuild() {
     const fp = fingerprint();
@@ -4537,7 +5116,8 @@
       return _unknownBuildChecked
         ? { level: 'amber', text: 'build unknown (checked)', changed: false }
         : { level: 'amber', text: 'Unknown Vest build — checking…', changed: true };
-    if (last && last !== fp) return { level: 'amber', text: 'Vest updated — checking…', changed: true };
+    if (last && last !== fp && _acceptedBuild !== fp)
+      return { level: 'amber', text: 'Vest updated — checking…', changed: true };
     return { level: 'green', text: fp, changed: false };
   };
 
@@ -4709,6 +5289,8 @@
   }
   const pauseBlocks = () => (S.paused ? `Paused: ${S.paused}` : null);
   if (window.__VC_TEST__) window.__vcStatus = checkStatus;
+  if (window.__VC_TEST__) window.__vcWarm = warmTick; // the 20 s read, on demand
+  if (window.__VC_TEST__) window.__vcDiagFile = () => diagFile(); // what Download saves
   function renderPause() {
     const bar = _root && _root.querySelector('.pausebar');
     if (!bar) return;
@@ -4764,7 +5346,7 @@
   }
   // Reload for an update only once nothing is in flight (an order, a stop move, a claim, Flatten All, arming).
   const busyNow = () =>
-    !!(S.placing || S.adjusting || S.flattening || S.arming || claimBusy()) ||
+    !!(S.placing || S.adjusting || S.exiting || S.flattening || S.arming || claimBusy()) ||
     Object.values(S.plans).some((p) => p.busy) ||
     S.stopEntries.length > 0; // a reload would cancel them
   function reloadWhenIdle() {
@@ -5408,10 +5990,11 @@
       return;
     }
     if (fp) {
+      _acceptedBuild = fp;
       try {
         localStorage.setItem(BUILD_KEY, fp);
       } catch {
-        /* best effort: nothing to do if this fails */
+        /* storage full: this page still knows (`_acceptedBuild`); the next load checks again */
       }
     } else _unknownBuildChecked = true;
     site.phase = 'accepted';
@@ -5426,6 +6009,7 @@
     const s = S.site;
     if (s && s.phase === 'accepted' && Date.now() - s.acceptedAt < ALL_CLEAR_MS) return 'clear';
     if (S.armed || !healthState().changed) return null;
+    if (s && s.phase === 'accepted') return null; // checked and accepted (its save may have failed: storage full)
     return s && s.fp === fingerprint() && s.phase !== 'done' ? s.phase : 'checking';
   }
   // Why an order from the panel (or automatic breakeven) has to wait, or null.
@@ -6657,6 +7241,212 @@
     .scard .ghostbtn {
       justify-self: start;
       margin-top: 4px;
+    }
+    /* the connection readout (the meter, 2026-10-15): the time to Vest */
+    .scard.cx-card {
+      width: 276px;
+      gap: 7px;
+    }
+    .health.cx-off .dot,
+    .health.cx-none .dot {
+      background: #4a4a50;
+      opacity: 1;
+    }
+    .health.cx-good .dot {
+      background: var(--accent);
+      opacity: 1;
+    }
+    .health.cx-ok .dot {
+      background: var(--dim);
+      opacity: 1;
+    }
+    .health.cx-slow .dot {
+      background: var(--warn);
+      opacity: 1;
+    }
+    .health.cx-down .dot {
+      background: var(--danger);
+      opacity: 1;
+    }
+    .hsum .ms {
+      color: var(--dim);
+    }
+    .health.cx-good .hsum .ms {
+      color: var(--text);
+    }
+    .health.cx-slow .hsum .ms {
+      color: var(--warn);
+    }
+    .health.cx-down .hsum .ms {
+      color: var(--danger);
+    }
+    .cx-sep {
+      height: 1px;
+      background: var(--hair);
+      margin: 3px 0;
+    }
+    .kv .v-down {
+      color: var(--danger);
+    }
+    .kv .v-muted {
+      color: var(--faint);
+    }
+    .cx-btns {
+      display: flex;
+      gap: 6px;
+      margin-top: 4px;
+    }
+    .cx-btns .ghostbtn {
+      flex: 1;
+      justify-content: center;
+      padding: 0 8px;
+      margin-top: 0;
+    }
+    .cx-btns .ghostbtn:disabled {
+      color: var(--dim);
+    }
+    .cx-prog {
+      height: 2px;
+      background: var(--s3);
+      margin-top: 2px;
+    }
+    .cx-prog i {
+      display: block;
+      height: 100%;
+      background: var(--dim);
+      transition: width 0.2s;
+    }
+    .cx-verdict {
+      display: grid;
+      gap: 4px;
+      padding: 9px 10px;
+      border-left: 2px solid var(--line2);
+      background: var(--s3);
+      font-size: 11.5px;
+      line-height: 1.45;
+      color: var(--dim);
+    }
+    .cx-verdict b {
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .cx-verdict small {
+      font-family: var(--mono);
+      font-size: 10.5px;
+      color: var(--faint);
+    }
+    .cx-verdict.good {
+      border-color: var(--accent);
+      background: var(--accent-dim);
+    }
+    .cx-verdict.good b {
+      color: var(--accent);
+    }
+    .cx-verdict.slow {
+      border-color: var(--warn);
+      background: var(--warn-dim);
+    }
+    .cx-verdict.slow b {
+      color: var(--warn);
+    }
+    .cx-verdict.down {
+      border-color: var(--danger);
+      background: var(--danger-dim);
+    }
+    .cx-verdict.down b {
+      color: var(--danger);
+    }
+    .cx-verdict[hidden],
+    .cx-prog[hidden] {
+      display: none;
+    }
+    .cx-meter {
+      display: grid;
+      gap: 6px;
+    }
+    .cx-big {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+    }
+    .cx-big b {
+      font: 600 24px/1 var(--mono);
+      color: var(--text);
+      letter-spacing: -0.02em;
+    }
+    .cx-big small {
+      font-size: 11.5px;
+      color: var(--dim);
+    }
+    .cx-big .lvl {
+      margin-left: auto;
+      font-size: 11px;
+      font-weight: 500;
+      padding: 3px 7px;
+      background: var(--s3);
+      color: var(--dim);
+      align-self: center;
+    }
+    .cx-big .lvl.good {
+      background: var(--accent-dim);
+      color: var(--accent);
+    }
+    .cx-big .lvl.slow {
+      background: var(--warn-dim);
+      color: var(--warn);
+    }
+    .cx-big .lvl.down {
+      background: var(--danger-dim);
+      color: var(--danger);
+    }
+    .cx-big.good b {
+      color: var(--accent);
+    }
+    .cx-big.slow b {
+      color: var(--warn);
+    }
+    .cx-big.down b {
+      color: var(--danger);
+    }
+    .cx-big.empty b {
+      color: var(--faint);
+      font-size: 18px;
+    }
+    .cx-spark {
+      display: block;
+    }
+    .cx-flat {
+      height: 50px;
+      border-bottom: 1px solid var(--line);
+    }
+    .cx-under {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--dim);
+    }
+    .cx-under span:last-child {
+      font-family: var(--mono);
+      color: var(--faint);
+      font-size: 10.5px;
+    }
+    .cx-pms {
+      display: none;
+    }
+    .collapsed .cx-pms:not(:empty) {
+      display: block;
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .collapsed .cx-pms.slow {
+      color: var(--warn);
+    }
+    .collapsed .cx-pms.down {
+      color: var(--danger);
+      font-family: var(--sans);
+      font-weight: 500;
     }
     .r-amber {
       color: var(--warn);
@@ -8939,7 +9729,7 @@
           <span class="brand" role="img" aria-label="STRATUH">${BRAND_SVG}</span><span class="sep"></span><span class="title">Copier</span>
           <span class="spacer"></span>
           <span class="pill" id="armtag"><i class="pdot"></i><span class="ptext">Not copying</span></span>
-          <span class="pillv" id="pillv"></span>
+          <span class="cx-pms" id="cx-pms"></span><span class="pillv" id="pillv"></span>
           <button class="pillbtn" data-act="pillgo" hidden></button>
           <button class="iconbtn" data-act="menu" title="More" aria-label="More" aria-haspopup="menu" aria-expanded="false">${ICON.more}</button>
           <button class="iconbtn" data-act="collapse" title="Minimise" aria-label="Minimise" aria-expanded="true">${ICON.min}</button>
@@ -8986,12 +9776,17 @@
           <button class="codebtn" data-act="code" title="Click to copy the code" hidden>Use code <b>${SUPPORT_CODE}</b><span class="off"> · 5% off</span></button>
           <button class="health" data-act="health" title="Vest's build, this version and the API budget. Click for the status card and the site check." aria-label="Status" aria-expanded="false"><span class="dot gray"></span><span class="hsum">Starting…</span></button>
         </div>
-        <div class="scard" hidden>
+        <div class="scard cx-card" hidden>
+          <div class="cx-meter" id="cx-meter"></div>
+          <div class="kv" title="How far the followers filled from the master on the last copied trade (average, in points) and how long after"><span>Last copy</span><span id="cx-last" class="v-muted">no copy yet</span></div>
+          <div class="cx-verdict" id="cx-verdict" hidden></div>
+          <div class="cx-btns"><button class="ghostbtn" data-act="sitecheck">Run site check</button><button class="ghostbtn" data-act="conntest" title="About 10 quick reads to Vest, copying or not">Test connection</button></div>
+          <div class="cx-prog" id="cx-prog" hidden><i></i></div>
+          <div class="cx-sep"></div>
           <div class="kv"><span>Vest build</span><span class="htext">Starting…</span></div>
           <div class="kv"><span>Copier</span><span class="ver">v${VERSION}</span></div>
           <div class="kv" title="Vest allows 200 requests a second; this is what's left this second"><span>API this second</span><span class="rate" id="rate">—</span></div>
           <div class="kv" title="How long Vest took to answer a follower order (it leaves with the master's own order in fast mode)"><span>Vest's answer, slowest today</span><span id="slowest">—</span></div>
-          <button class="ghostbtn" data-act="sitecheck">Run site check</button>
         </div>
         <div class="grip" title="Drag to resize"></div>
       </div>`;
@@ -9113,11 +9908,15 @@
     const setCard = (open) => {
       scard.hidden = !open;
       health.setAttribute('aria-expanded', String(open));
+      // a test's verdict stays until the card closes; the next test replaces it
+      if (!open && S.net.test && !S.net.test.running) S.net.test = null;
+      renderConn();
     };
     health.onclick = (e) => {
       e.stopPropagation(); // not a click on the log line
       setCard(scard.hidden);
     };
+    on('[data-act="conntest"]', () => testConnection());
     on('[data-act="sitecheck"]', () => {
       setCard(false);
       if (siteGate()) return; // the check already fills the panel
@@ -9168,28 +9967,176 @@
       g === 'failed' ? 'Vest changed — copying off' : g === 'waiting' ? 'Vest updated — check waiting' : h.text;
     _root.querySelector('.reportbar').classList.toggle('alert', level !== 'green');
     renderRate();
-    renderHealthSum();
+    renderConn(); // the time to Vest: the bar's text and dot, the status card, the pill
     renderUpdate();
     renderPause();
     renderNotice();
     renderThemeIntro();
   }
-  // The bottom bar's right side: this version · the API budget, or what Vest's update means for copying.
+  // The bottom bar's right side: this version · the time to Vest, or what Vest's update means for copying.
   function renderHealthSum() {
     const el = _root && _root.querySelector('.hsum');
     if (!el) return;
     const h = healthState(),
-      g = siteGate(),
-      { remaining, limit } = S.rate;
-    const api = remaining == null ? '' : ` · API ${remaining}${limit ? '/' + limit : ''}`;
-    el.textContent =
-      g === 'failed'
-        ? 'Vest changed — copying off'
-        : g === 'waiting'
-          ? 'Vest updated — check waiting'
-          : h.changed
-            ? h.text
-            : `v${VERSION}${api}`; // Vest's build is on the status card
+      g = siteGate();
+    const health = el.closest('.health');
+    // a failed or waiting site check keeps the bar, whatever the connection
+    if (g === 'failed' || g === 'waiting' || h.changed) {
+      health.className = 'health';
+      el.textContent =
+        g === 'failed' ? 'Vest changed — copying off' : g === 'waiting' ? 'Vest updated — check waiting' : h.text;
+      return;
+    }
+    // the version and the time to Vest (Vest's build and the API budget are on the status card); the dot by connection
+    const cs = netState(),
+      last = S.net.samples[S.net.samples.length - 1];
+    health.className = 'health cx-' + cs;
+    const html =
+      cs === 'down'
+        ? `v${VERSION} · <span class="ms">Vest not answering</span>`
+        : last && cs !== 'off' && cs !== 'none'
+          ? `v${VERSION} · <span class="ms">${last.ms}ms</span>`
+          : `v${VERSION}`;
+    if (el.dataset.html !== html) el.innerHTML = el.dataset.html = html;
+  }
+  // ── The connection readout (design B, the Meter): the status card leads with the time to Vest, its level and the last
+  // 5 minutes' reads as bars against the 80 and 200 ms lines; then the last copy's result, Test connection and its
+  // verdict. The wording says what the number means for copies and never promises a fill.
+  const hms = (t) => new Date(t).toLocaleTimeString([], { hour12: false });
+  const CX_LEVEL = { good: 'Good', ok: 'OK', slow: 'Slow', down: 'No answer' };
+  // one bar per read on a square-root scale to 450 ms (small times still show), the 80 and 200 ms lines; a red cross
+  // for a read Vest didn't answer
+  function connBars(vals, w = 252, h = 50) {
+    const max = 450,
+      y = (v) => +(h - 4 - Math.sqrt(Math.min(v, max) / max) * (h - 8)).toFixed(1),
+      step = (w - 26) / NET_BARS;
+    const line = (v, lab) =>
+      `<line x1="0" x2="${w - 22}" y1="${y(v)}" y2="${y(v)}" stroke="rgba(255,255,255,.13)" stroke-dasharray="2 3"/><text x="${w}" y="${y(v) + 3}" text-anchor="end" style="font-family: var(--mono)" font-size="9" fill="#6b6b73">${lab}</text>`;
+    const bars = vals
+      .map((v, i) => {
+        const x = +(2 + i * step).toFixed(1);
+        if (v == null)
+          return `<path d="M${x - 2} ${h - 7} l5 5 M${x + 3} ${h - 7} l-5 5" stroke="#ff5a4f" stroke-width="1.3"/>`;
+        const c = v < NET_GOOD_MS ? '#c8f542' : v <= NET_OK_MS ? '#a1a1a8' : '#f5b942';
+        return `<rect x="${x - 1.5}" y="${y(v)}" width="3" height="${+(h - 4 - y(v)).toFixed(1)}" fill="${c}" opacity="${(0.55 + (i / vals.length) * 0.45).toFixed(2)}"/>`;
+      })
+      .join('');
+    return `<svg class="cx-spark" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true">${line(NET_GOOD_MS, '80')}${line(NET_OK_MS, '200')}<line x1="0" x2="${w - 22}" y1="${h - 4}" y2="${h - 4}" stroke="rgba(255,255,255,.09)"/>${bars}</svg>`;
+  }
+  function meterHtml(cs) {
+    const n = S.net,
+      last = n.samples[n.samples.length - 1],
+      jit = netJitter();
+    const measured = cs === 'good' || cs === 'ok' || cs === 'slow';
+    const big = measured
+      ? `<b>${last.ms}</b><small>ms to Vest</small>`
+      : cs === 'down'
+        ? '<b>—</b><small>Vest not answering</small>'
+        : `<b>—</b><small>${cs === 'off' ? 'measured while copying' : 'first reading in a few seconds'}</small>`;
+    const cls = measured ? (cs === 'ok' ? '' : cs) : cs === 'down' ? 'down' : 'empty';
+    const chip = CX_LEVEL[cs] ? `<span class="lvl ${cs}">${CX_LEVEL[cs]}</span>` : '';
+    const bars =
+      cs === 'off' || !n.samples.length ? '<div class="cx-flat"></div>' : connBars(n.samples.map((x) => x.ms));
+    const under =
+      cs === 'off'
+        ? 'Start copying to measure'
+        : cs === 'down'
+          ? `No answer since ${hms(n.missSince)}`
+          : jit != null
+            ? `${jit <= 10 ? 'Steady' : jit <= 40 ? 'A little uneven' : 'Uneven'} (±${jit}ms)`
+            : 'Measuring every 20s';
+    return `<div class="cx-big ${cls}" title="How long Vest takes to answer a small read, every 20s while copying">${big}${chip}</div>${bars}<div class="cx-under"><span title="How much the time to Vest varies between readings">${under}</span><span>last 5 min</span></div>`;
+  }
+  // Test connection's verdict from its reads (ms, or null for no answer).
+  function verdictOf(res) {
+    const ok = res.filter((x) => x != null).sort((a, b) => a - b),
+      missed = res.length - ok.length,
+      at = hhmm(Date.now());
+    if (!ok.length || missed > res.length / 2)
+      return {
+        level: 'down',
+        title: "Vest isn't answering",
+        text: `${missed} of ${res.length} checks got no answer. Copies may not go through until it does. Check your internet, then test again.`,
+        small: `${res.length} checks · ${ok.length} answered · ${at}`,
+      };
+    const med = pctOf(ok, 0.5),
+      level = netLevel(med),
+      w = ok.length >= 5 ? ok.slice(1, -1) : ok,
+      jit = Math.round((w[w.length - 1] - w[0]) / 2);
+    return {
+      level,
+      title:
+        level === 'good'
+          ? `Good: ${med}ms${jit <= 10 ? ', steady' : ''}`
+          : `${level === 'ok' ? 'OK' : 'Slow'}: ${med}ms`,
+      text: {
+        good: 'Copies reach Vest quickly from here. Fill prices still depend on the market.',
+        ok: "In fast markets, followers' fills and closes may land a tick or so from the master's.",
+        slow: 'Expect slippage: followers may fill a few ticks from the master, most in fast markets. A wired connection usually helps.',
+      }[level],
+      small: `${res.length} checks · ${ok[0]}-${ok[ok.length - 1]}ms${missed ? ` · ${missed} no answer` : ''} · ${at}`,
+    };
+  }
+  // ~10 reads a quarter second apart, copying or not, then one verdict. Its own reads: the 20 s ones carry on and the
+  // card's bars only ever show those. Three misses in a row end it early (each waits NET_TIMEOUT_MS for an answer).
+  const TEST_READS = 10,
+    TEST_GAP_MS = 250,
+    TEST_MISSES = 3;
+  async function testConnection() {
+    const n = S.net;
+    if (n.test && n.test.running) return;
+    if (!Object.keys(S.byId).length || !userTokenOk()) return toast('Wait for your accounts to load, then test again.');
+    const t = (n.test = { running: true, res: [] });
+    renderConn();
+    let missRun = 0;
+    for (let i = 0; i < TEST_READS && missRun < TEST_MISSES; i++) {
+      if (i) await sleep(TEST_GAP_MS);
+      const ms = await timedRead();
+      if (ms === undefined) break;
+      t.res.push(ms);
+      missRun = ms == null ? missRun + 1 : 0;
+      renderConn();
+    }
+    t.running = false;
+    t.verdict = t.res.length ? verdictOf(t.res) : null;
+    diag('connection_test', { results: t.res, level: t.verdict ? t.verdict.level : null, copying: S.armed });
+    renderConn();
+  }
+  function renderConn() {
+    if (!_root) return;
+    renderHealthSum();
+    const cs = netState(),
+      set = (el, html) => el && el.dataset.html !== html && (el.innerHTML = el.dataset.html = html);
+    set(_root.querySelector('#cx-meter'), meterHtml(cs));
+    const lc = S.lastCopy,
+      last = _root.querySelector('#cx-last');
+    if (last) {
+      last.textContent = !lc
+        ? 'no copy yet'
+        : lc.notSent
+          ? 'not sent'
+          : `${lc.pts < 1e-6 ? 'same price' : +lc.pts.toFixed(2) + ' pts'}${lc.gapMs != null ? ` · ${lc.gapMs}ms` : ''}`;
+      last.className = !lc ? 'v-muted' : lc.notSent ? 'v-down' : '';
+    }
+    const t = S.net.test,
+      v = t && !t.running && t.verdict,
+      box = _root.querySelector('#cx-verdict');
+    if (box) {
+      box.hidden = !v;
+      box.className = 'cx-verdict' + (v ? ' ' + v.level : '');
+      set(box, v ? `<b>${esc(v.title)}</b><span>${esc(v.text)}</span><small>${esc(v.small)}</small>` : '');
+    }
+    const btn = _root.querySelector('[data-act="conntest"]'),
+      prog = _root.querySelector('#cx-prog');
+    if (btn) {
+      btn.disabled = !!(t && t.running);
+      btn.textContent = t && t.running ? `Testing… ${t.res.length} of ${TEST_READS}` : 'Test connection';
+    }
+    if (prog) {
+      prog.hidden = !(t && t.running);
+      prog.firstElementChild.style.width = t && t.running ? `${(t.res.length / TEST_READS) * 100}%` : '0';
+    }
+    renderDock();
   }
   function renderRate() {
     if (!_root) return;
@@ -9429,8 +10376,16 @@
         : 'Docked on the chart: click to float it anywhere';
     const orphans = !!(S.orphan && S.orphan.list.length),
       siteOff = siteGate() === 'failed';
-    const red = orphans || siteOff || (S.armed && !feedLive() && Date.now() - _bootAt > FEED_QUIET_MS / 5);
-    const amber = !red && healthState().changed;
+    const cs = netState(); // copying: slow shows amber and the time, not answering red and "No answer"
+    const red =
+      orphans || siteOff || (S.armed && !feedLive() && Date.now() - _bootAt > FEED_QUIET_MS / 5) || cs === 'down';
+    const amber = !red && (healthState().changed || cs === 'slow');
+    const pms = _root.querySelector('#cx-pms');
+    if (pms) {
+      const last = S.net.samples[S.net.samples.length - 1];
+      pms.textContent = cs === 'slow' && last ? `${last.ms}ms` : cs === 'down' ? 'No answer' : '';
+      pms.className = 'cx-pms ' + cs;
+    }
     const panel = _root.querySelector('.panel');
     panel.classList.toggle('attn-red', red);
     panel.classList.toggle('attn-amber', amber);
@@ -10256,7 +11211,7 @@
         "Vest changed something the copier relies on (in red below). Copying, Trade-tab orders, automatic breakeven and claims stay off until a copier update fixes it: trade from Vest's own panel meanwhile. Flatten all still works.",
       ],
       clear: ['All clear', "The copier works with Vest's update."],
-    }[g];
+    }[g] || ['Vest updated its site', 'Checking that the copier still works with it.']; // never a crash on a new state
     body.innerHTML = `
       <div class="gate gate-${g}">
         <div class="rules">
@@ -10965,7 +11920,7 @@
   // placed), `stopEntry`, and `ioc` (with a max slip: an immediate-or-cancel limit at that price instead of a market
   // order). Returns true once Vest has accepted the order.
   async function placeTrade(side, limitPx = null, opt = {}) {
-    if (S.placing || S.adjusting) return;
+    if (S.placing || S.adjusting || S.exiting) return;
     if (S.flattening) return toast('Wait for Flatten All to finish.');
     if (S.arming || claimBusy()) return toast('Wait for copying to start or the claim to finish.');
     const siteHeld = siteBlocks() || pauseBlocks(); // Vest's update not checked yet, the check failed, or paused
@@ -11031,16 +11986,19 @@
           : { ...plan0, stop: planPrices({ side, entry: stopFrom, stopPts, targetPts: [], tick: meta.tick }).stop };
       if (plan.error) throw new Error(plan.error);
       if (!(SYMBOLS[sym] && SYMBOLS[sym].margin)) await loadSymbolRules(sym);
-      // Two reads before sending: the saved leverage (Vest's own rule) and whether this market already holds a position
-      // or a waiting order (Vest ignores a second open on the same symbol: accepted, never filled; same direction is an
-      // add, the opposite direction is refused here). They don't depend on each other, so they run together. A stop entry
-      // read its leverage when it was placed (kept fresh while it waits) and, with Vest's live feed up, checks the
-      // market from the feed, so it goes out the moment it triggers; without the feed it asks Vest like any order.
-      const quick = opt.stopEntry ? stopEntryCheck(master, sym) : null;
+      // Two things to know before sending: the saved leverage (Vest's own rule) and whether this market already holds a
+      // position or a waiting order (Vest ignores a second open on the same symbol: accepted, never filled; same
+      // direction is an add, the opposite direction is refused here). With Vest's live feed up both are known already
+      // (the feed's positions and orders; the leverage the Trade tab read, with any change the page made laid over it),
+      // so the order goes out at once and the leverage is read again afterwards. Without the feed they're read, together.
+      // A stop entry keeps its own leverage, refreshed while it waits.
+      const quick = stopEntryCheck(master, sym);
+      const known = quick && S.levs ? withPageLevs({ ...S.levs }) : null;
       const [levs, held] = await Promise.all([
-        opt.stopEntry && opt.stopEntry.levs ? opt.stopEntry.levs : fetchLeverages(),
+        opt.stopEntry && opt.stopEntry.levs ? opt.stopEntry.levs : known || fetchLeverages(),
         quick ? quick.held : openPosition(master, sym),
       ]);
+      if (known && !(opt.stopEntry && opt.stopEntry.levs)) setTimeout(refreshTradeState, 0); // re-read once it's out
       const lev = orderLeverage(levFor(levs, master, sym), maxLeverageFor(sym, master));
       if (!(lev > 0))
         throw new Error(
@@ -11421,6 +12379,7 @@
     }
     let failed = 0;
     for (const m of moves) {
+      if (_exitedHere.has(positionId)) return done(); // closed from the panel meanwhile: nothing left to re-place
       const isStop = m.kind === 'sl';
       try {
         await send('PUT', isStop ? '/v3/positions/stop-loss' : '/v3/positions/take-profit', master, {
@@ -11863,7 +12822,7 @@
     const st = S.acctState[master];
     if (!feedLive() || !st || !Array.isArray(st.orders) || !stateFresh(st)) return null;
     const pos = st.positions.find((p) => p.symbol === sym && p.qty > 0);
-    if (pos) return { held: { quantity: String(pos.qty), side: pos.side } };
+    if (pos) return { held: { positionId: pos.id, quantity: String(pos.qty), side: pos.side } }; // an add needs the id
     if (st.orders.some((o) => o.symbol === sym)) return { held: { quantity: '0' } };
     return { held: null };
   }
@@ -11963,7 +12922,7 @@
       );
     const siteHeld = siteBlocks() || pauseBlocks();
     if (siteHeld) return cancelStopEntry(e, `${stopName(e)} cancelled: ${siteHeld}`);
-    if (S.placing || S.adjusting || S.flattening || S.arming || claimBusy()) {
+    if (S.placing || S.adjusting || S.exiting || S.flattening || S.arming || claimBusy()) {
       if (Date.now() - e.triggered > STOP_WAIT_MS)
         cancelStopEntry(
           e,
@@ -12119,7 +13078,7 @@
       return no(
         `a ${leg.kind === 'sl' ? 'stop' : 'target'} goes ${(leg.kind === 'sl') === long ? 'under' : 'over'} the limit price.`,
       );
-    if (S.placing || S.adjusting || S.flattening || S.arming || claimBusy())
+    if (S.placing || S.adjusting || S.exiting || S.flattening || S.arming || claimBusy())
       return no('wait for the order going through.');
     const held = siteBlocks() || pauseBlocks();
     if (held) return no(held);
@@ -12309,7 +13268,7 @@
     return { price: be, sl, why };
   }
   async function breakevenNow() {
-    if (S.placing || S.adjusting || S.flattening || S.arming) return;
+    if (S.placing || S.adjusting || S.flattening || S.arming || S.exiting) return;
     const siteHeld = siteBlocks();
     if (siteHeld) return toast(siteHeld);
     const master = S.master,
@@ -12362,29 +13321,61 @@
       refreshTradeState();
     }
   }
+  // ── Getting out (Close, Reduce) never waits. The position and its leverage (Vest wants one on every exit) come from what
+  // the copier already knows when Vest's live feed is up, so nothing is read before the order goes; without the feed,
+  // one read. An order, a re-anchor or a breakeven move still in flight doesn't hold an exit back: they find the
+  // position closed and stop. Only Flatten All (already closing everything), another exit on its way or a start of
+  // copying in progress (it is reading the positions to adopt) holds one.
+  const _exitedHere = new Set(); // position ids the panel closed, so a re-anchor or breakeven still running leaves them
+  const exitBlocks = () => S.flattening || S.exiting || S.arming;
+  async function exitPosition(master, sym) {
+    const h = feedLive() && heldOn(master, sym);
+    if (h) return { id: h.id, qty: h.qty, side: h.side, leverage: h.leverage, read: false };
+    const r = await api('/v3/positions/opened', (await mintAccountToken(master)).token);
+    const p = ((r && r.positions) || []).find((x) => x.symbol === sym && parseFloat(x.quantity) > 0);
+    return p
+      ? { id: posIdOf(p), qty: parseFloat(p.quantity), side: p.side, leverage: num(p.leverage), read: true }
+      : null;
+  }
+  const exitLeverage = (pos, master, sym) =>
+    (pos.leverage > 0 ? pos.leverage : orderLeverage(levFor(S.levs, master, sym), maxLeverageFor(sym, master))) ||
+    +DEFAULT_LEVERAGE;
+  // A panel exit that failed: before it went out, it wasn't sent; after, Vest didn't take the master's, and fast mode
+  // may already have sent the followers' (their copies leave with the master's order).
+  const exitFailed = (Name, name, sent, e) =>
+    !sent
+      ? `${Name}: not sent — ${e.message}.`
+      : `${Name}: Vest didn't take the master's ${name} (${e.message})${S.armed && S.fast ? `; fast mode had already sent the followers' ${name}` : ''}. Check the master on Vest.`;
+  function noteExitedHere(pid) {
+    _exitedHere.add(pid);
+    if (_exitedHere.size > 200) _exitedHere.delete(_exitedHere.values().next().value);
+    if (S.plans[pid]) endPlan(S.plans[pid], null); // nothing left for breakeven to move
+  }
   async function closeNow() {
-    if (S.placing || S.adjusting || S.flattening || S.arming) return;
+    if (exitBlocks()) return;
     const master = S.master,
       sym = S.trade.symbol,
       meta = SYMBOLS[sym];
     if (!master) return;
-    S.placing = true;
+    S.exiting = true;
+    let sent = false;
     try {
       updateTrade();
-      const pos = await openPosition(master, sym);
+      const pos = await exitPosition(master, sym);
       if (!pos) throw new Error(`${accLabel(master)} has no open ${meta.label} position`);
-      const lev = orderLeverage(levFor(await fetchLeverages(), master, sym), maxLeverageFor(sym, master));
-      await send('POST', '/v3/positions/close', master, closeBody(sym, posIdOf(pos), lev, master));
+      noteExitedHere(pos.id);
+      sent = true;
+      await send('POST', '/v3/positions/close', master, closeBody(sym, pos.id, exitLeverage(pos, master, sym), master));
       logEvent(
         'ok',
-        `Trade panel: CLOSE ${pos.quantity} ${meta.label} on ${accLabel(master)}${S.armed ? ' — the copier closes the followers' : ''}.`,
+        `Trade panel: CLOSE ${fmtQty(pos.qty, sym)} ${meta.label} on ${accLabel(master)}${S.armed ? ' — the copier closes the followers' : ''}.`,
       );
-      diag('trade_panel', { outcome: 'closed', positionId: posIdOf(pos), quantity: pos.quantity });
+      diag('trade_panel', { outcome: 'closed', positionId: pos.id, quantity: pos.qty, readFirst: pos.read });
     } catch (e) {
-      logEvent('warn', `Close: not sent — ${e.message}.`);
+      logEvent('warn', exitFailed('Close', 'close', sent, e));
       diag('trade_panel', { outcome: 'close-failed', error: e.message, errorCode: errCode(e) });
     } finally {
-      S.placing = false;
+      S.exiting = false;
       updateTrade();
       refreshTradeState();
     }
@@ -12410,7 +13401,8 @@
   const legKindAt = (side, price, px) => (price < px === (side === 'long') ? 'sl' : 'tp');
   // why adding that leg has to wait, or null (a stop only takes risk off, so a pause doesn't hold it back)
   function legBlocks(kind) {
-    if (S.placing || S.adjusting || S.flattening || S.arming || claimBusy()) return 'Wait for the order going through.';
+    if (S.placing || S.adjusting || S.exiting || S.flattening || S.arming || claimBusy())
+      return 'Wait for the order going through.';
     const held = siteBlocks() || (kind === 'tp' ? pauseBlocks() : null);
     if (held) return held;
     if (!S.ack) return 'Read and accept the terms first.';
@@ -12701,7 +13693,7 @@
   // body its close window sends). 100% is a close. The stop and targets stay where they are. It goes through the hooked
   // fetch, so an armed copier reduces each follower by the same share of its own position.
   async function reduceNow() {
-    if (S.placing || S.adjusting || S.flattening || S.arming) return;
+    if (exitBlocks()) return;
     const key = S.addPick || '25';
     if (key === 'max') return;
     if (key === '100') return closeNow(); // a close is never held back
@@ -12711,19 +13703,20 @@
       sym = S.trade.symbol,
       meta = SYMBOLS[sym];
     if (!master) return;
-    S.placing = true;
+    S.exiting = true;
+    let sent = false;
     try {
       updateTrade();
-      const pos = await openPosition(master, sym);
+      const pos = await exitPosition(master, sym);
       if (!pos) throw new Error(`${accLabel(master)} has no open ${meta.label} position`);
-      const have = parseFloat(pos.quantity),
+      const have = pos.qty,
         q = floorStep(have * (key === '50' ? 0.5 : 0.25), meta.step);
       if (!(q > 0)) throw new Error(`${key}% of ${fmtQty(have, sym)} rounds to nothing at ${meta.label}'s size step`);
-      const lev = orderLeverage(levFor(await fetchLeverages(), master, sym), maxLeverageFor(sym, master));
+      sent = true;
       const body = {
-        positionId: posIdOf(pos),
+        positionId: pos.id,
         orderType: 'market',
-        leverage: fmtNum(lev, 2),
+        leverage: fmtNum(exitLeverage(pos, master, sym), 2),
         quantity: fmtQty(q, sym),
         timeInForce: 'IOC',
         reduceOnly: true,
@@ -12734,12 +13727,18 @@
         'ok',
         `Trade panel: REDUCE ${body.quantity} ${meta.label} (${fmtQty(have, sym)} → ${fmtQty(have - q, sym)})${S.armed ? ' — the copier reduces the followers' : ''}. Stop and targets unchanged.`,
       );
-      diag('trade_panel', { outcome: 'reduced', positionId: body.positionId, quantity: body.quantity, prevQty: have });
+      diag('trade_panel', {
+        outcome: 'reduced',
+        positionId: body.positionId,
+        quantity: body.quantity,
+        prevQty: have,
+        readFirst: pos.read,
+      });
     } catch (e) {
-      logEvent('warn', `Reduce: not sent — ${e.message}.`);
+      logEvent('warn', exitFailed('Reduce', 'reduce', sent, e));
       diag('trade_panel', { outcome: 'reduce-failed', error: e.message, errorCode: errCode(e) });
     } finally {
-      S.placing = false;
+      S.exiting = false;
       updateTrade();
       refreshTradeState();
     }
@@ -13272,7 +14271,8 @@
         (S.adjusting ? 'Adjusting stop & targets…' : '');
     const q = c.qty > 0 ? fmtQty(c.qty, c.t.symbol) : '';
     const h = c.held,
-      busy = !!S.placing || !!S.adjusting || !!S.flattening || !!S.arming;
+      busy = !!S.placing || !!S.adjusting || !!S.flattening || !!S.arming || !!S.exiting,
+      exitBusy = !!exitBlocks(); // getting out isn't held back by an order or a re-anchor in flight
     const nf = S.armed ? S.followers.size : 0;
     $('tr-who').hidden = !!c.held; // in a trade, the position card says it
     $('tr-who').textContent = S.master
@@ -13400,7 +14400,7 @@
       $('tr-be').disabled = busy || !!be.why;
       $('tr-be').title = be.why || `Move the stop to ${fmtPx(be.price, tick)}, your average entry`;
       $('tr-close').textContent = `Close ${fmtQty(h.qty, h.symbol)}`;
-      $('tr-close').disabled = busy;
+      $('tr-close').disabled = exitBusy;
       // Scale chips: a share of the position (or MAX, adds only) that sizes both ADD and REDUCE; one is always picked
       const key = (c.pick && c.pick.key) || '25',
         step = c.meta.step;
@@ -13435,7 +14435,7 @@
           ? `Add: ${c.pick.why}`
           : `Add ${fmtQty(c.qty, h.symbol)} to the ${h.side}${S.armed ? ' (the copier adds to each follower, scaled)' : ''}. The stop and targets stay where they are.`;
       redBtn.textContent = key === '100' ? 'Reduce all' : redQ > 0 ? `Reduce ${fmtQty(redQ, h.symbol)}` : 'Reduce';
-      redBtn.disabled = busy || key === 'max' || !(redQ > 0);
+      redBtn.disabled = exitBusy || key === 'max' || !(redQ > 0);
       redBtn.title =
         key === 'max'
           ? 'MAX is for adds: pick 25, 50 or 100 to reduce'
@@ -13737,8 +14737,8 @@
           'fast',
           S.fast,
           'Fast mode',
-          'Followers enter as soon as the master sends.',
-          "Fire follower entries the instant the master sends, for the most simultaneous fills. They open before the master's order is confirmed.",
+          'Followers copy each order as soon as the master sends it.',
+          "Copy every market order the instant the master sends it (entries, closes, reduces, adds, stops and targets), for the most simultaneous fills. Followers act before Vest has confirmed the master's order. Limit orders and cancels are copied once Vest answers.",
         )}
         ${option(
           'autoflat',
@@ -13967,8 +14967,13 @@
       Object.values(o).forEach(learn);
     };
     learn(S.diag);
-    let unknown = 0;
+    let unknown = 0,
+      unknownText = 0;
     const nameFor = (id) => alias[id] || (alias[id] = `account-${++unknown}`);
+    // inside free text an id could be an account's, an order's or a position's: an unknown one becomes a neutral
+    // "id-N" (the same id, the same N), so no account id leaves in a sentence (reports reach public issues)
+    const textIds = {};
+    const textName = (id) => alias[id] || textIds[id] || (textIds[id] = `id-${++unknownText}`);
     const scrub = (v) =>
       JSON.parse(JSON.stringify(v), function (k, val) {
         if (Array.isArray(val) && ACCOUNT_KEYS.has(k)) return val.map((x) => (isUuid(x) ? nameFor(x) : x));
@@ -13976,7 +14981,9 @@
         if (alias[val]) return alias[val];
         if (isUuid(val) && ACCOUNT_KEYS.has(k) && (k !== 'id' || 'label' in this)) return nameFor(val);
         // account ids inside longer text, e.g. an error message holding an API path with the id in it
-        return val.replace(/[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}/gi, (m) => alias[m] || m);
+        if (isUuid(val)) return val; // a position or order id in its own field: kept (it ties related events together)
+        if (isUuid(val)) return val; // a position or order id in its own field: kept (it ties related events together)
+        return val.replace(/[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}/gi, textName);
       });
     return { scrub, alias };
   }
@@ -14017,7 +15024,7 @@
         trade: S.trade,
       },
       accounts,
-      log: [...S.log].reverse().map((e) => ({ t: e.t.toISOString(), level: e.level, msg: e.msg })),
+      log: storedLog().reverse(),
       diagnostics: S.diag,
     });
   }
@@ -15932,7 +16939,7 @@
 
   async function claimPreview() {
     if (claimBusy()) return;
-    if (S.flattening || S.placing || S.adjusting || S.arming)
+    if (S.flattening || S.placing || S.adjusting || S.exiting || S.arming)
       return toast('Wait for the current order, Flatten all or starting to finish.');
     // a trade copied mid-claim would change what each account can claim
     if (S.armed) return toast('Stop copying before claiming profit.');
@@ -15982,7 +16989,7 @@
     if (!c || c.phase !== 'review') return;
     const todo = c.items.filter((i) => i.claimable > 0);
     if (!todo.length) return;
-    if (S.armed || S.arming || S.placing || S.adjusting || S.flattening)
+    if (S.armed || S.arming || S.placing || S.adjusting || S.exiting || S.flattening)
       return toast('Stop copying and let orders finish before claiming profit.');
     c.phase = 'running';
     c.stop = false;
