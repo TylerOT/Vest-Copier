@@ -6,9 +6,9 @@ to your other accounts (the **followers**), live, from inside the Vest web page.
 your own logged-in browser session: nothing logs in on your behalf, and it only acts when you trade.
 
 > **Risk notice.** This places **real orders on live accounts** the instant you start copying. One bad
-> master trade hits **every** linked account at once. Vest has no official copier; a Vest team
-> member has said third-party copy tools aren't prohibited ("use at your own risk"). Every order it
-> sends is your responsibility. Start tiny.
+> master trade hits **every** linked account at once. Vest has no official copier, and its terms
+> treat trade copiers as independent third-party tools: you use one at your own risk, and Vest won't
+> investigate or reimburse problems it causes. Every order it sends is your responsibility. Start tiny.
 
 ---
 
@@ -68,7 +68,8 @@ their own browser.
   panel; the arrow at the top
   left brings you back.
 - **Copier tab:** your **master** on top, then the **followers**, then any account that isn't copied under **Left out**,
-  with the reason. One line each: the account number and name (an **Eval** or **Instant** tag when it isn't a funded
+  with the reason. One line each: the account's number in a square and its name (the one you gave it on Vest, else
+  "Account 07"; the log and saved files say both, Account 07 ("Swing")) (an **Eval** or **Instant** tag when it isn't a funded
   account), the **room left** to its floor with a small meter, and a dot: lime in a trade while copying, grey flat, hollow not copied,
   red when Vest says it can't trade. Hover a row for its balance and floor (the **daily floor** on plans with a daily loss
   limit, when it's the higher one today). A follower with **less than 30% of its drawdown left** shows "Only $310 to its
@@ -121,8 +122,9 @@ answering: "No answer"); amber means Vest updated its site and the check is runn
   (per symbol, except on a market where it's already in a trade). Change your leverage or switch symbols → **stop and start copying again** to re-sync.
 - **It mirrors the full lifecycle:** open, add/scale, move stop-loss / take-profit, partial reduce,
   close, and cancel resting orders.
-- **Stops and targets copy too:** set at entry, added later, moved, resized or removed. Each follower's
-  matching order is changed.
+- **Stops and targets copy too:** set at entry, added later, moved, resized or removed, even within a second of
+  adding one. Each follower's matching order is changed. If a follower's stops or targets ever stop matching yours,
+  the log says so (**Bracket check**), naming the account and the price.
 - **Only your orders are copied.** When Vest closes the master itself (a stop or target filling, a drawdown
   breach, a liquidation), nothing is copied. The log says what Vest did, and a follower still in the trade a few
   seconds later is offered as **Flatten / Keep** (or closed by itself with **Auto-flatten** on).

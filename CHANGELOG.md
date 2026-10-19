@@ -2,6 +2,13 @@
 
 Newest first. To update, click **Install** on the update row that appears in the panel whenever there's a newer version.
 
+## v0.41.1
+Your followers' stops and targets stay in step with yours, and the names you give your accounts on Vest show in the panel.
+
+- **A stop or target you remove or move right after adding it now copies too.** This worked normally at an everyday pace, but a quick change could be missed: removed within about a second of adding it, or within two or three seconds for traders far from Vest's servers (around 250 ms away, where each follower's order takes up to 2 s to land). Your followers could keep theirs, and it could close them early while you stayed in the trade. In our tests, a stop or target removed 0.3 s after adding it, and one removed 2 s after adding it with followers 1.8 s away, now goes on every follower too; in a live test, five removals 0.6-0.9 s after adding all copied. Only a stop or target the copier put on a follower is touched, never one you placed on a follower yourself.
+- **A bracket check.** If a follower's stops or targets ever stop matching yours (an extra target, or a missing stop), the log names the account and the price so you can fix it on Vest.
+- **Account names.** Name an account on Vest and the panel shows that name, with the account's number in the square beside it. The log, the Download file and Report a problem say both, for example Account 07 ("Swing"), so a report shows which account you mean.
+
 ## v0.41.0
 Followers copy you at the same moment, not after Vest answers, and the panel shows your connection to Vest.
 

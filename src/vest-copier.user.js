@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Vest Copier
 // @namespace    vestcopier
-// @version      0.41.0
+// @version      0.41.1
 // @description  Copies a master Vest account's trades to your other Vest accounts, live, and adds a points-based order panel.
 // @author       xAmped
 // @license      STRATUH Copier License — free to use, no selling; see LICENSE
@@ -38,7 +38,7 @@
     })(),
   };
 
-  const VERSION = '0.41.0';
+  const VERSION = '0.41.1';
   // Where this script runs from, read off its own first stack frame (each script manager names it differently): the
   // diagnostics use it to tell the copier's own errors from Vest's. Null when the stack shows no address.
   const OWN_SRC = (() => {
@@ -386,8 +386,8 @@
     const p = _fetch.apply(this, arguments);
     if (levChange)
       p.then(
-        (r) => pageLeverageDone(levChange, r.status),
-        () => pageLeverageDone(levChange, 0),
+        (r) => pageRequestDone(levChange, r.status),
+        () => pageRequestDone(levChange, 0),
       );
     // Only order requests are read back (never other responses, which may be long-lived streams).
     if (pending || (auth && orderAction(url))) {
@@ -441,7 +441,7 @@
           } catch {
             /* best effort: nothing to do if this fails */
           }
-          if (vc.lev) pageLeverageDone(vc.lev, this.status);
+          if (vc.lev) pageRequestDone(vc.lev, this.status);
           if (pending) settleFast(pending, r, this.status);
           else onRequest(vc.url, b, r, vc.auth, vc.method, this.status, 'xhr');
         },
@@ -467,8 +467,8 @@
     });
 
   // What the page sends that the copier needs to know before Vest answers: a close or reduce (so the position closing on
-  // the live feed isn't mistaken for one Vest made), the account Vest's screen switches to, and a leverage change
-  // (returned, so the hook can report Vest's answer to `pageLeverageDone`).
+  // the live feed isn't mistaken for one Vest made), the account Vest's screen switches to, a leverage change and an
+  // account's new name (returned, so the hook can report Vest's answer to `pageRequestDone`).
   const _exits = {}; // positionId -> when this tab last sent a close or reduce for it
   const noteExit = (positionId) => positionId && (_exits[positionId] = Date.now());
   const ourExit = (positionId) => Date.now() - (_exits[positionId] || 0) < OUR_EXIT_MS;
@@ -490,6 +490,8 @@
     } else if (method === 'PATCH' && /\/v3\/user-state\/preferences/.test(url)) {
       const req = parseJson(body, null);
       if (req && req.lastUsedAccountId) setScreen(req.lastUsedAccountId);
+    } else if (method === 'PATCH' && /\/v3\/user-state\/accounts\/[^/?#]+\/?(?:[?#]|$)/.test(url)) {
+      return notePageRename(url, body); // an account renamed on Vest
     } else if (/\/v3\/user-state\/accounts\/[^/]+\/leverages\//.test(url)) {
       setTimeout(() => S.tradeOpen && refreshTradeState(), BALANCE_AFTER_TRADE_MS);
       return notePageLeverage(url, body);
@@ -516,6 +518,8 @@
     drawTradeSoon();
     return change;
   }
+  const pageRequestDone = (change, status) =>
+    change.kind === 'name' ? pageRenameDone(change, status) : pageLeverageDone(change, status);
   function pageLeverageDone(change, status) {
     if (status >= 200 && status < 300) return void presetFollowerLeverage(change);
     if (_levSet[change.key] === change) delete _levSet[change.key];
@@ -996,7 +1000,70 @@
   const typeName = (t, p) =>
     t === 2 ? 'Evaluation' : t === 3 ? (p === 'instant_funded' ? 'Instant Funded' : 'Funded') : 'Other';
   const shortType = (t, p) => (t === 2 ? 'Eval' : t === 3 ? (p === 'instant_funded' ? 'Instant' : 'Funded') : 'Other');
-  const label = (a) => a.name || 'Account ' + String((a.attempt_index ?? 0) + 1).padStart(2, '0');
+  const label = (a) => 'Account ' + String((a.attempt_index ?? 0) + 1).padStart(2, '0'); // Vest's own number for it
+
+  // ── Account names. A trader can name an account on Vest (saved in its user-state: PATCH /v3/user-state/accounts/{id}
+  // { name }, read back from GET /v3/user-state with a `revision`, the newest winning, as Vest's page does). A named
+  // account's label is `Account 07 ("Swing")` in the log, the diagnostics and saved files (the owner's call, 2026-10-19:
+  // a report says which account by both), and its name alone in the panel's rows, with the number in its tile. Names
+  // are trimmed to NAME_MAX characters. Read when the accounts load, with every full read, and at once from a rename this
+  // tab saves (taken back if Vest refuses it).
+  const NAME_MAX = 24;
+  const _names = {}; // accountId -> { name, rev } from Vest's user-state
+  const cleanName = (n) => {
+    const s = String(n || '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    return s ? (s.length > NAME_MAX ? s.slice(0, NAME_MAX - 1) + '…' : s) : null;
+  };
+  function nameRow(r) {
+    const n = _names[r.id];
+    r.name = cleanName(n ? n.name : r.vestName);
+    r.label = r.name ? `${r.base} ("${r.name}")` : r.base;
+  }
+  const shortName = (r) => r.name || r.base; // what the panel's rows show
+  function noteNames(list) {
+    let changed = false;
+    for (const a of list || []) {
+      if (!a || !a.accountId || !('name' in a)) continue; // a user-state without names: the last known stays
+      const rev = Number.isFinite(+a.revision) ? +a.revision : 0,
+        had = _names[a.accountId];
+      if (had && rev < had.rev) continue; // an older answer than what's known
+      _names[a.accountId] = { name: a.name || null, rev };
+      const r = S.byId[a.accountId];
+      if (!r) continue;
+      const was = r.label;
+      nameRow(r);
+      if (r.label !== was) changed = true;
+    }
+    if (changed && _root) render();
+  }
+  // A rename the page saves: shown at once, above any read already on its way (half a revision ahead); Vest's next read
+  // brings the real revision. Refused: the old name comes back.
+  function notePageRename(url, body) {
+    const m = /\/v3\/user-state\/accounts\/([^/?#]+)/.exec(url),
+      req = parseJson(body, null);
+    if (!m || !req || typeof req !== 'object' || !('name' in req)) return null;
+    const id = decodeURIComponent(m[1]),
+      had = _names[id] || null;
+    _names[id] = { name: req.name || null, rev: (had ? had.rev : 0) + 0.5 };
+    const r = S.byId[id];
+    if (r) {
+      nameRow(r);
+      if (_root) render();
+    }
+    return { kind: 'name', id, had };
+  }
+  function pageRenameDone(change, status) {
+    if (status >= 200 && status < 300) return;
+    if (change.had) _names[change.id] = change.had;
+    else delete _names[change.id];
+    const r = S.byId[change.id];
+    if (r) {
+      nameRow(r);
+      if (_root) render();
+    }
+  }
 
   // True equity per account (balance + unrealized PnL) from the performance series — what Vest measures
   // drawdown against — and the unrealized PnL in it. /v3/accounts `amount` is only FREE collateral (under-reports while a
@@ -1040,11 +1107,13 @@
   }
 
   async function buildRegistry() {
-    const [active, bals, eq] = await Promise.all([
+    const [active, bals, eq, us] = await Promise.all([
       api('/v3/capital/accounts/active'),
       fetchBalances().catch(() => ({ free: {}, ver: {} })),
       fetchEquities(),
+      api('/v3/user-state').catch(() => null), // the names the trader gave the accounts
     ]);
+    if (us && Array.isArray(us.accounts)) noteNames(us.accounts);
     const balById = bals.free;
     const rows = (active.accounts || []).map((a) => {
       const initial = num(a.initial_capital),
@@ -1055,7 +1124,8 @@
         maxDD = initial - floor;
       const r = {
         id: a.id,
-        label: label(a),
+        base: label(a),
+        vestName: a.name || null, // a name on Vest's account list, if it ever carries one (user-state's comes first)
         type: typeName(a.account_type, a.plan_product_type),
         chip: shortType(a.account_type, a.plan_product_type),
         size: initial,
@@ -1072,6 +1142,7 @@
         canTrade: null,
         order: a.attempt_index ?? 0,
       };
+      nameRow(r); // r.name, r.label
       setLimits(r, a);
       r.room = r.equity - floorOf(r);
       return r;
@@ -1305,11 +1376,13 @@
     _balBusy = true;
     const t0 = Date.now();
     try {
-      const [bals, eq, active] = await Promise.all([
+      const [bals, eq, active, us] = await Promise.all([
         fetchBalances().catch(() => ({ free: {}, ver: {} })),
         fetchEquities(),
         api('/v3/capital/accounts/active').catch(() => null), // failed or new accounts; the daily floor moves daily
+        api('/v3/user-state').catch(() => null), // a rename made elsewhere (another tab, Vest's app)
       ]);
+      if (us && Array.isArray(us.accounts)) noteNames(us.accounts);
       if (active && Array.isArray(active.accounts)) await syncAccountSet(active.accounts);
       for (const a of (active && active.accounts) || []) if (S.byId[a.id]) setLimits(S.byId[a.id], a);
       const bal = bals.free;
@@ -1594,7 +1667,7 @@
       /* a token that can't be renewed now is renewed by the next request that needs it */
     }
     if (!S.armed) return;
-    if (feedLive()) Object.values(S.posMap).forEach(checkShares); // the size check, from what the feed shows
+    if (feedLive()) Object.values(S.posMap).forEach((e) => (checkShares(e), checkBrackets(e))); // size and bracket checks, from the feed
     const ms = await timedRead();
     if (ms !== undefined && S.armed) noteNet(ms);
   }
@@ -1604,6 +1677,7 @@
   async function fetchLeverages() {
     try {
       const r = await api('/v3/user-state');
+      noteNames(r && r.accounts); // the same read carries the accounts' names
       const out = {};
       for (const a of r.accounts || []) {
         out[a.accountId] = {};
@@ -2017,6 +2091,34 @@
     return run;
   }
 
+  // The stops and targets the copier added to a follower (`fp.copied`: kind and price, kept through its moves). A master
+  // move or removal that comes before the copier has read back the new leg's id (removed 2 s after it was added, with
+  // the followers' copies still landing: a user's report, 2026-10-19) can't be paired by id; it is paired with the one
+  // the copier added at a price the master no longer has, when exactly one fits. A leg placed on a follower by hand is
+  // never one of these.
+  const near = (a, b) => Math.abs(a - b) < PRICE_EPS;
+  function noteCopied(fp, kind, price, was = null) {
+    const list = (fp.copied || []).filter((c) => !(was != null && c.kind === kind && near(c.price, was)));
+    if (price != null) list.push({ kind, price: parseFloat(price) });
+    fp.copied = list.slice(-20);
+  }
+  const isCopied = (fp, kind, price) => (fp.copied || []).some((c) => c.kind === kind && near(c.price, price));
+  const masterHas = (entry, kind, price) => (entry.legs || []).some((m) => m.kind === kind && near(m.price, price));
+  function copiedLeg(entry, fp, kind) {
+    const fits = (fp.legs || []).filter(
+      (l) => l.kind === kind && isCopied(fp, kind, l.price) && !masterHas(entry, kind, l.price),
+    );
+    return fits.length === 1 ? fits[0] : null;
+  }
+  // a copied leg the master no longer has, that the follower's read doesn't show yet (Vest's reads can trail a change)
+  const copiedNotSeen = (entry, fp, kind) =>
+    (fp.copied || []).some(
+      (c) =>
+        c.kind === kind &&
+        !masterHas(entry, kind, c.price) &&
+        !(fp.legs || []).some((l) => l.kind === kind && near(l.price, c.price)),
+    );
+
   // Copy a master add / move / remove of one stop or target to every follower.
   async function mirrorLeg(op, kind, req, entry, followers, lat, t0, fast = null) {
     const KIND = kind === 'sl' ? 'SL' : 'TP';
@@ -2024,9 +2126,15 @@
     const path = kind === 'sl' ? '/v3/positions/stop-loss' : '/v3/positions/take-profit';
     const idKey = kind === 'sl' ? 'stopLossId' : 'takeProfitId';
     const masterLegId = req[idKey] || req.orderId || req.id;
+    // One re-read of every account for this change, shared by all the followers (each read covers them all), and at
+    // most one more a moment later when a follower's read doesn't show a leg the copier added yet.
+    let reread = null,
+      reread2 = null;
+    const resync = () => (reread = reread || syncLegs(entry));
+    const resyncLater = () => (reread2 = reread2 || sleep(POLL_MS).then(() => syncLegs(entry)));
     // Re-read only when the leg is unknown (e.g. added later). Reading after the master's move would show the master leg
     // at its new price while the follower's is still at the old one, and pairing needs the pre-move prices.
-    if (op !== 'add' && !(entry.legs || []).some((l) => l.id === masterLegId)) await syncLegs(entry);
+    if (op !== 'add' && !(entry.legs || []).some((l) => l.id === masterLegId)) await resync();
     // One sized leg scaled to a follower: nearest size step (flooring each leg alone leaves an uncovered sliver), capped
     // so this kind's sized legs never add up past the follower's position. null when it rounds to nothing.
     const scaleOne = (qty, fp, skip) => {
@@ -2062,6 +2170,7 @@
               body.quantity = q;
             }
             await acctPost(f, path, body);
+            noteCopied(fp, kind, req.triggerPrice);
             logEvent(
               'ok',
               `↳ added ${KIND} ${req.triggerPrice}${body.quantity ? ' × ' + body.quantity : ''} on ${accLabel(f)} (${lat()})`,
@@ -2069,14 +2178,20 @@
           } else {
             let fl = matchLeg(entry.legs, fp.legs, masterLegId);
             if (!fl) {
-              await syncLegs(entry);
-              fl = matchLeg(entry.legs, fp.legs, masterLegId);
+              await resync();
+              fl = matchLeg(entry.legs, fp.legs, masterLegId) || copiedLeg(entry, fp, kind);
+            }
+            if (!fl && copiedNotSeen(entry, fp, kind)) {
+              await resyncLater();
+              fl = matchLeg(entry.legs, fp.legs, masterLegId) || copiedLeg(entry, fp, kind);
             }
             if (!fl) {
               logEvent('warn', `↳ ${accLabel(f)} has no matching ${KIND} — skipped`);
               diag('bracket', { ...d, outcome: 'skipped', reason: 'no matching leg', met: false });
               return;
             }
+            const byCopy = !matchLeg(entry.legs, fp.legs, masterLegId); // paired with the leg the copier added
+            if (byCopy) d.pairedBy = 'copied';
             const body = { ...req, positionId: fp.positionId };
             for (const k of ['stopLossId', 'takeProfitId', 'orderId', 'id'])
               if (body[k] === masterLegId) body[k] = fl.id;
@@ -2089,6 +2204,7 @@
               }
               await acctPut(f, path, body);
               const resized = body.quantity != null && Math.abs(fl.price - parseFloat(req.triggerPrice)) < PRICE_EPS;
+              if (isCopied(fp, kind, fl.price)) noteCopied(fp, kind, req.triggerPrice, fl.price); // it moves with the leg
               fl.price = parseFloat(req.triggerPrice);
               if (body.quantity != null) fl.qty = body.quantity;
               logEvent(
@@ -2099,6 +2215,7 @@
               );
             } else {
               await acctDelete(f, path, body);
+              noteCopied(fp, kind, null, fl.price);
               fp.legs = fp.legs.filter((l) => l !== fl);
               logEvent('ok', `↳ removed ${KIND} on ${accLabel(f)} (${lat()})`);
             }
@@ -2125,6 +2242,7 @@
     }
     if (op === 'remove') entry.legs = (entry.legs || []).filter((l) => l.id !== masterLegId);
     if (op === 'add') setTimeout(() => enqueue(entry, () => syncLegs(entry)), LEG_SYNC_DELAY_MS); // learn the new leg ids
+    scheduleBracketCheck(entry);
     // fast mode sent it to the followers: if Vest didn't take the master's, say exactly what each side has now (on the
     // side: the trade's next copied action doesn't wait for this answer)
     if (fast) fast.answer.then((ok) => !ok && legRefused(op, kind, req, entry, changed, fast));
@@ -2349,6 +2467,69 @@
   function scheduleShareCheck(entry) {
     setTimeout(() => checkShares(entry), SHARE_SETTLE_MS / 2);
     setTimeout(() => checkShares(entry), SHARE_SETTLE_MS * 2);
+  }
+
+  // ── Bracket check. Each follower in a trade should have the master's stops and targets at the same prices. From Vest's
+  // live feed (each position's active stops and targets), every WARM_MS while copying and twice after each copied stop
+  // or target change: a follower with one the master doesn't have, or without the master's stop, on two looks
+  // SHARE_SETTLE_MS apart (a change still landing isn't a difference), gets a "Bracket check" log line, once per
+  // difference (`bracket_check` diag). A target the master has and a follower doesn't isn't one: a sized target whose
+  // share rounds to nothing is left off a small follower. Nothing is changed: the trader decides. Seen 2026-10-19 in a
+  // user's report: every follower kept a target the master had removed, and it filled 14 pts before the master passed.
+  const _bracketOff = {}; // "masterPositionId|accountId" -> { sig, at, warned }
+  // prices in `a` that `b` doesn't have, counted (two at one price need two)
+  const pricesNotIn = (a, b) => {
+    const left = [...b];
+    return a.filter((p) => {
+      const i = left.findIndex((q) => near(p, q));
+      if (i < 0) return true;
+      left.splice(i, 1);
+      return false;
+    });
+  };
+  function checkBrackets(entry) {
+    const pid = Object.keys(S.posMap).find((k) => S.posMap[k] === entry);
+    if (!pid || !feedLive()) return;
+    const held = (acct, positionId) => {
+      const st = S.acctState[acct];
+      return stateFresh(st) && st.positions.find((x) => x.id === positionId);
+    };
+    const m = held(entry.master, pid);
+    if (!m) return;
+    const tick = (SYMBOLS[entry.symbol] || {}).tick || 0.25,
+      prices = (p, kind) => (p.triggers || []).filter((t) => t.kind === kind).map((t) => t.price);
+    for (const [f, fp] of Object.entries(entry.followers)) {
+      const key = pid + '|' + f,
+        p = held(f, fp.positionId);
+      const notes = [];
+      if (p)
+        for (const kind of ['sl', 'tp']) {
+          const name = kind === 'sl' ? 'stop' : 'target';
+          for (const px of pricesNotIn(prices(p, kind), prices(m, kind)))
+            notes.push(`a ${name} at ${fmtPx(px, tick)} the master doesn't`);
+          if (kind === 'sl')
+            for (const px of pricesNotIn(prices(m, kind), prices(p, kind)))
+              notes.unshift(`no stop at ${fmtPx(px, tick)} (the master has one there)`); // the riskier one first
+        }
+      if (!notes.length) {
+        delete _bracketOff[key];
+        continue;
+      }
+      const sig = notes.join('|'),
+        seen = _bracketOff[key];
+      if (!seen || seen.sig !== sig) {
+        _bracketOff[key] = { sig, at: Date.now(), warned: false };
+        continue;
+      }
+      if (seen.warned || Date.now() - seen.at < SHARE_SETTLE_MS) continue;
+      seen.warned = true;
+      logEvent('warn', `Bracket check: ${accLabel(f)} has ${notes.join(', and ')}. Check it on Vest.`);
+      diag('bracket_check', { ...who(f), symbol: entry.symbol, notes });
+    }
+  }
+  function scheduleBracketCheck(entry) {
+    setTimeout(() => checkBrackets(entry), SHARE_SETTLE_MS / 2);
+    setTimeout(() => checkBrackets(entry), SHARE_SETTLE_MS * 2);
   }
 
   // ── An add the master didn't get (Vest refused it, didn't run it, or its answer was lost and the master didn't grow):
@@ -3005,7 +3186,7 @@
               reduceOnly: false,
               symbol: sym,
             });
-            if (fRest > 0) Object.assign(fp, { qty: fmtQty(fRest, sym), legs: [] });
+            if (fRest > 0) Object.assign(fp, { qty: fmtQty(fRest, sym), legs: [], copied: [] });
             else delete entry.followers[f]; // its share of the new side rounds to nothing: it's out
             logEvent(
               'ok',
@@ -3066,7 +3247,7 @@
         // it's raised with the others (a Flatten of a position that's gone does nothing)
         if (p === undefined && !m) return void off.push({ accountId: f, positionId: fp.positionId, side: null });
         if (!p) return;
-        Object.assign(fp, { positionId: posIdOf(p), qty: String(p.quantity), legs: posLegs(p) });
+        Object.assign(fp, { positionId: posIdOf(p), qty: String(p.quantity), legs: posLegs(p), copied: [] });
         if (!m || p.side !== m.side) off.push({ accountId: f, positionId: posIdOf(p), side: p.side });
       }),
     );
@@ -10903,7 +11084,7 @@
       sub = _root.querySelector('#st-sub');
     const m = S.master && S.byId[S.master],
       nf = S.followers.size;
-    const who = m ? `<em>${esc(m.label)}</em> to ${nf} follower${nf === 1 ? '' : 's'}` : '';
+    const who = m ? `<em>${esc(shortName(m))}</em> to ${nf} follower${nf === 1 ? '' : 's'}` : '';
     const st = dayStats(),
       opts = [S.fast && 'fast mode', S.capFit && 'cap-to-fit'].filter(Boolean);
     let sayHtml, subTxt;
@@ -10929,7 +11110,7 @@
           ? `${st.copies}${st.complete ? '' : '+'} copies today, ${st.missed} missed`
           : 'Nothing copied yet today';
     } else if (m) {
-      sayHtml = `Pick followers for <em>${esc(m.label)}</em>`;
+      sayHtml = `Pick followers for <em>${esc(shortName(m))}</em>`;
       subTxt = 'Tick the accounts that copy it';
     } else {
       sayHtml = 'Pick a master and followers';
@@ -10978,6 +11159,7 @@
         : money(n);
   // An account row's tooltip: balance, the floor that applies (the daily one when it's higher) and the room to it.
   const acctTip = (r) =>
+    (r.name ? `${r.base} · ` : '') + // a named account: its number on hover
     `Balance ${money(r.equity)} · ${r.dailyFloor > r.floor ? 'daily floor' : 'floor'} ${money(floorOf(r))} · ${money(r.room)} to go` +
     (r.canTrade === false ? ' · trading disabled' : '');
   function renderCopier(body) {
@@ -11000,7 +11182,7 @@
       const tag = r.chip === 'Funded' ? '' : `<small>${esc(r.chip)}</small>`;
       const warn = near && kind !== 'out' && !note ? `Only ${moneyShort(r.room)} to its floor.` : note;
       return `<div class="acct${kind === 'm' ? ' master' : ''}${kind === 'out' ? ' off' : ''}" title="${esc(acctTip(r))}">
-          <span class="tile${kind === 'm' ? ' m' : ''}">${esc(acctNum(r.label))}</span><span class="nm">${esc(r.label)}${tag}</span>
+          <span class="tile${kind === 'm' ? ' m' : ''}">${esc(acctNum(r.base))}</span><span class="nm">${esc(shortName(r))}${tag}</span>
           <span class="room"><span class="${near ? 'amber' : ''}">${moneyShort(r.room)}</span><span class="meter"><i class="${near ? 'warn' : ''}" style="width:${isNaN(f) ? 0 : Math.round(f * 100)}%"></i></span></span>
           <i class="sdot ${dot}" title="${dotTip}"></i>${warn ? `<span class="note${kind === 'out' ? ' dim' : ''}">${esc(warn)}</span>` : ''}</div>`;
     };
@@ -11041,7 +11223,7 @@
       const isM = S.master === r.id,
         isF = S.followers.has(r.id);
       const fDisabled = !S.master || isM || (!S.capFit && !masterGroup) || r.canTrade === false || S.armed;
-      const label = esc(r.label),
+      const label = esc(shortName(r)),
         id = esc(r.id),
         f = roomFrac(r);
       const note =
@@ -11051,7 +11233,7 @@
             ? `Only ${moneyShort(r.room)} to its floor.${isF ? '' : ' Tick to copy it anyway.'}`
             : '';
       return `<div class="acct ed${isM ? ' master' : ''}" title="${esc(acctTip(r))}">
-          <span class="tile${isM ? ' m' : ''}">${esc(acctNum(r.label))}</span><span class="nm">${label}${r.chip === 'Funded' ? '' : `<small>${esc(r.chip)}</small>`}</span>
+          <span class="tile${isM ? ' m' : ''}">${esc(acctNum(r.base))}</span><span class="nm">${label}${r.chip === 'Funded' ? '' : `<small>${esc(r.chip)}</small>`}</span>
           <button class="rd${isM ? ' on' : ''}" data-m="${id}" role="radio" aria-checked="${isM}" aria-label="Make ${label} the master"
             title="Make ${label} the master" ${r.canTrade === false || S.armed ? 'disabled' : ''}></button>
           ${
@@ -15065,7 +15247,7 @@
             placeholder="What happened, and what did you expect? Which accounts, roughly when?"></textarea>
           <div class="hint">Saves a report file and opens a GitHub issue with your description filled in: drag the file
             into it and submit (a free GitHub account). The file holds the log, settings and balances, with account ids
-            replaced by their names. Never passwords or tokens.</div>
+            replaced by their numbers, and the names you gave your accounts on Vest. Never passwords or tokens.</div>
           <button class="ghostbtn" id="rp-send">Save report &amp; open issue ${ICON.ext}</button></div>
         <div class="grp">
           <a class="lrow" href="${DISCORD_URL}" target="_blank" rel="noopener"><span>Join the Discord</span><span class="hint">questions, setup help</span>${ICON.ext}</a>
@@ -17339,8 +17521,8 @@
                   : r.target && !isNaN(r.equity) && r.equity < r.target
                     ? `${money(r.target - r.equity)} to pass`
                     : '';
-              return `<div class="sum-row${r.id === S.master ? ' m' : ''}"><span class="tile${r.id === S.master ? ' m' : ''}">${esc(acctNum(r.label))}</span>
-              <span class="sum-left"><span class="sum-name">${esc(r.label)}</span><span class="sum-k" title="${k > 0 ? `Keeps ${money(k)} after its ${Math.round(r.split * 100)}% split` : ''}">${esc(r.chip)}${side ? ' · ' + side : ''}</span></span>
+              return `<div class="sum-row${r.id === S.master ? ' m' : ''}"><span class="tile${r.id === S.master ? ' m' : ''}">${esc(acctNum(r.base))}</span>
+              <span class="sum-left"><span class="sum-name" title="${esc(r.label)}">${esc(shortName(r))}</span><span class="sum-k" title="${k > 0 ? `Keeps ${money(k)} after its ${Math.round(r.split * 100)}% split` : ''}">${esc(r.chip)}${side ? ' · ' + side : ''}</span></span>
               <span class="sum-right"><span class="sum-td ${isNaN(td) ? '' : td >= 0 ? 'pos' : 'neg'}" title="${paidToday(r.id) ? 'Today, since its payout started it fresh' : 'Today'}">${hasDay ? sp(td) : ''}</span>
                 <span class="sum-tot"><span class="sum-eq">${money(r.equity)}</span> <span class="sum-pnl ${isNaN(pnl) ? '' : pnl >= 0 ? 'pos' : 'neg'}" title="Since start">${isNaN(pnl) ? '—' : sp(pnl)}</span></span></span></div>`;
             })

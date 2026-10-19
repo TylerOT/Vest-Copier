@@ -27,9 +27,10 @@ or sized differently than you expected. See sections 7 and 8 of the [LICENSE](LI
 
 ## Not Vest, not advice
 
-STRATUH Copier is an independent tool. It is not affiliated with, endorsed by or supported by Vest Markets. Whether
-the trading or prop-trading program you use allows a trade copier is yours to check. Nothing in this project is
-financial or trading advice.
+STRATUH Copier is an independent tool. It is not affiliated with, endorsed by or supported by Vest Markets. Vest's
+terms treat trade copiers like this one as independent third-party tools: you use one at your own risk, and Vest won't
+investigate or reimburse problems it causes. Whether the trading or prop-trading program you use allows a trade copier
+is yours to check. Nothing in this project is financial or trading advice.
 
 ## Referral code
 
