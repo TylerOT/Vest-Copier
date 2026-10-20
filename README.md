@@ -29,6 +29,9 @@ New here? Start with the [10-minute tutorial video](https://youtu.be/mFJGsJ0IInY
 
 Balances, P&L and fills update live, straight from Vest's own feed, and an account that fails drops out by itself.
 
+Name an account on Vest and the panel shows that name. If a follower's size, stops or targets ever stop matching the
+master's, the log names the account so you can fix it on Vest.
+
 Followers size to their own account by default (Cap-to-fit): a smaller account trades a smaller size. Same-size
 accounts trade the same size. Switch to strict 1:1 in Edit if you want identical contracts everywhere.
 
