@@ -110,8 +110,9 @@ guides), **Report a problem**, docking and reload.
 - **Market, Limit or Stop:** with Limit or Stop, one click on Vest's chart places it. Stop orders (a buy stop over the
   market, a sell stop under it) are kept by the copier, since Vest doesn't have them: they fire while the Vest tab is open.
 - **In a trade:** your stop, entry, price and targets on one bar; **+ Add stop** / **+ Add target** (or right-click
-  the chart at a price) when you want one, with targets split evenly; Breakeven, Close, and scaling in or out: pick 25, 50
-  or 100% of the position (or MAX, the most you can add), then Add or Reduce. Your stop and targets stay where they are.
+  the chart at a price) when you want one, with targets split the way you placed the trade; Breakeven, Close, and
+  scaling in or out: pick 25, 50 or 100% of the position (or MAX, the most you can add), then Add or Reduce. Your stop
+  stays where it is; your targets keep their prices and their sizes follow the position.
 
 **Flatten all** closes everything on every account at once (no confirmation, and copying keeps running, so it doubles
 as a quick exit). At the bottom: the latest activity line (click for the log), then the code and a status dot with

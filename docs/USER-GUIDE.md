@@ -78,7 +78,7 @@ their own browser.
   (saves one file with the whole log and the diagnostics) and **Clear**. The panel remembers whether you left it open. When the line is a problem,
   **Get help** sits next to it.
 - **Bottom bar:** the AMPED code on the left (click to copy it); on the right a coloured dot with your **version** and,
-  while copying, your **time to Vest** (e.g. `v0.41.1 · 64ms`): the copier makes a small read to Vest every 20 s, which
+  while copying, your **time to Vest** (e.g. `v0.41.2 · 64ms`): the copier makes a small read to Vest every 20 s, which
   also keeps its connection ready for your next copy. The dot: lime under 80 ms (good), grey 80-200 ms (OK), amber over
   200 ms (slow: followers' fills may land a tick or more from yours in fast markets), red when Vest isn't answering;
   grey with just the version when you're not copying. While Vest has updated its site, the bar shows that instead (amber
@@ -292,8 +292,9 @@ is put away until you're flat again.
 - **+ Add stop** and **+ Add target** (above Breakeven and Close): **+ Add stop** shows only when the trade has no
   stop, in amber. Click one, then click Vest's chart where it goes (a dashed line follows the pointer), or press
   **Enter** (or the button again) for your saved points from the average entry; **Esc** cancels. Up to 5 targets.
-  Adding a target splits the position evenly across all of them: the ones already there are resized first (2 targets
-  = halves, 3 = thirds). Removing one doesn't resize the rest; add another to cover the whole position again. A stop
+  Adding a target splits the position across all of them by the split you placed the trade with (Start, Even or End;
+  Even for a trade placed on Vest's own form): the ones already there are resized first. Removing one doesn't resize
+  the rest; add another to cover the whole position again. A stop
   goes under the price for a long and over it for a short, a target the other way; the wrong side is refused. Adding a
   stop works while the copier is paused; adding a target doesn't. While copying, the followers get the same, sized to
   their own positions.
@@ -313,8 +314,17 @@ is put away until you're flat again.
   - **Reduce** takes that share off at market (100 = all of it, like Close; MAX is for adds only).
   - Both use Vest's own orders ("add to position" and "reduce"), and while copying, the copier does the same to each follower,
     by the same share of its own position.
-- **Your stop and targets stay exactly where they are** when you add or reduce, including a stop you moved to
-  breakeven. A stop covers the whole position, whatever its size. To move them, drag them on Vest's chart.
+- **Your stop stays exactly where it is** when you add or reduce, including a stop you moved to breakeven. A stop
+  covers the whole position, whatever its size.
+- **Your targets keep their prices, and their sizes follow the position.** With two or more targets, once Vest confirms
+  the add or reduce filled, each target gets its share of the new size by the split you placed the trade with (Start,
+  Even or End), and the log says what they became ("targets re-split to 0.0086 / 0.0086 / 0.0085"). A target already
+  hit is left out; one you moved keeps its price and takes the share of its place. A single target already closes the
+  whole position, so it's left alone. If the fill can't be confirmed, or the size is too small to split (each target
+  needs at least one size step and $1), the sizes stay as they were and the log says so. While copying, each follower
+  does the same across its own position once its own add or reduce has filled; a target you placed on a follower
+  yourself is never touched. Adds and reduces on Vest's own order form leave your targets as they are.
+- To move a stop or target, drag it on Vest's chart.
 - The other direction is replaced by Close: the panel doesn't reverse a position in one click.
 
 ## 7. Settings
@@ -344,14 +354,16 @@ is put away until you're flat again.
 - **Hide marks on bars** (on by default) — hides Vest's buy and sell marks on the chart each time it loads, the same
   as the chart's right-click **Hide marks on bars**, which Vest forgets on every refresh. Show them again from that
   menu whenever you want; the copier leaves them shown until the next load.
-- **Hide session shading** (on by default) — removes the pre-market, after-hours and overnight bands Vest draws on
-  the chart (its Market Sessions indicator), each time Vest adds them.
+- **Hide session shading** (on by default) — hides the pre-market, after-hours and overnight bands Vest draws on
+  the chart (the eye on its Market Sessions indicator). Switch it off and they show again at once. Vest's own
+  Session shading setting still decides whether Vest draws them at all.
 - **STRATUH theme** (on by default, dark mode only) — Vest's own page and chart in STRATUH's colours: onyx and
   lime, square corners, grey candles, and no Volume indicator added by Vest (one you add yourself stays). Vest's own
   order lines (limits, stops, targets) turn lime and red and run a short way in from the price scale instead of across
   the chart. The first time, a bar offers **Keep it** or **Back to Vest's colours**. Turning it off brings Vest's
-  colours back at once (the chart's after a refresh).
-- **Shorts and losses** — grey (as on STRATUH's DeepCharts theme) or red, for Sell buttons, losing P&L and the bid
+  colours back at once, the chart's included. Vest saves the chart's colours to your account, so turn the theme off
+  before removing the copier; otherwise use the chart's settings, **Apply defaults**.
+- **Shorts and losses** — grey (STRATUH's look) or red, for Sell buttons, losing P&L and the bid
   side of the book. Candles stay grey either way.
 
 Options are saved and persist across refreshes. Fast mode and Cap-to-fit show in the line under the status sentence

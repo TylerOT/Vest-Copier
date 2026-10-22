@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Vest Copier
 // @namespace    vestcopier
-// @version      0.41.1
+// @version      0.41.2
 // @description  Copies a master Vest account's trades to your other Vest accounts, live, and adds a points-based order panel.
 // @author       xAmped
 // @license      STRATUH Copier License — free to use, no selling; see LICENSE
@@ -38,7 +38,7 @@
     })(),
   };
 
-  const VERSION = '0.41.1';
+  const VERSION = '0.41.2';
   // Where this script runs from, read off its own first stack frame (each script manager names it differently): the
   // diagnostics use it to tell the copier's own errors from Vest's. Null when the stack shows no address.
   const OWN_SRC = (() => {
@@ -483,7 +483,11 @@
   }
   function notePageRequest(url, method, body) {
     const action = orderAction(url);
-    if (action === 'close' || action === 'reduce') {
+    if (action === 'take-profit' && method === 'PUT') {
+      const req = parseJson(body, null);
+      if (req && req.takeProfitId && !_resplitting.has(resplitKey(req)))
+        noteMovedTo(req.takeProfitId, req.triggerPrice);
+    } else if (action === 'close' || action === 'reduce') {
       const req = parseJson(body, null);
       if (req && action === 'reduce') notePreSize(req.positionId);
       if (req && (req.orderType || 'market') === 'market') noteExit(req.positionId);
@@ -922,7 +926,8 @@
   }
 
   // ───────────────────────── api ─────────────────────────
-  // Vest REST call. Errors read "<path> -> <status>" (errCode() parses the status back out).
+  // Vest REST call. Errors read "<path> -> <status>" (errCode() parses the status back out), with Vest's own reason, when
+  // it gives one, as `e.vest`.
   const READ_TIMEOUT_MS = 15000;
   const api = async (path, token = userToken, opts = {}) => {
     if (!token) throw new Error('no Vest session yet — click around Vest, then retry');
@@ -953,7 +958,16 @@
       const fresh = await mintAccountToken(id);
       return api(path, fresh.token, { ...opts, _retried: true });
     }
-    if (!r.ok) throw new Error(`${path} -> ${r.status}`);
+    if (!r.ok) {
+      const e = new Error(`${path} -> ${r.status}`),
+        b = parseJson(text, null);
+      e.vest =
+        String((b && (b.msg || b.message || b.error)) || '')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .slice(0, 200) || null;
+      throw e;
+    }
     return parseJson(text, text);
   };
   // Vest's rate budget from an answer's headers (200 requests a second): the status card shows what's left.
@@ -1790,20 +1804,22 @@
   const NO_FILL_WHY = 'Vest accepted the order but did not execute it (usually not enough margin for that size)';
   const NO_FILL_LIMIT = "its limit price wasn't there (fill now or not at all), so nothing opened";
   const _missNoted = new Set(); // master order ids the Trade tab already reported as not filled (a capped stop entry)
+  // One order's fill, looked up to FILL_TRIES times: { fill } when filled, { missing: true } when confirmed absent, {}
+  // when it couldn't be checked
+  async function fillOf(acct, symbol, oid) {
+    let failed = false;
+    for (let i = 0; i < FILL_TRIES; i++) {
+      const f = await fillInfo(acct, symbol, oid, i ? 0 : FEED_FILL_WAIT_MS); // the feed is waited on once
+      if (f) return { fill: f };
+      if (f === undefined) failed = true;
+      if (i < FILL_TRIES - 1) await sleep(FILL_RETRY_MS);
+    }
+    return failed ? {} : { missing: true };
+  }
   async function confirmFills(symbol, master, placed, entry, kind = 'entry') {
     if (!placed.length && !master.orderId) return;
     if (!feedLive()) await sleep(FILL_FIRST_LOOK_MS); // with the feed, each check waits on it instead
-    // → { fill } when filled, { missing: true } when confirmed absent, {} when it couldn't be checked
-    const tryFill = async (acct, oid) => {
-      let failed = false;
-      for (let i = 0; i < FILL_TRIES; i++) {
-        const f = await fillInfo(acct, symbol, oid, i ? 0 : FEED_FILL_WAIT_MS); // the feed is waited on once
-        if (f) return { fill: f };
-        if (f === undefined) failed = true;
-        if (i < FILL_TRIES - 1) await sleep(FILL_RETRY_MS);
-      }
-      return failed ? {} : { missing: true };
-    };
+    const tryFill = (acct, oid) => fillOf(acct, symbol, oid);
     const m = master.orderId ? await tryFill(master.accountId, master.orderId) : {};
     const mp = m.fill || null;
     const masterMissed = !!m.missing;
@@ -2202,6 +2218,7 @@
                 if (q) body.quantity = q;
                 else delete body.quantity;
               }
+              noteMovedTo(fl.id, req.triggerPrice);
               await acctPut(f, path, body);
               const resized = body.quantity != null && Math.abs(fl.price - parseFloat(req.triggerPrice)) < PRICE_EPS;
               if (isCopied(fp, kind, fl.price)) noteCopied(fp, kind, req.triggerPrice, fl.price); // it moves with the leg
@@ -2607,6 +2624,19 @@
     });
   }
 
+  // What each follower did on a master add or reduce, kept by the master's order id once Vest has answered, so the
+  // re-split a Trade tab add or reduce is followed by pairs each follower with its own order (resplitFollowers)
+  function noteChange(entry, kind, answer) {
+    const lc = { kind, followers: {} };
+    answer.then((m) => {
+      if (!m || !m.orderId) return;
+      const ch = (entry.changes = entry.changes || {});
+      ch[m.orderId] = lc;
+      for (const k of Object.keys(ch).slice(0, -5)) delete ch[k]; // only the last few are ever asked for
+    });
+    return lc;
+  }
+
   // Mirror a MASTER action to every follower. Quantities are 1:1 unless cap-to-fit is on. Followers use the master's
   // leverage for each order (pre-synced at arm, so the leverage PUT is normally skipped).
   // `fast`: fast mode copies this at the master's send (maybeFastAction): `res` is empty and `fast.answer` brings Vest's
@@ -2714,6 +2744,7 @@
       );
       if (!entry) return untracked('add');
       const added = (a, b) => fmtQty(parseFloat(a) + parseFloat(b), sym);
+      const lc = noteChange(entry, 'add', answer()); // for the re-split a Trade tab add is followed by
       const resting = !isImmediate(req) && res.orderId;
       if (resting) (entry.restingAdds = entry.restingAdds || {})[res.orderId] = { qty: req.quantity, followers: {} };
       const run = enqueue(entry, async () => {
@@ -2729,6 +2760,7 @@
               return null;
             }
             const q = scaleToFollower(req.quantity, fp.qty, mBefore, sym);
+            lc.followers[f] = { orderId: null, why: 'rounds to 0' };
             if (!(parseFloat(q) > 0)) {
               logEvent('info', `↳ ${accLabel(f)} add rounds to 0 — skipped`);
               diag('append', {
@@ -2755,6 +2787,7 @@
             try {
               const r = await acctPost(f, '/v3/positions/append', body);
               const was = fp.qty;
+              lc.followers[f] = { orderId: r.orderId, before: parseFloat(was) };
               fp.qty = added(was, q);
               if (resting && entry.restingAdds && entry.restingAdds[res.orderId])
                 entry.restingAdds[res.orderId].followers[f] = { orderId: r.orderId, qty: q };
@@ -2781,6 +2814,7 @@
               };
             } catch (e) {
               noteNotSent();
+              lc.followers[f] = { orderId: null, why: 'refused' };
               logEvent('warn', `↳ ${accLabel(f)} ADD failed: ${e.message}`);
               diag('append', {
                 ...d,
@@ -2796,6 +2830,7 @@
         );
         return placed.filter(Boolean);
       });
+      lc.sent = run;
       run.then(async (placed) => {
         const m = await answer();
         if (fast && !m) {
@@ -2836,7 +2871,8 @@
       if (req.reduceOnly === false && held > 0 && parseFloat(req.quantity) > held + sizeStepOf(entry.symbol) / 2)
         return mirrorFlip(req, entry, followers, held, lat, t0);
       logEvent('info', `MASTER reduced ${req.quantity} ${req.symbol} on ${accLabel(S.master)}`);
-      enqueue(entry, async () => {
+      const lc = noteChange(entry, 'reduce', answer()); // for the re-split a Trade tab reduce is followed by
+      lc.sent = enqueue(entry, async () => {
         const mBefore = entry.qty;
         entry.qty = fmtQty(Math.max(0, parseFloat(mBefore) - parseFloat(req.quantity)), req.symbol);
         await Promise.all(
@@ -2849,6 +2885,7 @@
               return;
             }
             const rq = scaleToFollower(req.quantity, fp.qty, mBefore, req.symbol);
+            lc.followers[f] = { orderId: null, why: 'rounds to 0' };
             if (!(parseFloat(rq) > 0)) {
               logEvent('info', `↳ ${accLabel(f)} reduce rounds to 0 — skipped`);
               diag('reduce', {
@@ -2862,7 +2899,7 @@
               return;
             }
             try {
-              await sendExit(f, '/v3/positions/reduce', {
+              const r = await sendExit(f, '/v3/positions/reduce', {
                 positionId: fp.positionId,
                 orderType: 'market',
                 leverage: req.leverage,
@@ -2871,6 +2908,10 @@
                 reduceOnly: true,
                 symbol: req.symbol,
               });
+              lc.followers[f] =
+                r && r.orderId
+                  ? { orderId: r.orderId, before: parseFloat(fp.qty) }
+                  : { orderId: null, why: 'no order id' };
               logEvent('ok', `↳ REDUCED ${rq} on ${accLabel(f)} (${lat()})`);
               diag('reduce', {
                 ...d,
@@ -2883,6 +2924,7 @@
               fp.qty = fmtQty(Math.max(0, parseFloat(fp.qty) - parseFloat(rq)), req.symbol);
             } catch (e) {
               noteNotSent();
+              lc.followers[f] = { orderId: null, why: 'refused' };
               logEvent('warn', `↳ ${accLabel(f)} REDUCE failed: ${e.message} — it still holds its full size.`);
               diag('reduce', {
                 ...d,
@@ -2956,6 +2998,8 @@
         KIND = kind === 'sl' ? 'SL' : 'TP';
       const op = method === 'POST' ? 'add' : method === 'DELETE' ? 'remove' : 'move';
       // a PUT that keeps the price and sends a size is a resize (e.g. targets split again when one is added)
+      // the master's own re-split: each follower re-splits its own targets across its own position instead
+      if (method === 'PUT' && kind === 'tp' && _resplitting.delete(resplitKey(req))) return;
       const legId = req.stopLossId || req.takeProfitId || req.orderId || req.id,
         was = entry && (entry.legs || []).find((l) => l.id === legId),
         resize =
@@ -3903,6 +3947,33 @@
   }
 
   /**
+   * Re-split a trade's sized targets across its new size (after an add, a reduce or a target added): the targets nearest
+   * the entry first, sized by the trade's split. Their prices never change; a target already hit isn't in the list.
+   *
+   * @param {object} o the trade
+   * @param {'long'|'short'} o.side the trade's direction
+   * @param {number[]} o.prices each open target's price, in any order
+   * @param {number} o.total the position's size now
+   * @param {'even'|'start'|'end'} o.mode the trade's split
+   * @param {number} o.step the size step
+   * @param {number} [o.minUsd] Vest's minimum value per target
+   * @returns {{qtys: number[]} | {error: string}} one size per target, in the order of `prices`, or why it can't be split
+   */
+  function resplitTargets({ side, prices, total, mode, step, minUsd = 0 }) {
+    if (!prices.length) return { error: 'No targets to split' };
+    const ladder = prices.map((p, i) => ({ p, i })).sort((a, b) => (side === 'long' ? a.p - b.p : b.p - a.p));
+    const sp = splitQty(total, ladder.length, mode, step);
+    if (sp.error) return sp;
+    if (ladder.some((x, k) => sp.qtys[k] * x.p < minUsd))
+      return {
+        error: `${total} is too small to split into ${ladder.length} targets (the $${minUsd} minimum per target)`,
+      };
+    const qtys = [];
+    ladder.forEach((x, k) => (qtys[x.i] = sp.qtys[k]));
+    return { qtys };
+  }
+
+  /**
    * Turn point distances into trigger prices from an entry price.
    * long: stop below, targets above · short: stop above, targets below. Targets must be increasing distances.
    * `stopPts: null` is a trade without a stop (stop: null); an empty `targetPts` is one without targets.
@@ -4140,6 +4211,7 @@
       roundTick,
       floorStep,
       splitQty,
+      resplitTargets,
       planPrices,
       riskQty,
       breakevenPrice,
@@ -5021,7 +5093,7 @@
     S.tradeOnly = o.tradeOnly !== false; // the panel shows on Vest's Trade page only (it runs on every page)
     S.hideSessions = o.hideSessions !== false; // Vest's pre-market / after-hours / overnight bands on the chart
     S.theme = o.theme !== false; // STRATUH colours for Vest's own page and chart (on by default; introduced once)
-    S.themeDown = o.themeDown === 'red' ? 'red' : 'mono'; // shorts and losses on Vest's page: grey (DeepCharts) or red
+    S.themeDown = o.themeDown === 'red' ? 'red' : 'mono'; // shorts and losses on Vest's page: grey (STRATUH's look) or red
     S.textSize = TEXT_ZOOM[o.textSize] ? o.textSize : 'regular'; // the panel's size: regular, large, larger
     S.chartBracket = o.chartBracket !== false; // the Trade tab draws the bracket on Vest's chart (on by default)
   }
@@ -8955,6 +9027,9 @@
       color: var(--faint);
       line-height: 1.5;
     }
+    .sum-note.warn {
+      color: var(--warn); /* why Claim all profit is off while copying: easy to miss in grey */
+    }
     .claim {
       display: flex;
       flex-direction: column;
@@ -10663,9 +10738,11 @@
       --radius: 0px; --radius-xs: 0px; --radius-sm: 0px; --radius-md: 0px; --radius-lg: 0px; --radius-xl: 0px;
       --radius-2xl: 0px; --radius-3xl: 0px;
     }
-    html.vc-stratuh.dark ::selection { background: rgba(200, 245, 66, 0.25); }`;
+    html.vc-stratuh.dark ::selection { background: rgba(200, 245, 66, 0.25); }
+    /* Vest's "long" buttons (Buy/Long, its order confirm) keep white text: dark on lime */
+    html.vc-stratuh.dark .bg-long.text-white { color: ${T.bg}; }`;
   }
-  // The chart: STRATUH's DeepCharts look, whatever the shorts colour: light and dark grey candles, onyx pane, faint grid.
+  // The chart: STRATUH's grey look, whatever the shorts colour: light and dark grey candles, onyx pane, faint grid.
   const THEME_UP = '#b4b4ba',
     THEME_DOWN = '#55555c',
     THEME_VOL_UP = '#4a4a52',
@@ -10718,6 +10795,26 @@
     'mainSeriesProperties.candleStyle.wickUpColor': '#00D98E',
     'mainSeriesProperties.candleStyle.wickDownColor': '#E03737',
   };
+  // Vest's chart background as Vest sets it now (it paints the chart frame's --tv-color-pane-background from its own
+  // palette, which has changed since VEST_CHART was read), with the copier's colours already removed. Vest's chart saves
+  // its colours to the account, so the old near-black put back by VEST_CHART stayed (seen 2026-10-22).
+  function vestChartBackground(doc) {
+    try {
+      const bg = getComputedStyle(doc.body || doc.documentElement)
+        .getPropertyValue('--tv-color-pane-background')
+        .trim();
+      return bg
+        ? {
+            'paneProperties.backgroundType': 'solid',
+            'paneProperties.background': bg,
+            'paneProperties.backgroundGradientStartColor': bg,
+            'paneProperties.backgroundGradientEndColor': bg,
+          }
+        : {};
+    } catch {
+      return {};
+    }
+  }
   const themeTvCss = () => {
     const T = STRATUH;
     const vars = {
@@ -10802,7 +10899,7 @@
         } else {
           if (st) st.remove();
           if (dark) {
-            f.contentWindow.applyOverrides(VEST_CHART);
+            f.contentWindow.applyOverrides({ ...VEST_CHART, ...vestChartBackground(doc) });
             themeVolume(f, false);
           }
         }
@@ -10874,14 +10971,27 @@
     }
   }
   // Vest's session shading (pre-market, after-hours, overnight bands) is a chart indicator it adds named "Market
-  // Sessions" (on load and when its own setting changes). With the setting on, it's removed whenever it shows up.
+  // Sessions" (on load and when its own Session shading setting changes). With the setting on, it's hidden with the
+  // indicator's own eye, never removed: switched off, the ones the copier hid show again at once. Vest rebuilds it on
+  // every load and never saves it with the chart, so nothing outlives the copier (it was removed until v0.41.2, which
+  // Vest's chart, now saved to the account, could keep: issue #5 on the public repo).
   const SESSIONS_STUDY = 'Market Sessions';
-  function hideSessionShading(f) {
-    if (!S.hideSessions || !f) return;
+  const _sessionsHidden = new Set(); // ids of the ones this tab hid
+  function sessionShading(f) {
+    if (!f || (!S.hideSessions && !_sessionsHidden.size)) return;
     try {
       const chart = f.contentWindow.tradingViewApi.activeChart();
-      if (typeof chart.getAllStudies !== 'function') return;
-      for (const st of chart.getAllStudies() || []) if (st && st.name === SESSIONS_STUDY) chart.removeEntity(st.id);
+      if (typeof chart.getAllStudies !== 'function' || typeof chart.getStudyById !== 'function') return;
+      for (const st of chart.getAllStudies() || []) {
+        if (!st || st.name !== SESSIONS_STUDY) continue;
+        const study = chart.getStudyById(st.id);
+        if (!study || typeof study.setVisible !== 'function') continue;
+        if (S.hideSessions && study.isVisible()) {
+          study.setVisible(false);
+          _sessionsHidden.add(st.id);
+        } else if (!S.hideSessions && _sessionsHidden.has(st.id)) study.setVisible(true);
+      }
+      if (!S.hideSessions) _sessionsHidden.clear();
     } catch {
       /* the chart isn't ready yet: tried again on the next check */
     }
@@ -10952,7 +11062,7 @@
     if (_dragging) return;
     removeAutoVolume(chartFrame());
     hideChartMarks(chartFrame());
-    hideSessionShading(chartFrame());
+    sessionShading(chartFrame());
     themeChart(chartFrame());
     themeOrderLines(chartFrame());
     hookChartMenu(chartFrame());
@@ -11568,7 +11678,7 @@
           : maxQty !== null && a > maxQty + meta.step / 2
             ? 'over margin'
             : !fits(a)
-              ? 'past floor'
+              ? 'stop-out fails' // the stop hit after this add would end below the floor (not: already at it)
               : null,
       });
       let best = maxQty !== null && maxQty > 0 ? maxQty : 0;
@@ -11669,7 +11779,11 @@
     else if (fresh && long.error) error = long.error;
     else if (fresh && stopOn && t.beMode === 'points' && !(+t.beTrigger > 0))
       error = 'Breakeven trigger must be above zero points.';
-    if (master && pick && pick.why) error = `Add ${pick.label}%: ${pick.why}.`;
+    if (master && pick && pick.why)
+      error =
+        pick.why === 'stop-out fails'
+          ? `Add ${pick.label}%: a stop-out would end ${riskBy === master ? 'below the' : `${accLabel(riskBy)} below its`} ${fmtUsd(floorOf(S.byId[riskBy]))} floor.`
+          : `Add ${pick.label}%: ${pick.why}.`;
 
     // The allowed range for this account now: where the stop may go and how much can be risked (new positions; an add
     // is held to Vest's max only, since its room depends on the position already open).
@@ -11704,7 +11818,7 @@
 
     // The Trade tab's two bars. Margin: how much of Vest's buying power the open position uses now and with this order
     // (the max above is what's left, on the tightest account). Risk: what the stop would lose, fees included, now and with
-    // this order (an add rebuilds the stop from the new average), against the room left before the floor on the tightest
+    // this order (an add keeps the stop where it is, so it's measured from the new average), against the room left before the floor on the tightest
     // account that copies the same size (the master, plus followers in strict 1:1 while armed).
     const heldQty = held ? held.qty : 0;
     const margin =
@@ -11795,7 +11909,7 @@
             <div class="tr-pn"><span>Risk</span><span id="tr-prisk"></span></div><div class="tr-track"><i id="tr-prnow"></i></div></div>
         </div>
         <div class="tr-pacts" id="tr-pacts" hidden>
-          <div class="tr-legs" id="tr-legs"><button class="tr-legbtn" id="tr-addsl" title="Add a stop to this trade: click the chart where it goes, or press Enter for your saved stop points">+ Add stop</button><button class="tr-legbtn" id="tr-addtp" title="Add a target: click the chart where it goes, or press Enter for your saved points. The targets split the position evenly">+ Add target</button></div>
+          <div class="tr-legs" id="tr-legs"><button class="tr-legbtn" id="tr-addsl" title="Add a stop to this trade: click the chart where it goes, or press Enter for your saved stop points">+ Add stop</button><button class="tr-legbtn" id="tr-addtp" title="Add a target: click the chart where it goes, or press Enter for your saved points. The targets split the position by the trade's split">+ Add target</button></div>
           <div class="tr-go"><button class="tr-bebtn" id="tr-be">Breakeven</button><button class="tr-close" id="tr-close">Close</button></div>
           <button class="tr-disc" id="tr-addfold" aria-expanded="false"><span>Add or reduce</span>${ICON.right}</button>
           <div class="tr-addbox" id="tr-addbox" hidden>
@@ -12077,7 +12191,7 @@
   const orderLeverage = (saved, max) => (saved > 0 && max > 0 && saved <= max ? saved : max || null);
   if (window.__VC_TEST__) window.__vcLev = { maxLeverageFor, orderLeverage };
 
-  // Stop/target work that runs after an order (re-anchor, rebuilding the ladder after an add). Buy and Sell stay disabled
+  // Stop/target work that runs after an order (re-anchor, re-splitting the targets after an add or reduce). Buy and Sell stay disabled
   // until it finishes, so two of these never work on the same legs at once.
   function adjust(job) {
     S.adjusting = (S.adjusting || 0) + 1;
@@ -12279,6 +12393,7 @@
       const sentMs = opt.stopEntry ? Date.now() - opt.stopEntry.triggered : null; // trigger → order out
       const res = await send('POST', '/v3/positions/open', master, body);
       if (!res.positionId) throw new Error('Vest returned no position');
+      saveSplit(res.positionId, t.scale); // the trade keeps its split: a re-split follows it
       const tps = takeProfits
         .map((l, i) => `TP${i + 1} ${l.triggerPrice}${l.quantity ? ' × ' + l.quantity : ''}`)
         .join(' · ');
@@ -12453,13 +12568,11 @@
     }
   };
 
-  // ── Add to an open trade from the panel: Vest's /append (the shape its own ticket sends), then ONE ladder for the whole
-  // position — the stop and targets re-placed from the new average entry at the panel's points, with the full size split
-  // across the targets by the chosen scale. The add and every leg change go through the hooked fetch, so an armed
-  // copier adds to each follower (scaled) and moves/resizes their legs to match.
+  // ── Add to an open trade from the panel: Vest's /append (the shape its own ticket sends). The stop stays where it is
+  // (it covers the whole position, so it covers the add too); once the add has filled, the trade's sized targets are
+  // re-split across its new size (resplitAfter). Armed, the copier adds to each follower, scaled, and each follower
+  // re-splits its own targets.
   async function addToTrade({ t, qty, meta, side, held, lev, sizing }) {
-    // Vest's own "add to position" order: the position grows, the stop and targets stay where they are (a stop covers
-    // the whole position, so it covers the add too). Armed, the copier adds to each follower, scaled.
     const sym = t.symbol,
       master = S.master,
       prevQty = parseFloat(held.quantity);
@@ -12475,9 +12588,291 @@
     const res = await send('POST', '/v3/positions/append', master, body);
     logEvent(
       'ok',
-      `Trade panel: ADD ${body.quantity} ${meta.label} to the ${side} (${fmtQty(prevQty, sym)} → ${fmtQty(prevQty + qty, sym)}). Stop and targets unchanged.`,
+      `Trade panel: ADD ${body.quantity} ${meta.label} to the ${side} (${fmtQty(prevQty, sym)} → ${fmtQty(prevQty + qty, sym)}). The stop stays where it is.`,
     );
     diag('trade_panel', { outcome: 'added', side, sizing, body, orderId: res.orderId, prevQty });
+    adjust(() =>
+      resplitAfter({ master, sym, positionId: body.positionId, orderId: res.orderId, before: prevQty, what: 'add' }),
+    );
+  }
+
+  // ── Each trade's split (Start, Even or End), saved when the Trade tab places it, so a re-split and + Add target follow
+  // the trade's own split, not the Trade tab's setting now. By position id, read fresh each time (other tabs write the
+  // same storage) and kept in memory too (storage can be full). A trade the copier didn't place splits Even.
+  const SPLITS_KEY = 'vc-splits',
+    SPLITS_KEEP_MS = 30 * 24 * 3600 * 1000,
+    SPLITS_MAX = 200;
+  const _splits = {};
+  const isSplit = (m) => ['even', 'start', 'end'].includes(m);
+  function saveSplit(positionId, mode) {
+    if (!positionId || !isSplit(mode)) return;
+    _splits[positionId] = mode;
+    const saved = store.get(SPLITS_KEY, {}),
+      all = saved && typeof saved === 'object' ? saved : {};
+    all[positionId] = { mode, at: Date.now() };
+    const kept = Object.entries(all)
+      .filter(([, v]) => v && isSplit(v.mode) && Date.now() - v.at < SPLITS_KEEP_MS)
+      .sort((a, b) => b[1].at - a[1].at)
+      .slice(0, SPLITS_MAX);
+    store.set(SPLITS_KEY, Object.fromEntries(kept));
+  }
+  function splitOf(positionId) {
+    const saved = store.get(SPLITS_KEY, {}),
+      v = saved && typeof saved === 'object' ? saved[positionId] : null;
+    return v && isSplit(v.mode) ? v.mode : _splits[positionId] || 'even';
+  }
+  const SPLIT_NAMES = { even: 'Even', start: 'Start', end: 'End' };
+
+  // ── Re-split (v0.41.2): after a Trade tab add or reduce, once Vest confirms it filled, the trade's sized targets get new
+  // sizes for the position's new size by the trade's split, nearest the entry first (resplitTargets). A target already
+  // hit is gone from Vest's list; a moved one keeps its price and takes the share of its place in the ladder. Prices
+  // and the stop never change; a lone target with no size (it closes the whole position) and a trade without targets
+  // are left alone. Not confirmed, or too small to split: the sizes stay and the log says so. One re-split at a time (a
+  // reduce clicked while an add's is waiting goes after it). The resizes go through the hooked fetch, but aren't copied
+  // as scaled sizes: each follower re-splits its own targets across its own position once its own add or reduce has
+  // filled (resplitFollowers), so rounding never leaves part of one without a target.
+  const _resplitting = new Set(); // "targetId|size" of the master's re-split resizes on their way (not copied as such)
+  const resplitKey = (b) => `${b.takeProfitId}|${b.quantity}`;
+  const RESPLIT_KEY_MS = 60000; // not copying, or Vest refused it: nothing reads the key
+  let _resplitRun = Promise.resolve();
+  // Where a target was last moved to, by its id, as the move went out (a drag on Vest's chart, or its copy to a
+  // follower). A re-split's resize carries a price, so one sent with the price it read before a move would put the
+  // target back: it uses the moved-to price instead (the owner's live test, 2026-10-22: a drag a second after a Reduce
+  // was undone on both followers, and the copier then lost that target's later drags).
+  const _movedTo = {};
+  function noteMovedTo(id, price) {
+    if (!id || !(parseFloat(price) > 0)) return;
+    const now = Date.now();
+    for (const k in _movedTo) if (now - _movedTo[k].at > 60000) delete _movedTo[k];
+    _movedTo[id] = { price: parseFloat(price), at: now };
+  }
+  // each target to its new size, the ones shrinking first, so the sizes never add up past the position. `put(leg, qty,
+  // price)` sends one, its price written the way the copier writes every price (Vest's reads give "29348.000000000",
+  // and Vest refused every resize sent back like that: the owner's live test, 2026-10-22); returns the price of the one
+  // that failed, with why, or null when all went
+  async function resizeTargets(tps, qtys, tick, put, since) {
+    const steps = tps
+      .map((l, i) => ({ l, qty: qtys[i], d: parseFloat(qtys[i]) - parseFloat(l.quantity) }))
+      .filter((x) => x.d !== 0)
+      .sort((a, b) => a.d - b.d);
+    for (const x of steps) {
+      const moved = _movedTo[x.l.id],
+        price = fmtNum(moved && moved.at >= since ? moved.price : parseFloat(x.l.triggerPrice), decimalsOf(tick));
+      try {
+        await put(x.l, x.qty, price);
+      } catch (e) {
+        return { price, why: e.vest ? `${e.message}: ${e.vest}` : e.message };
+      }
+    }
+    return null;
+  }
+  // new target sizes for the log, nearest the entry first ("0.0086 / 0.0086 / 0.0085")
+  const ladderText = (side, prices, qtys) =>
+    prices
+      .map((p, i) => ({ p, q: qtys[i] }))
+      .sort((a, b) => (side === 'long' ? a.p - b.p : b.p - a.p))
+      .map((x) => x.q)
+      .join(' / ');
+  // the targets Vest has on a position, when every one is sized (null: none, or one closes the whole position)
+  const sizedTargets = (tps) =>
+    tps.length && tps.every((l) => l.sizeMode !== 'full_position' && l.quantity != null && +l.quantity > 0)
+      ? tps
+      : null;
+  const unsizedWhy = (tps) => (tps.length ? 'whole-position target' : 'no targets');
+  // One account's re-split, once its own order has filled: its position, read until the size has moved off `before`
+  // (Vest's reads can trail a fill), and the targets `pick(pos)` chooses ({ tps, total }) resized for `total` by the
+  // split. Returns { to, side, qty, prices, from } when done, else { reason } with `warn` when the trader should look.
+  async function resplitAccount({ acct, sym, positionId, before, mode, pick, put }) {
+    const since = Date.now(), // a target moved after this keeps its new price
+      step = SYMBOLS[sym].step,
+      moved = (p) => Math.abs(parseFloat(p.quantity) - before) >= step / 2;
+    let pos;
+    for (let i = 0; i < 4 && !(pos && moved(pos)); i++) {
+      if (i) await sleep(POLL_MS);
+      try {
+        pos = await openPosition(acct, sym, positionId);
+      } catch {
+        pos = undefined; // unreadable: look again
+      }
+      if (pos === null) return { reason: 'position gone' };
+    }
+    if (!pos || !moved(pos)) return { reason: pos ? 'size not updated' : 'position unreadable', warn: true };
+    const { tps: picked, total } = pick(pos),
+      tps = sizedTargets(picked);
+    if (!tps) return { reason: unsizedWhy(picked) };
+    const prices = tps.map((l) => parseFloat(l.triggerPrice)),
+      info = { side: pos.side, qty: pos.quantity, prices, from: tps.map((l) => String(l.quantity)) },
+      targets = tps.map((l, i) => ({ id: l.id, price: prices[i] })); // for the followers' pairing
+    const r = resplitTargets({ side: pos.side, prices, total, mode, step, minUsd: MIN_LEG_USD });
+    if (r.error) return { ...info, reason: 'too small', total, error: r.error, warn: true };
+    const to = r.qtys.map((q) => fmtQty(q, sym));
+    if (to.every((q, i) => +q === +info.from[i])) return { ...info, to, targets, since, unchanged: true };
+    const failed = await resizeTargets(tps, to, SYMBOLS[sym].tick, put, since);
+    if (failed) return { ...info, to, reason: 'failed', error: failed.why, failed, warn: true };
+    return { ...info, to, targets, since };
+  }
+  // what a re-split that didn't happen means for the trader
+  const resplitWhy = (r, sym) =>
+    r.reason === 'too small'
+      ? `${fmtQty(r.total, sym)} ${symLabel(sym)} is too small to split across ${r.prices.length} targets: their sizes were left as they were`
+      : r.reason === 'failed'
+        ? `couldn't resize the target at ${r.failed.price} (${r.failed.why}): the targets may not add up to the position`
+        : "couldn't read the new size: the targets were left as they were";
+  const resplitRecord = (d, mode, r) => ({
+    ...d,
+    split: mode,
+    qty: r.qty,
+    prices: r.prices,
+    from: r.from,
+    to: r.to,
+    outcome: r.unchanged ? 'unchanged' : !r.reason ? 'resplit' : r.reason === 'failed' ? 'failed' : 'skipped',
+    reason: r.reason,
+    error: r.error,
+  });
+  function resplitAfter(o) {
+    const run = _resplitRun.then(() => resplitMaster(o));
+    _resplitRun = run.catch(() => {});
+    return run;
+  }
+  async function resplitMaster({ master, sym, positionId, orderId, before, what }) {
+    const d = { ...who(master), symbol: sym, positionId, after: what };
+    // a lone target or none: nothing to re-split, so nothing to wait for
+    const first = await tryOpenPosition(master, sym, positionId);
+    if (first && !sizedTargets(first.takeProfits || []))
+      return void diag('resplit', { ...d, outcome: 'skipped', reason: unsizedWhy(first.takeProfits || []) });
+    if (orderId && !feedLive()) await sleep(FILL_FIRST_LOOK_MS); // let the fill reach Vest's fill history
+    const f = orderId ? await fillOf(master, sym, orderId) : {};
+    if (!f.fill) {
+      logEvent(
+        'warn',
+        f.missing
+          ? `The ${what} didn't fill: the targets were left as they were.`
+          : `Couldn't confirm the ${what} filled: the targets were left as they were. Check them on Vest.`,
+      );
+      return void diag('resplit', { ...d, outcome: 'skipped', reason: f.missing ? 'not filled' : 'fill unconfirmed' });
+    }
+    if (_exitedHere.has(positionId)) return void diag('resplit', { ...d, outcome: 'skipped', reason: 'position gone' });
+    const mode = splitOf(positionId);
+    const r = await resplitAccount({
+      acct: master,
+      sym,
+      positionId,
+      before,
+      mode,
+      pick: (pos) => ({ tps: pos.takeProfits || [], total: parseFloat(pos.quantity) }),
+      put: (l, qty, price) => {
+        const body = {
+          positionId,
+          executionType: 'market',
+          triggerPrice: price,
+          takeProfitId: l.id,
+          quantity: qty,
+        };
+        const key = resplitKey(body);
+        _resplitting.add(key);
+        setTimeout(() => _resplitting.delete(key), RESPLIT_KEY_MS);
+        return send('PUT', '/v3/positions/take-profit', master, body);
+      },
+    });
+    diag('resplit', resplitRecord(d, mode, r));
+    if (r.reason) {
+      const why = resplitWhy(r, sym);
+      // closed from the panel meanwhile (an exit never waits on this): nothing left to resize
+      if (r.warn && !_exitedHere.has(positionId))
+        logEvent('warn', `${why[0].toUpperCase()}${why.slice(1)}. Check them on Vest.`);
+      return;
+    }
+    if (!r.unchanged)
+      logEvent(
+        'ok',
+        `Targets re-split to ${ladderText(r.side, r.prices, r.to)} (${SPLIT_NAMES[mode]}); their prices stay.`,
+      );
+    const entry = S.armed && S.posMap[positionId];
+    if (entry) resplitFollowers(entry, { orderId, what, mode, targets: r.targets, since: r.since });
+  }
+  // Each follower's own re-split: after its own add or reduce (the copy of the master's order `orderId`) has filled, its
+  // targets at the master's prices are re-split across its own position by the same split. A target placed on it by
+  // hand is never touched, and a sized one keeps its share: the copied ones share the rest. A follower whose add or
+  // reduce didn't happen keeps its targets. Not on the trade's queue, so a close or reduce copied meanwhile never waits
+  // on it (seen live 2026-10-22: reduces back to back reached the followers ~850 ms late); it waits only for the copies
+  // of this add or reduce to be sent, and a trade's re-splits run one at a time.
+  function resplitFollowers(entry, { orderId, what, mode, targets, since }) {
+    const sym = entry.symbol,
+      step = SYMBOLS[sym].step,
+      lc = entry.changes && entry.changes[orderId];
+    if (!lc || lc.kind !== what) {
+      logEvent('info', `↳ the ${what} wasn't copied to the followers: their targets were left as they were.`);
+      return void diag('resplit', { symbol: sym, after: what, outcome: 'skipped', reason: 'not copied' });
+    }
+    const run = (entry.resplitRun || Promise.resolve()).then(async () => {
+      await Promise.resolve(lc.sent).catch(() => {});
+      if (!feedLive()) await sleep(FILL_FIRST_LOOK_MS);
+      await Promise.all(
+        Object.entries(lc.followers).map(async ([f, ch]) => {
+          const fp = entry.followers[f];
+          if (!fp) return;
+          const d = { ...who(f), symbol: sym, positionId: fp.positionId, after: what };
+          if (!ch.orderId) return void diag('resplit', { ...d, split: mode, outcome: 'skipped', reason: ch.why });
+          const fill = await fillOf(f, sym, ch.orderId);
+          if (!fill.fill) {
+            if (!fill.missing)
+              logEvent(
+                'warn',
+                `↳ ${accLabel(f)}: couldn't confirm its ${what} filled: its targets were left as they were. Check them on Vest.`,
+              );
+            const reason = fill.missing ? 'not filled' : 'fill unconfirmed';
+            return void diag('resplit', { ...d, split: mode, outcome: 'skipped', reason });
+          }
+          const r = await resplitAccount({
+            acct: f,
+            sym,
+            positionId: fp.positionId,
+            before: ch.before,
+            mode,
+            pick: (pos) => {
+              // its targets at the master's prices, one each (at the price the master's re-split read, or where that
+              // target was dragged since, as its copy may have landed); a target at another price was placed by hand
+              const left = [...(pos.takeProfits || [])];
+              const tps = targets
+                .map((t) => {
+                  const m = _movedTo[t.id],
+                    alt = m && m.at >= since ? m.price : null,
+                    at = (l) =>
+                      near(parseFloat(l.triggerPrice), t.price) ||
+                      (alt != null && near(parseFloat(l.triggerPrice), alt));
+                  const k = left.findIndex(at);
+                  return k < 0 ? null : left.splice(k, 1)[0];
+                })
+                .filter(Boolean);
+              const hand = left.reduce((a, l) => a + (l.sizeMode !== 'full_position' ? +l.quantity || 0 : 0), 0);
+              return { tps, total: floorStep(parseFloat(pos.quantity) - hand, step) };
+            },
+            put: (l, qty, price) =>
+              acctPut(f, '/v3/positions/take-profit', {
+                positionId: fp.positionId,
+                executionType: 'market',
+                triggerPrice: price,
+                takeProfitId: l.id,
+                quantity: qty,
+              }).then(() => {
+                const fl = (fp.legs || []).find((x) => x.id === l.id);
+                if (fl) fl.qty = qty;
+              }),
+          });
+          diag('resplit', resplitRecord(d, mode, r));
+          if (r.reason) {
+            // the trade closed meanwhile (its close doesn't wait on this): nothing left to resize
+            if (r.warn && Object.values(S.posMap).includes(entry))
+              logEvent('warn', `↳ ${accLabel(f)}: ${resplitWhy(r, sym)}. Check its targets on Vest.`);
+            return;
+          }
+          if (!r.unchanged)
+            logEvent('ok', `↳ targets re-split to ${ladderText(r.side, r.prices, r.to)} on ${accLabel(f)}`);
+        }),
+      );
+    });
+    entry.resplitRun = run.catch(() => {});
+    return run;
   }
 
   // ── Re-anchor after fill (always). The order's stop and targets are computed from the live price at the click.
@@ -13565,7 +13960,8 @@
 
   // ── Adding a stop or a target to the open trade (v0.40): from the buttons above Breakeven / Close (then one click on
   // the chart, or Enter for the saved points) or from the chart's right-click menu (at the price clicked). A target
-  // added to targets already there splits the position evenly across all of them: those are resized first (each PUT
+  // added to targets already there re-splits the position across all of them by the trade's split (Even for a trade
+  // the copier didn't place): those are resized first (each PUT
   // carries its size, else Vest makes the leg full-position), then the new one is added. Everything goes through the
   // hooked fetch, so an armed copier copies each step to the followers, sized to their own positions.
   const MAX_TRADE_TARGETS = 5;
@@ -13639,18 +14035,25 @@
       if (tps.length >= MAX_TRADE_TARGETS) throw new Error(`${MAX_TRADE_TARGETS} targets is the most`);
       if (tps.some((l) => Math.abs(parseFloat(l.triggerPrice) - p) < tick / 2))
         throw new Error(`there's already a target at ${fmt(p)}`);
-      // the targets nearest the entry first; an even split, the odd size steps going to the first ones
+      // the targets nearest the entry first, by the trade's split
       const total = parseFloat(pos.quantity),
         n = tps.length + 1,
         order = [...tps.map((l) => ({ l, price: parseFloat(l.triggerPrice) })), { l: null, price: p }].sort((a, b) =>
           long ? a.price - b.price : b.price - a.price,
         );
       if (n > 1) {
-        const sp = splitQty(total, n, 'even', meta.step);
-        if (sp.error) throw new Error(`${fmtQty(total, sym)} ${meta.label} is too small for ${n} targets`);
-        if (sp.qtys.some((q) => q * p < MIN_LEG_USD))
+        const prices = order.map((o) => o.price),
+          sp = resplitTargets({
+            side: pos.side,
+            prices,
+            total,
+            mode: splitOf(pid),
+            step: meta.step,
+            minUsd: MIN_LEG_USD,
+          });
+        if (sp.error)
           throw new Error(
-            `${fmtQty(total, sym)} ${meta.label} is too small for ${n} targets (Vest's $1 minimum per target)`,
+            `${fmtQty(total, sym)} ${meta.label} is too small for ${n} targets${/minimum/.test(sp.error) ? " (Vest's $1 minimum per target)" : ''}`,
           );
         order.forEach((o, i) => (o.qty = fmtQty(sp.qtys[i], sym)));
       }
@@ -13872,8 +14275,9 @@
   }
 
   // Scale out: take the picked share (25 or 50%) off the master's position at market, with Vest's own reduce order (the
-  // body its close window sends). 100% is a close. The stop and targets stay where they are. It goes through the hooked
-  // fetch, so an armed copier reduces each follower by the same share of its own position.
+  // body its close window sends). 100% is a close. The stop stays where it is; once the reduce has filled, the sized
+  // targets are re-split across what's left (resplitAfter). It goes through the hooked fetch, so an armed copier reduces
+  // each follower by the same share of its own position, and each follower re-splits its own targets.
   async function reduceNow() {
     if (exitBlocks()) return;
     const key = S.addPick || '25';
@@ -13904,10 +14308,10 @@
         reduceOnly: true,
         symbol: sym,
       };
-      await send('POST', '/v3/positions/reduce', master, body);
+      const res = await send('POST', '/v3/positions/reduce', master, body);
       logEvent(
         'ok',
-        `Trade panel: REDUCE ${body.quantity} ${meta.label} (${fmtQty(have, sym)} → ${fmtQty(have - q, sym)})${S.armed ? ' — the copier reduces the followers' : ''}. Stop and targets unchanged.`,
+        `Trade panel: REDUCE ${body.quantity} ${meta.label} (${fmtQty(have, sym)} → ${fmtQty(have - q, sym)})${S.armed ? ' — the copier reduces the followers' : ''}. The stop stays where it is.`,
       );
       diag('trade_panel', {
         outcome: 'reduced',
@@ -13916,6 +14320,9 @@
         prevQty: have,
         readFirst: pos.read,
       });
+      adjust(() =>
+        resplitAfter({ master, sym, positionId: pos.id, orderId: res.orderId, before: have, what: 'reduce' }),
+      );
     } catch (e) {
       logEvent('warn', exitFailed('Reduce', 'reduce', sent, e));
       diag('trade_panel', { outcome: 'reduce-failed', error: e.message, errorCode: errCode(e) });
@@ -14615,7 +15022,7 @@
       addBtn.title =
         c.pick && c.pick.why
           ? `Add: ${c.pick.why}`
-          : `Add ${fmtQty(c.qty, h.symbol)} to the ${h.side}${S.armed ? ' (the copier adds to each follower, scaled)' : ''}. The stop and targets stay where they are.`;
+          : `Add ${fmtQty(c.qty, h.symbol)} to the ${h.side}${S.armed ? ' (the copier adds to each follower, scaled)' : ''}. The stop stays where it is; sized targets are re-split to the new size.`;
       redBtn.textContent = key === '100' ? 'Reduce all' : redQ > 0 ? `Reduce ${fmtQty(redQ, h.symbol)}` : 'Reduce';
       redBtn.disabled = exitBusy || key === 'max' || !(redQ > 0);
       redBtn.title =
@@ -14654,7 +15061,7 @@
       } else if (addQ > 0 && c.price > 0) {
         pvHtml = `<span>→ <b>${fmtQty(tot, h.symbol)}</b> · avg <b>${fmtPx(avgA, tick)}</b></span>${o && o.loss > 0 ? `<span>stop-out <b>${fmtUsd(o.loss)}</b></span>` : ''}`;
         pvTitle =
-          'After this add: the new size and average, and what a stop-out would then cost. The stop and targets stay where they are.';
+          'After this add: the new size and average, and what a stop-out would then cost. The stop stays where it is; sized targets are re-split to the new size.';
       }
       if ($('tr-addpv').dataset.html !== pvHtml) $('tr-addpv').innerHTML = $('tr-addpv').dataset.html = pvHtml;
       $('tr-addpv').title = pvTitle;
@@ -15008,8 +15415,8 @@
           'hidesessions',
           S.hideSessions,
           'Hide session shading',
-          "Remove Vest's pre-market and overnight bands.",
-          'Removes the pre-market, after-hours and overnight bands Vest draws on the chart (its Market Sessions indicator), every time it adds them.',
+          "Hide Vest's pre-market and overnight bands.",
+          "Hides the pre-market, after-hours and overnight bands Vest draws on the chart (the eye on its Market Sessions indicator). Switch it off and they show again at once. Vest's own Session shading setting still decides whether it draws them.",
         )}
         <div class="set-h">Theme</div>
         ${option(
@@ -15163,7 +15570,6 @@
         if (alias[val]) return alias[val];
         if (isUuid(val) && ACCOUNT_KEYS.has(k) && (k !== 'id' || 'label' in this)) return nameFor(val);
         // account ids inside longer text, e.g. an error message holding an API path with the id in it
-        if (isUuid(val)) return val; // a position or order id in its own field: kept (it ties related events together)
         if (isUuid(val)) return val; // a position or order id in its own field: kept (it ties related events together)
         return val.replace(/[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}/gi, textName);
       });
@@ -17273,7 +17679,7 @@
     const c = S.claim;
     if (!c && S.armed)
       return `<div class="claim"><button class="ghostbtn claim-go" data-claim="preview" disabled>Claim all profit…</button>
-        <div class="sum-note">Stop copying to claim profit: a trade copied mid-claim would change what each account
+        <div class="sum-note warn">Stop copying to claim profit: a trade copied mid-claim would change what each account
         can claim.</div></div>`;
     if (!c)
       return `<div class="claim"><button class="ghostbtn claim-go" data-claim="preview">Claim all profit…</button>

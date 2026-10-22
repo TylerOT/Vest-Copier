@@ -2,6 +2,18 @@
 
 Newest first. To update, click **Install** on the update row that appears in the panel whenever there's a newer version.
 
+## v0.41.2
+Your targets follow your position when you add or reduce.
+
+- **Adding or reducing re-splits your targets.** With two or more targets, an add from the Trade tab left them at the sizes they had at entry, so part of the bigger position had no target: after an add from 0.0085 to 0.0257 NQ, three targets of 0.0029 / 0.0028 / 0.0028 covered a third of it. Now, once Vest confirms the add or reduce filled, each target keeps its price and gets its share of the new size, by the split you placed the trade with (Start, Even or End). A target already hit is left out, and one you moved keeps its new price. Your stop doesn't change.
+- **Followers too:** each follower re-splits its own targets across its own position once its own add or reduce has filled. A target you placed on a follower yourself is never touched.
+- **+ Add target follows the trade's split** (it always split evenly before).
+- A single target already closes your whole position, so it's left alone. Adds and reduces made on Vest's own order form are copied as before and leave your targets as they are.
+- **Session shading comes back when you turn Hide session shading off,** right away. The copier now hides Vest's pre-market and overnight bands instead of removing them.
+- **Buy/Long is easy to read with the STRATUH theme:** dark text on the lime button, on Vest's order form and its confirmation.
+- **Clearer reasons in the Trade tab and P&L:** an add that's too big now says "a stop-out would end below the $4,800 floor" instead of "past floor", and the note saying to stop copying before claiming profit shows in amber while copying is on.
+- **Turning the STRATUH theme off now brings back Vest's own chart background.** Vest now saves your chart's colours to your account, so the copier's colours could stay after turning the theme off. If your chart still has STRATUH colours after removing the copier, open the chart's settings and use Apply defaults.
+
 ## v0.41.1
 Your followers' stops and targets stay in step with yours, and the names you give your accounts on Vest show in the panel.
 
